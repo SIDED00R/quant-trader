@@ -1,13 +1,13 @@
 CREATE TABLE IF NOT EXISTS accounts (
     account_id   TEXT PRIMARY KEY,
-    krw_balance  NUMERIC(20,4) NOT NULL,
+    krw_balance  NUMERIC(20,4) NOT NULL CHECK (krw_balance >= 0),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS positions (
     account_id     TEXT NOT NULL REFERENCES accounts(account_id),
     symbol         TEXT NOT NULL,
-    quantity       NUMERIC(28,12) NOT NULL DEFAULT 0,
+    quantity       NUMERIC(28,12) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     avg_buy_price  NUMERIC(20,4) NOT NULL DEFAULT 0,
     PRIMARY KEY (account_id, symbol)
 );
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS executions (
     execution_id  UUID PRIMARY KEY,
     order_id      UUID NOT NULL REFERENCES orders(order_id),
-    account_id    TEXT NOT NULL,
+    account_id    TEXT NOT NULL REFERENCES accounts(account_id),
     symbol        TEXT NOT NULL,
     side          TEXT NOT NULL,
     price         NUMERIC(20,4) NOT NULL,
