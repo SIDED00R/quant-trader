@@ -3,26 +3,14 @@ import json
 import time
 from datetime import datetime
 
-from confluent_kafka import Consumer
-
-from common.clickhouse_client import create_client, ensure_schema
-from common.config import KAFKA_BOOTSTRAP_SERVERS, TOPIC_TICKS
+from common.clickhouse_client import create_client
+from common.config import TOPIC_TICKS
+from common.kafka_client import create_consumer
 
 GROUP_ID = "tick-clickhouse-sink"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
 COLUMNS = ["symbol", "price", "volume", "side", "trade_ts"]
-
-
-def create_consumer() -> Consumer:
-    return Consumer(
-        {
-            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
-            "group.id": GROUP_ID,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,
-        }
-    )
 
 
 def parse_row(value: bytes) -> list:
@@ -38,8 +26,7 @@ def parse_row(value: bytes) -> list:
 
 def run() -> None:
     client = create_client()
-    ensure_schema(client)
-    consumer = create_consumer()
+    consumer = create_consumer(GROUP_ID)
     consumer.subscribe([TOPIC_TICKS])
     print(f"[sink] consuming {TOPIC_TICKS} → ClickHouse ticks")
 

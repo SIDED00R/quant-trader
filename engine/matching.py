@@ -4,35 +4,18 @@ market.ticks + orders 를 동시 소비한다.
 - 종목별 최신가(latest_price)를 틱으로 갱신
 - 시장가 주문은 최신가로 즉시 체결, 가격 미확인 종목은 pending에 보관 후 첫 틱에 체결
 - 지정가(LIMIT)는 기능 #7에서 처리
+
+주의: latest_price/pending이 인메모리이므로 이 엔진은 단일 인스턴스로만 실행한다.
 """
 import json
 import uuid
 from datetime import datetime, timezone
 
-from confluent_kafka import Consumer
-
-from common.config import (
-    FEE_RATE,
-    KAFKA_BOOTSTRAP_SERVERS,
-    TOPIC_EXECUTIONS,
-    TOPIC_ORDERS,
-    TOPIC_TICKS,
-)
-from common.kafka_client import create_producer
+from common.config import FEE_RATE, TOPIC_EXECUTIONS, TOPIC_ORDERS, TOPIC_TICKS
+from common.kafka_client import create_consumer, create_producer
 from common.schemas import Execution
 
 GROUP_ID = "matching-engine"
-
-
-def create_consumer() -> Consumer:
-    return Consumer(
-        {
-            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
-            "group.id": GROUP_ID,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": True,
-        }
-    )
 
 
 def execute(order: dict, price: float, producer) -> None:
@@ -55,7 +38,7 @@ def execute(order: dict, price: float, producer) -> None:
 
 def run() -> None:
     producer = create_producer()
-    consumer = create_consumer()
+    consumer = create_consumer(GROUP_ID, enable_auto_commit=True)
     consumer.subscribe([TOPIC_TICKS, TOPIC_ORDERS])
     latest_price: dict[str, float] = {}
     pending: dict[str, list[dict]] = {}
