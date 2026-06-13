@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS ticks (
     volume     Float64,
     side       LowCardinality(String),
     trade_ts   DateTime64(3, 'UTC'),
+    seq        UInt64,
     ingest_ts  DateTime64(3, 'UTC') DEFAULT now64(3)
 )
-ENGINE = MergeTree
-ORDER BY (symbol, trade_ts);
+ENGINE = ReplacingMergeTree(ingest_ts)
+ORDER BY (symbol, seq);

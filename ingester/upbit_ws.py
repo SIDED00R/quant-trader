@@ -3,6 +3,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import websockets
 
@@ -26,8 +27,8 @@ def build_subscribe(symbols: list[str]) -> str:
 def to_tick(msg: dict) -> Tick:
     return Tick(
         symbol=msg["code"],
-        price=float(msg["trade_price"]),
-        volume=float(msg["trade_volume"]),
+        price=Decimal(msg["trade_price"]),
+        volume=Decimal(msg["trade_volume"]),
         side=msg["ask_bid"],
         trade_ts=datetime.fromtimestamp(
             msg["trade_timestamp"] / 1000, tz=timezone.utc
@@ -44,7 +45,7 @@ async def run() -> None:
             await ws.send(build_subscribe(SYMBOLS))
             count = 0
             async for raw in ws:
-                msg = json.loads(raw)
+                msg = json.loads(raw, parse_float=Decimal)
                 if msg.get("type") != "trade":
                     continue
                 tick = to_tick(msg)

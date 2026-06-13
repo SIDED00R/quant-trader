@@ -15,6 +15,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from common.config import FEE_RATE, TOPIC_EXECUTIONS, TOPIC_ORDERS, TOPIC_TICKS
 from common.kafka_client import create_consumer, create_producer
@@ -48,9 +49,9 @@ def load_pending_orders() -> dict[str, list[dict]]:
     return pending
 
 
-def execute(order: dict, price: float, producer) -> None:
-    qty = float(order["quantity"])
-    fee = round(price * qty * FEE_RATE, 4)
+def execute(order: dict, price: Decimal, producer) -> None:
+    qty = Decimal(str(order["quantity"]))
+    fee = (price * qty * FEE_RATE).quantize(Decimal("0.0001"))
     ex = Execution(
         execution_id=str(uuid.uuid5(EXEC_NAMESPACE, order["order_id"])),
         order_id=order["order_id"],
@@ -70,7 +71,7 @@ def run() -> None:
     producer = create_producer()
     consumer = create_consumer(GROUP_ID, enable_auto_commit=False)
     consumer.subscribe([TOPIC_TICKS, TOPIC_ORDERS])
-    latest_price: dict[str, float] = {}
+    latest_price: dict[str, Decimal] = {}
     pending = load_pending_orders()
     print(f"[engine] started (reseeded {sum(len(v) for v in pending.values())} pending orders)")
     last_commit = time.monotonic()
@@ -85,7 +86,7 @@ def run() -> None:
                 data = json.loads(msg.value())
                 if msg.topic() == TOPIC_TICKS:
                     symbol = data["symbol"]
-                    latest_price[symbol] = float(data["price"])
+                    latest_price[symbol] = Decimal(str(data["price"]))
                     for order in pending.pop(symbol, []):
                         execute(order, latest_price[symbol], producer)
                 elif msg.topic() == TOPIC_ORDERS:
