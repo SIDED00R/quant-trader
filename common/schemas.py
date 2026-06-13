@@ -29,3 +29,19 @@ class Order:
 
     def to_json(self) -> bytes:
         return json.dumps(asdict(self)).encode("utf-8")
+
+
+@dataclass
+class Execution:
+    execution_id: str
+    order_id: str
+    account_id: str
+    symbol: str
+    side: str
+    price: float
+    quantity: float
+    fee: float
+    ts: str               # ISO8601 (UTC)
+
+    def to_json(self) -> bytes:
+        return json.dumps(asdict(self)).encode("utf-8")
