@@ -48,7 +48,30 @@ docker compose down            # 컨테이너 제거 (볼륨 유지)
 docker compose down -v         # 볼륨까지 삭제
 ```
 
-접속 정보: Kafka `localhost:9092` · PostgreSQL `localhost:5432` · ClickHouse HTTP `localhost:8123`
+접속 정보: Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123`
+(컨테이너 포트는 보안상 `127.0.0.1` 루프백에만 바인딩. Windows에서 `localhost`가 IPv6 `::1`로 풀리는 문제를 피하려 호스트 접속은 `127.0.0.1`을 사용합니다.)
+
+### 서비스 실행 (각각 별도 터미널)
+
+```bash
+.venv/Scripts/python -m ingester.upbit_ws      # 업비트 WS → market.ticks
+.venv/Scripts/python -m sink.tick_clickhouse   # market.ticks → ClickHouse
+.venv/Scripts/python -m engine.matching        # 체결 엔진(시장가)
+.venv/Scripts/python -m portfolio.updater      # executions → 잔고/포지션
+.venv/Scripts/python -m relay.order_relay      # 주문 outbox → orders 토픽
+.venv/Scripts/python -m uvicorn api.main:app --port 8000   # 주문 API
+
+# 주문 넣고 잔고 확인
+curl -X POST 127.0.0.1:8000/orders -H "Content-Type: application/json" \
+  -d '{"symbol":"KRW-BTC","side":"BUY","type":"MARKET","quantity":0.001}'
+curl 127.0.0.1:8000/accounts/demo
+```
+
+## 알려진 한계 (학습용 MVP)
+
+- **체결 엔진은 단일 인스턴스 전제**: 최신가·pending이 인메모리이고 ticks/orders가 별도 토픽이라, 컨슈머 그룹으로 스케일아웃하면 파티션 분배가 어긋나 동작이 깨진다. 재시작 직후 워밍업 구간에는 약간 과거 가격으로 체결될 수 있다(틱 재생 기반).
+- **정밀도 분리**: 금액·수량은 Postgres `NUMERIC` + Python `Decimal`로 무손실 처리. ClickHouse `ticks`는 분석용이라 `Float64`.
+- **모의 체결**: 사용자 간 호가 매칭 없이 실시간 최신가로 체결한다.
 
 ## 진행 상태
 

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
 
 SYMBOLS = [
     s.strip()
@@ -17,10 +17,10 @@ SYMBOLS = [
 TOPIC_TICKS = "market.ticks"
 
 # ── ClickHouse ──
-CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "127.0.0.1")
 CLICKHOUSE_HTTP_PORT = int(os.getenv("CLICKHOUSE_HTTP_PORT", "8123"))
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
-CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
+CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "ch_pw")
 CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
 
 # ── Kafka 토픽 ──
@@ -31,7 +31,7 @@ TOPIC_EXECUTIONS = "executions"
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 
 # ── PostgreSQL ──
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_USER = os.getenv("POSTGRES_USER", "trader")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "trader_pw")
