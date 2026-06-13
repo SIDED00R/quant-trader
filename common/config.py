@@ -26,6 +26,9 @@ CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
 TOPIC_ORDERS = "orders"
 TOPIC_EXECUTIONS = "executions"
 
+# ── 거래 ──
+FEE_RATE = float(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
