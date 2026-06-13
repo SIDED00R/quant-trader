@@ -20,6 +20,33 @@
 
 전체 설계는 [DESIGN.md](DESIGN.md) 참고.
 
+## 로컬 실행 (인프라)
+
+```bash
+# 1) 환경변수 준비
+cp .env.example .env
+
+# 2) 인프라 기동 (Kafka + PostgreSQL + ClickHouse + 토픽 자동 생성)
+docker compose up -d
+
+# 3) 검증
+docker compose ps                                   # 컨테이너 상태 확인
+docker compose logs kafka-init                       # 생성된 토픽 목록 확인
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+
+# 4) produce/consume 왕복 테스트
+docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 --topic market.ticks   # 입력 후 메시지 타이핑
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 --topic market.ticks --from-beginning --max-messages 1
+
+# 종료
+docker compose down            # 컨테이너 제거 (볼륨 유지)
+docker compose down -v         # 볼륨까지 삭제
+```
+
+접속 정보: Kafka `localhost:9092` · PostgreSQL `localhost:5432` · ClickHouse HTTP `localhost:8123`
+
 ## 진행 상태
 
 - [ ] 0. 로컬 인프라 (docker-compose)
