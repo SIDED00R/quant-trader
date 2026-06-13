@@ -29,6 +29,9 @@ cp .env.example .env
 # 2) 인프라 기동 (Kafka + PostgreSQL + ClickHouse + 토픽 자동 생성)
 docker compose up -d
 
+# 2-1) DB 스키마 1회 적용 (앱 런타임과 분리)
+.venv/Scripts/python -m scripts.init_db
+
 # 3) 검증
 docker compose ps                                   # 컨테이너 상태 확인
 docker compose logs kafka-init                       # 생성된 토픽 목록 확인

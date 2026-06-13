@@ -1,28 +1,15 @@
 """포트폴리오 서비스 (단일 책임: executions → Postgres 잔고/포지션).
 
-executions 토픽을 소비해 잔고/포지션을 갱신하고 주문을 FILLED 처리한다.
-execution_id PK로 멱등 처리하여 중복 체결을 막는다(exactly-once 효과).
-DB 트랜잭션이 끝난 뒤 오프셋을 수동 커밋한다.
+executions 토픽을 at-least-once로 소비하고, execution_id PK로 멱등 처리하여
+중복 체결 적용을 막는다. DB 트랜잭션이 끝난 뒤 오프셋을 수동 커밋한다.
 """
 import json
 
-from confluent_kafka import Consumer
-
-from common.config import KAFKA_BOOTSTRAP_SERVERS, TOPIC_EXECUTIONS
-from common.postgres_client import close_pool, ensure_schema, open_pool, pool
+from common.config import TOPIC_EXECUTIONS
+from common.kafka_client import create_consumer
+from common.postgres_client import close_pool, open_pool, pool
 
 GROUP_ID = "portfolio-updater"
-
-
-def create_consumer() -> Consumer:
-    return Consumer(
-        {
-            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
-            "group.id": GROUP_ID,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,
-        }
-    )
 
 
 def apply_execution(conn, ex: dict) -> bool:
@@ -74,8 +61,7 @@ def apply_execution(conn, ex: dict) -> bool:
 
 def run() -> None:
     open_pool()
-    ensure_schema()
-    consumer = create_consumer()
+    consumer = create_consumer(GROUP_ID)
     consumer.subscribe([TOPIC_EXECUTIONS])
     print("[portfolio] started")
     try:
