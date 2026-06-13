@@ -14,3 +14,18 @@ class Tick:
 
     def to_json(self) -> bytes:
         return json.dumps(asdict(self)).encode("utf-8")
+
+
+@dataclass
+class Order:
+    order_id: str
+    account_id: str
+    symbol: str
+    side: str             # BUY | SELL
+    type: str             # MARKET | LIMIT
+    price: float | None   # LIMIT일 때만
+    quantity: float
+    ts: str               # ISO8601 (UTC)
+
+    def to_json(self) -> bytes:
+        return json.dumps(asdict(self)).encode("utf-8")
