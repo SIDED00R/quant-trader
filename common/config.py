@@ -21,3 +21,18 @@ CLICKHOUSE_HTTP_PORT = int(os.getenv("CLICKHOUSE_HTTP_PORT", "8123"))
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
 CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
+
+# ── Kafka 토픽 ──
+TOPIC_ORDERS = "orders"
+TOPIC_EXECUTIONS = "executions"
+
+# ── PostgreSQL ──
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_USER = os.getenv("POSTGRES_USER", "trader")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "trader_pw")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "coin_trading")
+POSTGRES_DSN = (
+    f"host={POSTGRES_HOST} port={POSTGRES_PORT} user={POSTGRES_USER} "
+    f"password={POSTGRES_PASSWORD} dbname={POSTGRES_DB}"
+)
