@@ -54,7 +54,7 @@ docker compose down -v         # 볼륨까지 삭제
 - [x] 2. 틱 Sink → ClickHouse
 - [x] 3. 주문 API + Postgres 스키마
 - [x] 4. 체결 엔진 (시장가)
-- [ ] 5. 포트폴리오 서비스
+- [x] 5. 포트폴리오 서비스
 - [ ] 6. 캔들 집계기 → ClickHouse
 - [ ] 7. 지정가 주문
 - [ ] 8. Grafana 대시보드
