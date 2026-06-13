@@ -1,5 +1,6 @@
 """환경 설정 로딩 (단일 책임: 설정)."""
 import os
+from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -27,7 +28,7 @@ TOPIC_ORDERS = "orders"
 TOPIC_EXECUTIONS = "executions"
 
 # ── 거래 ──
-FEE_RATE = float(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
+FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")

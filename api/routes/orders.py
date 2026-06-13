@@ -1,6 +1,7 @@
 """주문 생성 라우트 (단일 책임: 주문 접수)."""
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -37,6 +38,8 @@ def create_order(req: OrderRequest, request: Request):
 
     order_id = uuid.uuid4()
     ts = datetime.now(timezone.utc).isoformat()
+    quantity = Decimal(str(req.quantity))
+    price = Decimal(str(req.price)) if req.price is not None else None
 
     with pool.connection() as conn:
         exists = conn.execute(
@@ -47,7 +50,7 @@ def create_order(req: OrderRequest, request: Request):
         conn.execute(
             "INSERT INTO orders (order_id, account_id, symbol, side, type, price, quantity, status) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,'PENDING')",
-            (order_id, req.account_id, req.symbol, req.side, req.type, req.price, req.quantity),
+            (order_id, req.account_id, req.symbol, req.side, req.type, price, quantity),
         )
 
     order = Order(
@@ -56,8 +59,8 @@ def create_order(req: OrderRequest, request: Request):
         symbol=req.symbol,
         side=req.side,
         type=req.type,
-        price=req.price,
-        quantity=req.quantity,
+        price=price,
+        quantity=quantity,
         ts=ts,
     )
     producer = request.app.state.producer

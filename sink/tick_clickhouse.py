@@ -10,7 +10,7 @@ from common.kafka_client import create_consumer
 GROUP_ID = "tick-clickhouse-sink"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
-COLUMNS = ["symbol", "price", "volume", "side", "trade_ts"]
+COLUMNS = ["symbol", "price", "volume", "side", "trade_ts", "seq"]
 
 
 def parse_row(value: bytes) -> list:
@@ -21,6 +21,7 @@ def parse_row(value: bytes) -> list:
         float(t["volume"]),
         t["side"],
         datetime.fromisoformat(t["trade_ts"]),
+        int(t["seq"]),
     ]
 
 
