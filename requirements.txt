@@ -1,0 +1,3 @@
+confluent-kafka>=2.6
+websockets>=13
+python-dotenv>=1

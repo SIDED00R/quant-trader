@@ -49,8 +49,8 @@ docker compose down -v         # 볼륨까지 삭제
 
 ## 진행 상태
 
-- [ ] 0. 로컬 인프라 (docker-compose)
-- [ ] 1. Market 수집기 (업비트 WS → market.ticks)
+- [x] 0. 로컬 인프라 (docker-compose)
+- [x] 1. Market 수집기 (업비트 WS → market.ticks)
 - [ ] 2. 틱 Sink → ClickHouse
 - [ ] 3. 주문 API + Postgres 스키마
 - [ ] 4. 체결 엔진 (시장가)
