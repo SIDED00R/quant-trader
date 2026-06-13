@@ -4,16 +4,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from api.routes import account, orders
-from common.kafka_client import create_producer
 from common.postgres_client import close_pool, open_pool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     open_pool()
-    app.state.producer = create_producer()
     yield
-    app.state.producer.flush(5)
     close_pool()
 
 

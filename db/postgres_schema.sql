@@ -36,6 +36,18 @@ CREATE TABLE IF NOT EXISTS executions (
     executed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 주문 발행 아웃박스: 주문 INSERT와 같은 트랜잭션에 기록 → orders 토픽 발행을 원자적으로 보장
+CREATE TABLE IF NOT EXISTS order_outbox (
+    id          BIGSERIAL PRIMARY KEY,
+    order_id    UUID NOT NULL,
+    symbol      TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    published   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON order_outbox (id) WHERE NOT published;
+
 INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;
