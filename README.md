@@ -84,4 +84,4 @@ curl 127.0.0.1:8000/accounts/demo
 - [x] 6. 캔들 집계기 → ClickHouse
 - [x] 7. 지정가 주문
 - [x] 8. Grafana 대시보드
-- [ ] 9. GCP 배포
+- [ ] 9. GCP 배포 (설계 완료: [DEPLOY.md](DEPLOY.md), 실제 배포 미착수)
