@@ -141,3 +141,29 @@ infra/terraform/
 - Kafka: Managed Service vs Confluent Cloud.
 - ClickHouse: GCE self-host vs ClickHouse Cloud.
 - Grafana: Grafana Cloud(무료) vs self-host.
+
+---
+
+## 11. 실제 배포 (저비용 단일 VM) — 적용됨
+
+비용 최소화를 위해 매니지드 서비스 대신 **단일 GCE VM에 docker-compose 풀스택**으로 배포했다.
+
+- 프로젝트: `coin-auto-trader-jvfhgq`, 존: `us-central1-a` (최저가 리전)
+- VM: `coin-trader-vm`, `e2-medium`(2vCPU/4GB), `pd-standard` 30GB, Ubuntu 22.04
+- 부팅 스크립트: [infra/gce-startup.sh](infra/gce-startup.sh) — Docker 설치 → 레포 클론 → `docker compose --profile app up -d --build` (+ 4GB 스왑으로 OOM 방지)
+- 예산 알림: 결제계정에 30,000 (50/90/100%) 설정됨
+- 포트는 VM 루프백에만 바인딩 → 외부 비노출, 접속은 SSH 터널
+
+### 접속 (SSH 터널)
+```bash
+gcloud compute ssh coin-trader-vm --zone=us-central1-a -- -L 3000:localhost:3000 -L 8000:localhost:8000
+# 브라우저 http://localhost:3000 (admin/admin), API http://localhost:8000
+```
+
+### 💰 비용 절감 — 안 쓸 때 VM 중지/삭제 (중요)
+```bash
+gcloud compute instances stop  coin-trader-vm --zone=us-central1-a   # 중지(디스크만 ~$2/월)
+gcloud compute instances start coin-trader-vm --zone=us-central1-a   # 재시작(startup이 재기동)
+gcloud compute instances delete coin-trader-vm --zone=us-central1-a  # 완전 삭제(과금 종료)
+```
+> e2-medium 가동 시 약 $24/월, 중지 시 디스크만 ~$2/월. 학습 후 **중지 또는 삭제** 권장.
