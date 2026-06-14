@@ -23,3 +23,6 @@ Thumbs.db
 
 # Docker volumes (local)
 docker/volumes/
+
+# 내부 문서 (GitHub 비공개 — 구현 상세/설계 근거)
+/IMPLEMENTATION.md
