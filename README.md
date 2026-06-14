@@ -81,7 +81,7 @@ curl 127.0.0.1:8000/accounts/demo
 - [x] 3. 주문 API + Postgres 스키마
 - [x] 4. 체결 엔진 (시장가)
 - [x] 5. 포트폴리오 서비스
-- [ ] 6. 캔들 집계기 → ClickHouse
+- [x] 6. 캔들 집계기 → ClickHouse
 - [ ] 7. 지정가 주문
 - [ ] 8. Grafana 대시보드
 - [ ] 9. GCP 배포
