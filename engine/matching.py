@@ -1,15 +1,17 @@
-"""체결 엔진 (단일 책임: 시장가 주문 매칭 → executions).
+"""체결 엔진 (단일 책임: 주문 매칭 → executions).
 
 market.ticks + orders 를 동시 소비한다.
 - 종목별 최신가(latest_price)를 틱으로 갱신
-- 시장가 주문은 최신가로 즉시 체결, 가격 미확인 종목은 pending에 보관 후 첫 틱에 체결
-- 지정가(LIMIT)는 기능 #7에서 처리
+- 시장가(MARKET): 최신가로 즉시 체결, 가격 미확인 종목은 pending에 보관 후 첫 틱에 체결
+- 지정가(LIMIT): 가격 조건 충족 시 지정가로 체결, 미충족이면 limit_orders에 보관 후 매 틱에 재확인
+  · BUY  LIMIT: 시장가 <= 지정가 → 체결
+  · SELL LIMIT: 시장가 >= 지정가 → 체결
 
 견고성:
 - execution_id는 order_id 기반 결정적 값(uuid5) → 재소비 시에도 portfolio가 멱등 처리
-- 기동 시 DB의 PENDING 시장가 주문을 pending으로 재적재 → 재시작에도 주문 유실 없음
-- enable.auto.commit=False, executions를 flush로 브로커 확정 후 오프셋 커밋
-- latest_price/pending이 인메모리이므로 이 엔진은 단일 인스턴스로만 실행한다.
+- 기동 시 DB의 PENDING 주문(MARKET/LIMIT)을 재적재 → 재시작에도 주문 유실 없음
+- enable.auto.commit=False, executions를 flush로 확정 전송 후 오프셋 커밋
+- latest_price/pending/limit_orders가 인메모리이므로 이 엔진은 단일 인스턴스로만 실행한다.
 """
 import json
 import time
@@ -24,29 +26,44 @@ from common.schemas import Execution
 
 GROUP_ID = "matching-engine"
 COMMIT_SEC = 1.0
-# order_id로부터 결정적 execution_id를 만들기 위한 네임스페이스
 EXEC_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "coin-auto-trader.executions")
 
 
-def load_pending_orders() -> dict[str, list[dict]]:
-    """기동 시 DB의 미체결(PENDING) 시장가 주문을 재적재한다."""
+def load_pending_orders() -> tuple[dict, dict]:
+    """기동 시 DB의 미체결(PENDING) 주문을 시장가/지정가로 나눠 재적재한다."""
     pending: dict[str, list[dict]] = {}
+    limit_orders: dict[str, list[dict]] = {}
     open_pool()
     try:
         with pool.connection() as conn:
             rows = conn.execute(
-                "SELECT order_id, account_id, symbol, side, type, quantity "
-                "FROM orders WHERE status='PENDING' AND type='MARKET'"
+                "SELECT order_id, account_id, symbol, side, type, price, quantity "
+                "FROM orders WHERE status='PENDING'"
             ).fetchall()
     finally:
         close_pool()
     for r in rows:
         order = {
             "order_id": str(r[0]), "account_id": r[1], "symbol": r[2],
-            "side": r[3], "type": r[4], "quantity": float(r[5]),
+            "side": r[3], "type": r[4], "price": r[5], "quantity": r[6],
         }
-        pending.setdefault(r[2], []).append(order)
-    return pending
+        bucket = pending if r[4] == "MARKET" else limit_orders
+        bucket.setdefault(r[2], []).append(order)
+    return pending, limit_orders
+
+
+def limit_fill_price(order: dict, market_price: Decimal):
+    """지정가 조건 충족 시 체결가(=시장가, 지정가보다 유리)를 반환, 아니면 None.
+
+    지정가는 트리거 임계값일 뿐이며, 실제 체결은 트리거 시점의 시장가로 한다
+    (BUY는 지정가 이하, SELL은 지정가 이상이라 항상 트레이더에게 유리하거나 같다).
+    """
+    limit = Decimal(str(order["price"]))
+    if order["side"] == "BUY" and market_price <= limit:
+        return market_price
+    if order["side"] == "SELL" and market_price >= limit:
+        return market_price
+    return None
 
 
 def execute(order: dict, price: Decimal, producer) -> None:
@@ -64,7 +81,7 @@ def execute(order: dict, price: Decimal, producer) -> None:
         ts=datetime.now(timezone.utc).isoformat(),
     )
     producer.produce(TOPIC_EXECUTIONS, key=order["symbol"].encode(), value=ex.to_json())
-    print(f"[engine] filled {order['side']} {order['symbol']} qty={qty} @ {price} (fee={fee})")
+    print(f"[engine] filled {order['side']} {order['type']} {order['symbol']} qty={qty} @ {price} (fee={fee})")
 
 
 def run() -> None:
@@ -72,10 +89,11 @@ def run() -> None:
     consumer = create_consumer(GROUP_ID, enable_auto_commit=False)
     consumer.subscribe([TOPIC_TICKS, TOPIC_ORDERS])
     latest_price: dict[str, Decimal] = {}
-    pending = load_pending_orders()
-    print(f"[engine] started (reseeded {sum(len(v) for v in pending.values())} pending orders)")
+    pending, limit_orders = load_pending_orders()
+    print(f"[engine] started (reseeded {sum(len(v) for v in pending.values())} market, "
+          f"{sum(len(v) for v in limit_orders.values())} limit)")
     last_commit = time.monotonic()
-    consumed = False  # 마지막 커밋 이후 소비한 메시지가 있는가
+    consumed = False
 
     try:
         while True:
@@ -86,19 +104,34 @@ def run() -> None:
                 data = json.loads(msg.value())
                 if msg.topic() == TOPIC_TICKS:
                     symbol = data["symbol"]
-                    latest_price[symbol] = Decimal(str(data["price"]))
+                    price = Decimal(str(data["price"]))
+                    latest_price[symbol] = price
                     for order in pending.pop(symbol, []):
-                        execute(order, latest_price[symbol], producer)
+                        execute(order, price, producer)
+                    if symbol in limit_orders:
+                        still_waiting = []
+                        for order in limit_orders[symbol]:
+                            fill = limit_fill_price(order, price)
+                            if fill is not None:
+                                execute(order, fill, producer)
+                            else:
+                                still_waiting.append(order)
+                        limit_orders[symbol] = still_waiting
                 elif msg.topic() == TOPIC_ORDERS:
+                    symbol = data["symbol"]
                     if data.get("type") == "MARKET":
-                        symbol = data["symbol"]
                         if symbol in latest_price:
                             execute(data, latest_price[symbol], producer)
                         else:
                             pending.setdefault(symbol, []).append(data)
-                    # 지정가(LIMIT)는 기능 #7에서 처리
+                    elif data.get("type") == "LIMIT":
+                        fill = (limit_fill_price(data, latest_price[symbol])
+                                if symbol in latest_price else None)
+                        if fill is not None:
+                            execute(data, fill, producer)
+                        else:
+                            limit_orders.setdefault(symbol, []).append(data)
 
-            # executions를 브로커에 확정 전송한 뒤에만 오프셋 커밋
             if consumed and now - last_commit >= COMMIT_SEC:
                 producer.flush()
                 consumer.commit(asynchronous=False)
