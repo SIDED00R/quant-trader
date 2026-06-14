@@ -48,7 +48,7 @@ docker compose down            # 컨테이너 제거 (볼륨 유지)
 docker compose down -v         # 볼륨까지 삭제
 ```
 
-접속 정보: Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123` · Grafana `127.0.0.1:3000` (admin/admin)
+접속 정보: 웹 대시보드 `127.0.0.1:8000` · Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123` · Grafana `127.0.0.1:3000` (admin/admin)
 (컨테이너 포트는 보안상 `127.0.0.1` 루프백에만 바인딩. Windows에서 `localhost`가 IPv6 `::1`로 풀리는 문제를 피하려 호스트 접속은 `127.0.0.1`을 사용합니다.)
 
 ### 서비스 실행 (각각 별도 터미널)
@@ -66,6 +66,12 @@ curl -X POST 127.0.0.1:8000/orders -H "Content-Type: application/json" \
   -d '{"symbol":"KRW-BTC","side":"BUY","type":"MARKET","quantity":0.001}'
 curl 127.0.0.1:8000/accounts/demo
 ```
+
+### 웹 대시보드
+
+브라우저에서 `http://127.0.0.1:8000` 접속 → 실시간 시세·잔고·평가손익·주문·체결내역을 한 화면에서 확인(2초 폴링). 모든 시각은 **KST(Asia/Seoul)** 표시(데이터는 UTC 저장).
+
+- 외부 공개(인터넷)는 `.env` 에 `API_BIND=0.0.0.0` + `WEB_PASSWORD=<강한 비번>` 설정 시 Basic Auth로 보호. GCP 배포는 [DEPLOY.md](DEPLOY.md) §11 참고.
 
 ## 알려진 한계 (학습용 MVP)
 
