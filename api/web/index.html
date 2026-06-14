@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>coin-auto-trader</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171b22; --panel2: #1f242d; --line: #2a313c;
+    --text: #e6e9ef; --muted: #8b94a3; --up: #f6465d; --down: #2e8eff;
+    --accent: #f0b90b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; color: var(--accent); }
+  header .stat { display: flex; flex-direction: column; }
+  header .stat .label { font-size: 11px; color: var(--muted); }
+  header .stat .value { font-size: 15px; font-weight: 600; }
+  header .spacer { flex: 1; }
+  #status { font-size: 12px; color: var(--muted); }
+  #status.live::before { content: "● "; color: #2ecc71; }
+  #status.err::before { content: "● "; color: var(--up); }
+  main { display: grid; grid-template-columns: 1fr 360px; gap: 14px; padding: 14px 20px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; }
+  .tickers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ticker { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; cursor: pointer; min-width: 130px; transition: border-color .15s; }
+  .ticker:hover { border-color: var(--accent); }
+  .ticker.sel { border-color: var(--accent); }
+  .ticker .sym { font-size: 12px; color: var(--muted); }
+  .ticker .px { font-size: 17px; font-weight: 700; }
+  .ticker .chg { font-size: 12px; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  canvas { width: 100%; height: 280px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; }
+  .full { grid-column: 1 / -1; }
+  form { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; gap: 8px; }
+  .seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: 1; }
+  .seg button { flex: 1; background: var(--panel2); color: var(--text); border: none;
+    padding: 8px; cursor: pointer; font-size: 13px; }
+  .seg button.on-buy { background: var(--up); color: #fff; }
+  .seg button.on-sell { background: var(--down); color: #fff; }
+  .seg button.on { background: var(--accent); color: #000; }
+  label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, select { width: 100%; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--text); padding: 8px; border-radius: 6px; font-size: 14px; }
+  .submit { padding: 11px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 15px; font-weight: 700; color: #fff; }
+  .submit.buy { background: var(--up); } .submit.sell { background: var(--down); }
+  #orderMsg { font-size: 12px; min-height: 16px; }
+  .muted { color: var(--muted); }
+  .pill { padding: 2px 7px; border-radius: 4px; font-size: 11px; }
+  .pill.BUY { background: rgba(246,70,93,.15); color: var(--up); }
+  .pill.SELL { background: rgba(46,142,255,.15); color: var(--down); }
+  .pill.FILLED { background: rgba(46,204,113,.15); color: #2ecc71; }
+  .pill.PENDING { background: rgba(240,185,11,.15); color: var(--accent); }
+  .pill.REJECTED { background: rgba(139,148,163,.15); color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>coin-auto-trader</h1>
+  <div class="stat"><span class="label">계좌</span><span class="value" id="acctId">demo</span></div>
+  <div class="stat"><span class="label">보유 현금</span><span class="value" id="krw">-</span></div>
+  <div class="stat"><span class="label">총 평가자산</span><span class="value" id="equity">-</span></div>
+  <div class="stat"><span class="label">총 손익</span><span class="value" id="totalPnl">-</span></div>
+  <div class="spacer"></div>
+  <div class="stat"><span class="label">갱신 (KST)</span><span class="value" id="updated" style="font-size:13px">-</span></div>
+  <div id="status">연결 중…</div>
+</header>
+
+<div style="padding: 14px 20px 0;">
+  <div class="tickers" id="tickers"></div>
+</div>
+
+<main>
+  <div>
+    <div class="panel">
+      <h2><span id="chartSym">KRW-BTC</span> · 1분봉 종가 (최근 2시간)</h2>
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <h2>보유 포지션</h2>
+      <table>
+        <thead><tr><th>종목</th><th>수량</th><th>평균매수가</th><th>현재가</th><th>평가금액</th><th>손익</th></tr></thead>
+        <tbody id="positions"><tr><td colspan="6" class="muted">없음</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>주문</h2>
+    <form id="orderForm">
+      <div>
+        <label>종목</label>
+        <select id="oSymbol"></select>
+      </div>
+      <div class="seg" id="sideSeg">
+        <button type="button" data-side="BUY" class="on-buy">매수</button>
+        <button type="button" data-side="SELL">매도</button>
+      </div>
+      <div class="seg" id="typeSeg">
+        <button type="button" data-type="MARKET" class="on">시장가</button>
+        <button type="button" data-type="LIMIT">지정가</button>
+      </div>
+      <div>
+        <label>수량</label>
+        <input id="oQty" type="number" step="any" min="0" placeholder="0.001" />
+      </div>
+      <div id="priceWrap" style="display:none">
+        <label>지정가 (원)</label>
+        <input id="oPrice" type="number" step="any" min="0" placeholder="가격" />
+      </div>
+      <button type="submit" class="submit buy" id="submitBtn">매수 주문</button>
+      <div id="orderMsg"></div>
+    </form>
+  </div>
+
+  <div class="panel full">
+    <h2>최근 체결 내역</h2>
+    <table>
+      <thead><tr><th>시각 (KST)</th><th>종목</th><th>구분</th><th>체결가</th><th>수량</th><th>수수료</th></tr></thead>
+      <tbody id="execs"><tr><td colspan="6" class="muted">없음</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const ACCOUNT = "demo";
+let prices = {};
+let prevPrices = {};
+let side = "BUY";
+let otype = "MARKET";
+let chartSym = null;
+
+const fmtTime = (iso) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
+const won = (n) => "₩" + Math.round(n).toLocaleString("ko-KR");
+const px = (n) => n == null ? "-" : n.toLocaleString("ko-KR", { maximumFractionDigits: n < 100 ? 4 : 0 });
+const setStatus = (cls, txt) => { const e = document.getElementById("status"); e.className = cls; e.textContent = txt; };
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(path + " " + res.status);
+  return res.json();
+}
+
+// ── 시세 ticker ──
+function renderTickers() {
+  const box = document.getElementById("tickers");
+  const syms = Object.keys(prices).sort();
+  box.innerHTML = syms.map(s => {
+    const p = prices[s], pv = prevPrices[s];
+    const dir = pv == null ? "" : (p > pv ? "up" : p < pv ? "down" : "");
+    return `<div class="ticker ${s === chartSym ? "sel" : ""}" data-sym="${s}">
+      <div class="sym">${s}</div>
+      <div class="px ${dir}">${px(p)}</div>
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".ticker").forEach(el =>
+    el.onclick = () => { chartSym = el.dataset.sym; document.getElementById("chartSym").textContent = chartSym; loadChart(); renderTickers(); });
+}
+
+// ── 계좌 / 포지션 ──
+async function loadAccount() {
+  const a = await api(`/accounts/${ACCOUNT}`);
+  document.getElementById("acctId").textContent = a.account_id;
+  document.getElementById("krw").textContent = won(a.krw_balance);
+  let posValue = 0, cost = 0;
+  const tbody = document.getElementById("positions");
+  if (!a.positions.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">없음</td></tr>`;
+  } else {
+    tbody.innerHTML = a.positions.map(p => {
+      const cur = prices[p.symbol] ?? p.avg_buy_price;
+      const value = cur * p.quantity;
+      const c = p.avg_buy_price * p.quantity;
+      const pnl = value - c;
+      const pct = c > 0 ? (pnl / c * 100) : 0;
+      posValue += value; cost += c;
+      const cls = pnl > 0 ? "up" : pnl < 0 ? "down" : "";
+      return `<tr><td>${p.symbol}</td><td>${px(p.quantity)}</td><td>${px(p.avg_buy_price)}</td>
+        <td>${px(cur)}</td><td>${won(value)}</td>
+        <td class="${cls}">${pnl >= 0 ? "+" : ""}${won(pnl)} (${pct.toFixed(2)}%)</td></tr>`;
+    }).join("");
+  }
+  const equity = a.krw_balance + posValue;
+  document.getElementById("equity").textContent = won(equity);
+  const totalPnl = posValue - cost;
+  const pe = document.getElementById("totalPnl");
+  pe.textContent = (totalPnl >= 0 ? "+" : "") + won(totalPnl);
+  pe.className = "value " + (totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "");
+}
+
+// ── 체결 내역 ──
+async function loadExecs() {
+  const rows = await api(`/history/executions?account_id=${ACCOUNT}&limit=20`);
+  const tbody = document.getElementById("execs");
+  tbody.innerHTML = rows.length ? rows.map(e =>
+    `<tr><td>${fmtTime(e.ts)}</td><td>${e.symbol}</td>
+     <td><span class="pill ${e.side}">${e.side === "BUY" ? "매수" : "매도"}</span></td>
+     <td>${px(e.price)}</td><td>${px(e.quantity)}</td><td>${px(e.fee)}</td></tr>`
+  ).join("") : `<tr><td colspan="6" class="muted">없음</td></tr>`;
+}
+
+// ── 차트 (canvas line) ──
+let candleData = [];
+async function loadChart() {
+  if (!chartSym) return;
+  candleData = await api(`/market/candles/${chartSym}`);
+  drawChart();
+}
+function drawChart() {
+  const cv = document.getElementById("chart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  if (candleData.length < 2) {
+    ctx.fillStyle = "#8b94a3"; ctx.font = "13px sans-serif";
+    ctx.fillText("데이터 수집 중…", 12, 24); return;
+  }
+  const closes = candleData.map(c => c.close);
+  const lo = Math.min(...closes), hi = Math.max(...closes);
+  const pad = 30, top = 12, bot = h - 20;
+  const x = i => pad + (w - pad - 12) * i / (candleData.length - 1);
+  const y = v => bot - (bot - top) * (hi === lo ? 0.5 : (v - lo) / (hi - lo));
+  // grid + labels
+  ctx.strokeStyle = "#2a313c"; ctx.fillStyle = "#8b94a3"; ctx.font = "10px sans-serif";
+  for (let g = 0; g <= 3; g++) {
+    const val = lo + (hi - lo) * g / 3, yy = y(val);
+    ctx.beginPath(); ctx.moveTo(pad, yy); ctx.lineTo(w - 12, yy); ctx.stroke();
+    ctx.fillText(px(val), 2, yy - 2);
+  }
+  // line
+  const last = closes[closes.length - 1], first = closes[0];
+  ctx.strokeStyle = last >= first ? "#f6465d" : "#2e8eff";
+  ctx.lineWidth = 1.5; ctx.beginPath();
+  candleData.forEach((c, i) => i ? ctx.lineTo(x(i), y(c.close)) : ctx.moveTo(x(i), y(c.close)));
+  ctx.stroke();
+}
+
+// ── 주문 폼 ──
+function initForm() {
+  document.getElementById("sideSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    side = b.dataset.side;
+    document.querySelectorAll("#sideSeg button").forEach(x => x.className = "");
+    b.className = side === "BUY" ? "on-buy" : "on-sell";
+    const sb = document.getElementById("submitBtn");
+    sb.className = "submit " + (side === "BUY" ? "buy" : "sell");
+    sb.textContent = (side === "BUY" ? "매수" : "매도") + " 주문";
+  });
+  document.getElementById("typeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    otype = b.dataset.type;
+    document.querySelectorAll("#typeSeg button").forEach(x => x.className = "");
+    b.className = "on";
+    document.getElementById("priceWrap").style.display = otype === "LIMIT" ? "block" : "none";
+  });
+  document.getElementById("orderForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("orderMsg");
+    const body = {
+      account_id: ACCOUNT,
+      symbol: document.getElementById("oSymbol").value,
+      side, type: otype,
+      quantity: parseFloat(document.getElementById("oQty").value),
+    };
+    if (!body.quantity || body.quantity <= 0) { msg.className = "down"; msg.textContent = "수량을 입력하세요"; return; }
+    if (otype === "LIMIT") {
+      body.price = parseFloat(document.getElementById("oPrice").value);
+      if (!body.price) { msg.className = "down"; msg.textContent = "지정가를 입력하세요"; return; }
+    }
+    try {
+      const r = await api("/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      msg.className = "muted"; msg.textContent = `접수됨: ${r.status} (${r.order_id.slice(0, 8)})`;
+      refresh();
+    } catch (err) {
+      msg.className = "down"; msg.textContent = "주문 실패: " + err.message;
+    }
+  };
+}
+
+// ── 폴링 ──
+async function refresh() {
+  try {
+    prevPrices = prices;
+    prices = await api("/market/prices");
+    renderTickers();
+    await Promise.all([loadAccount(), loadExecs()]);
+    document.getElementById("updated").textContent =
+      new Date().toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
+    setStatus("live", "실시간");
+  } catch (e) {
+    setStatus("err", "연결 끊김");
+  }
+}
+
+async function boot() {
+  initForm();
+  const syms = await api("/market/symbols");
+  document.getElementById("oSymbol").innerHTML = syms.map(s => `<option>${s}</option>`).join("");
+  chartSym = syms[0];
+  document.getElementById("chartSym").textContent = chartSym;
+  await refresh();
+  await loadChart();
+  setInterval(refresh, 2000);
+  setInterval(loadChart, 15000);
+  window.addEventListener("resize", drawChart);
+}
+boot();
+</script>
+</body>
+</html>

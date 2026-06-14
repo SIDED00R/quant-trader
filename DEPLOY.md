@@ -160,6 +160,34 @@ gcloud compute ssh coin-trader-vm --zone=us-central1-a -- -L 3000:localhost:3000
 # 브라우저 http://localhost:3000 (admin/admin), API http://localhost:8000
 ```
 
+### 웹 대시보드 (인터넷 공개 + Basic Auth)
+
+실시간 시세·잔고·포지션·주문·체결을 한 화면에서 보는 대시보드(`/`)를 인터넷에 공개한다.
+주문 가능한 API라 **반드시 Basic Auth**로 보호한다.
+
+1. VM `.env` 에 외부 노출 + 비밀번호 설정:
+   ```bash
+   API_BIND=0.0.0.0
+   WEB_USER=admin
+   WEB_PASSWORD=<강한 비밀번호>
+   ```
+2. 방화벽에서 tcp:8000 허용(태그 기반):
+   ```bash
+   gcloud compute firewall-rules create allow-web-8000 \
+     --project=coin-auto-trader-jvfhgq --network=default \
+     --direction=INGRESS --action=ALLOW --rules=tcp:8000 \
+     --source-ranges=0.0.0.0/0 --target-tags=coin-web
+   gcloud compute instances add-tags coin-trader-vm --zone=us-central1-a --tags=coin-web
+   ```
+3. 재기동: `docker compose --profile app up -d`
+4. 접속: `http://<VM_EXTERNAL_IP>:8000` (ID/비번 입력). 외부 IP 확인:
+   ```bash
+   gcloud compute instances describe coin-trader-vm --zone=us-central1-a \
+     --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
+   ```
+> 외부 IP는 기본 임시(ephemeral)라 VM stop/start 시 바뀔 수 있다. 고정하려면 정적 IP 예약(소량 과금).
+> 시각은 전부 KST(Asia/Seoul) 표시(데이터는 UTC 저장).
+
 ### 💰 비용 절감 — 안 쓸 때 VM 중지/삭제 (중요)
 ```bash
 gcloud compute instances stop  coin-trader-vm --zone=us-central1-a   # 중지(디스크만 ~$2/월)

@@ -30,6 +30,11 @@ TOPIC_EXECUTIONS = "executions"
 # ── 거래 ──
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 
+# ── 웹 대시보드 인증 (Basic Auth) ──
+# WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.
+WEB_USER = os.getenv("WEB_USER", "admin")
+WEB_PASSWORD = os.getenv("WEB_PASSWORD", "")
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))

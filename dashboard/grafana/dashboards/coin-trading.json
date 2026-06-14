@@ -2,7 +2,7 @@
   "uid": "coin-trading",
   "title": "Coin Auto Trader",
   "tags": ["coin", "kafka"],
-  "timezone": "utc",
+  "timezone": "Asia/Seoul",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "5s",
