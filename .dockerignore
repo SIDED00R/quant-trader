@@ -1,0 +1,13 @@
+.venv/
+venv/
+.git/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+data/
+logs/
+dashboard/
+DESIGN.md
+DEPLOY.md
+README.md

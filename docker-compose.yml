@@ -1,5 +1,27 @@
 name: coin-auto-trader
 
+# 앱 서비스 공통 설정 (profile: app). 컨테이너는 내부 네트워크 호스트로 접속.
+x-app: &app
+  build: .
+  image: coin-auto-trader-app
+  restart: unless-stopped
+  profiles: ["app"]
+  environment:
+    KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    POSTGRES_HOST: postgres
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+    CLICKHOUSE_HOST: clickhouse
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+  depends_on:
+    kafka:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+    clickhouse:
+      condition: service_healthy
+    db-init:
+      condition: service_completed_successfully
+
 services:
   # ── Kafka (KRaft 단일 노드, Zookeeper 없음) ─────────────────────────
   kafka:
@@ -117,6 +139,55 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+
+  # ── 앱 서비스 (profile: app — 풀스택/VM 실행) ──────────────────────
+  db-init:
+    <<: *app
+    container_name: db-init
+    command: python -m scripts.init_db
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  ingester:
+    <<: *app
+    container_name: ingester
+    command: python -m ingester.upbit_ws
+
+  sink:
+    <<: *app
+    container_name: sink
+    command: python -m sink.tick_clickhouse
+
+  candle:
+    <<: *app
+    container_name: candle
+    command: python -m aggregator.candle
+
+  engine:
+    <<: *app
+    container_name: engine
+    command: python -m engine.matching
+
+  portfolio:
+    <<: *app
+    container_name: portfolio
+    command: python -m portfolio.updater
+
+  relay:
+    <<: *app
+    container_name: relay
+    command: python -m relay.order_relay
+
+  api:
+    <<: *app
+    container_name: api
+    command: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:8000:8000"
 
 volumes:
   kafkadata:
