@@ -48,7 +48,7 @@ docker compose down            # 컨테이너 제거 (볼륨 유지)
 docker compose down -v         # 볼륨까지 삭제
 ```
 
-접속 정보: Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123`
+접속 정보: Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123` · Grafana `127.0.0.1:3000` (admin/admin)
 (컨테이너 포트는 보안상 `127.0.0.1` 루프백에만 바인딩. Windows에서 `localhost`가 IPv6 `::1`로 풀리는 문제를 피하려 호스트 접속은 `127.0.0.1`을 사용합니다.)
 
 ### 서비스 실행 (각각 별도 터미널)
@@ -83,5 +83,5 @@ curl 127.0.0.1:8000/accounts/demo
 - [x] 5. 포트폴리오 서비스
 - [x] 6. 캔들 집계기 → ClickHouse
 - [x] 7. 지정가 주문
-- [ ] 8. Grafana 대시보드
+- [x] 8. Grafana 대시보드
 - [ ] 9. GCP 배포

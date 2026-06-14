@@ -1,0 +1,30 @@
+apiVersion: 1
+
+# 주의: Grafana 프로비저닝은 ${VAR:-default} bash 기본값 문법을 지원하지 않는다.
+# 로컬 dev 값은 직접 명시한다(운영에서는 시크릿 주입 방식으로 대체).
+datasources:
+  - name: ClickHouse
+    uid: clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      username: default
+      defaultDatabase: coin_analytics
+    secureJsonData:
+      password: ch_pw
+
+  - name: PostgreSQL
+    uid: postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: trader
+    jsonData:
+      database: coin_trading
+      sslmode: disable
+    secureJsonData:
+      password: trader_pw

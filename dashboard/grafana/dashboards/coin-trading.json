@@ -1,0 +1,46 @@
+{
+  "uid": "coin-trading",
+  "title": "Coin Auto Trader",
+  "tags": ["coin", "kafka"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "KRW-BTC 1분봉 종가",
+      "type": "timeseries",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT window_start AS time, close FROM candles_1m FINAL WHERE symbol = 'KRW-BTC' AND $__timeFilter(window_start) ORDER BY window_start"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "종목별 1분 거래량",
+      "type": "timeseries",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT window_start AS time, symbol, volume FROM candles_1m FINAL WHERE $__timeFilter(window_start) ORDER BY window_start"
+        }
+      ]
+    }
+  ]
+}
