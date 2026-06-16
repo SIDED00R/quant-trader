@@ -20,6 +20,10 @@ x-app: &app
     SESSION_SECRET: ${SESSION_SECRET:-dev-insecure-change-me}
     SITE_ADDRESS: ${SITE_ADDRESS:-}
     INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
+    SMA_SHORT: ${SMA_SHORT:-20}
+    SMA_LONG: ${SMA_LONG:-60}
+    STRATEGY_ORDER_KRW: ${STRATEGY_ORDER_KRW:-1000000}
+    STRATEGY_COOLDOWN_SEC: ${STRATEGY_COOLDOWN_SEC:-60}
   depends_on:
     kafka:
       condition: service_healthy
@@ -184,6 +188,11 @@ services:
     <<: *app
     container_name: portfolio
     command: python -m portfolio.updater
+
+  strategy:
+    <<: *app
+    container_name: strategy
+    command: python -m strategy.sma_trader
 
   relay:
     <<: *app

@@ -56,6 +56,12 @@ OAUTH_REDIRECT_URI = (
 # 신규 계정 초기 가상자금(원)
 INITIAL_BALANCE = Decimal(os.getenv("INITIAL_BALANCE", "10000000"))
 
+# ── 자동매매 전략 (SMA 교차) ──
+SMA_SHORT = int(os.getenv("SMA_SHORT", "20"))            # 단기 이동평균(틱 수)
+SMA_LONG = int(os.getenv("SMA_LONG", "60"))             # 장기 이동평균(틱 수)
+STRATEGY_ORDER_KRW = Decimal(os.getenv("STRATEGY_ORDER_KRW", "1000000"))  # 매수 1회 금액
+STRATEGY_COOLDOWN_SEC = int(os.getenv("STRATEGY_COOLDOWN_SEC", "60"))     # 종목별 최소 매매 간격
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
