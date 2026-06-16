@@ -11,6 +11,7 @@ COPY sink ./sink
 COPY aggregator ./aggregator
 COPY engine ./engine
 COPY portfolio ./portfolio
+COPY strategy ./strategy
 COPY relay ./relay
 COPY api ./api
 COPY scripts ./scripts

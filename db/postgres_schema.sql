@@ -1,8 +1,12 @@
 CREATE TABLE IF NOT EXISTS accounts (
     account_id   TEXT PRIMARY KEY,
     krw_balance  NUMERIC(20,4) NOT NULL CHECK (krw_balance >= 0),
+    auto_trade   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 기존 DB 에도 자동매매 토글 컬럼 보장(멱등)
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS auto_trade BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS positions (
     account_id     TEXT NOT NULL REFERENCES accounts(account_id),

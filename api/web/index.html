@@ -101,6 +101,10 @@
 
   <div class="panel">
     <h2>주문</h2>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <input type="checkbox" id="autoToggle" style="width:auto;cursor:pointer" />
+      <label for="autoToggle" style="margin:0;cursor:pointer">🤖 자동매매 (SMA 교차) — 켜면 봇이 내 계정으로 매매</label>
+    </div>
     <form id="orderForm">
       <div>
         <label>종목</label>
@@ -177,6 +181,14 @@ async function loadMe() {
     document.getElementById("acctId").textContent = me.email || me.account_id;
     if (me.auth_enabled) document.getElementById("logout").style.display = "inline";
   } catch (e) { /* 게이트가 /login 으로 보냄 */ }
+}
+
+// ── 자동매매 토글 ──
+async function loadAuto() {
+  try {
+    const a = await api("/autotrade");
+    document.getElementById("autoToggle").checked = a.enabled;
+  } catch (e) { /* ignore */ }
 }
 
 // ── 계좌 / 포지션 ──
@@ -297,6 +309,14 @@ function initForm() {
     } catch (err) {
       msg.className = "down"; msg.textContent = "주문 실패: " + err.message;
     }
+  };
+  document.getElementById("autoToggle").onchange = async (e) => {
+    try {
+      await api("/autotrade", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: e.target.checked }),
+      });
+    } catch (err) { e.target.checked = !e.target.checked; }
   };
 }
 
