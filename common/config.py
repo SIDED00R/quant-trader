@@ -56,11 +56,19 @@ OAUTH_REDIRECT_URI = (
 # 신규 계정 초기 가상자금(원)
 INITIAL_BALANCE = Decimal(os.getenv("INITIAL_BALANCE", "10000000"))
 
-# ── 자동매매 전략 (SMA 교차) ──
-SMA_SHORT = int(os.getenv("SMA_SHORT", "20"))            # 단기 이동평균(틱 수)
-SMA_LONG = int(os.getenv("SMA_LONG", "60"))             # 장기 이동평균(틱 수)
-STRATEGY_ORDER_KRW = Decimal(os.getenv("STRATEGY_ORDER_KRW", "1000000"))  # 매수 1회 금액
-STRATEGY_COOLDOWN_SEC = int(os.getenv("STRATEGY_COOLDOWN_SEC", "60"))     # 종목별 최소 매매 간격
+# ── 자동매매 전략 (규율 기반 SMA) ──
+SMA_SHORT = int(os.getenv("SMA_SHORT", "7"))             # 단기 이동평균(틱 수)
+SMA_LONG = int(os.getenv("SMA_LONG", "25"))              # 장기 이동평균(틱 수)
+STRATEGY_ORDER_KRW = Decimal(os.getenv("STRATEGY_ORDER_KRW", "500000"))   # 매수 1회 금액
+STRATEGY_COOLDOWN_SEC = int(os.getenv("STRATEGY_COOLDOWN_SEC", "15"))     # (계정,종목) 재진입 쿨다운(초)
+STRATEGY_STOP_LOSS_PCT = Decimal(os.getenv("STRATEGY_STOP_LOSS_PCT", "1.2"))       # 손절 %(평단 대비)
+STRATEGY_TAKE_PROFIT_PCT = Decimal(os.getenv("STRATEGY_TAKE_PROFIT_PCT", "2.0"))   # 익절 %
+STRATEGY_TRAIL_ARM_PCT = Decimal(os.getenv("STRATEGY_TRAIL_ARM_PCT", "0.8"))       # 트레일링 무장 임계 %
+STRATEGY_TRAIL_GIVEBACK_PCT = Decimal(os.getenv("STRATEGY_TRAIL_GIVEBACK_PCT", "0.5"))  # 고점 대비 되돌림 %
+STRATEGY_ENTRY_BAND = Decimal(os.getenv("STRATEGY_ENTRY_BAND", "0.0015"))  # SMA 이격 밴드(비율)
+STRATEGY_CONFIRM_TICKS = int(os.getenv("STRATEGY_CONFIRM_TICKS", "2"))     # 확인봉 틱 수
+STRATEGY_MIN_HOLD_SEC = int(os.getenv("STRATEGY_MIN_HOLD_SEC", "20"))      # 데드크로스 청산 최소보유(초)
+STRATEGY_WARMUP_SEC = int(os.getenv("STRATEGY_WARMUP_SEC", "30"))          # 기동 후 신규 진입/데드크로스 청산 보류(초)
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
