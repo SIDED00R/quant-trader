@@ -49,8 +49,7 @@ def _on_delivery(err, msg) -> None:
 
 async def run() -> None:
     producer = create_producer()
-    symbols = resolve_symbols()
-    print(f"[ingester] connecting Upbit | {len(symbols)} symbols | kafka={KAFKA_BOOTSTRAP_SERVERS}")
+    print(f"[ingester] connecting Upbit | kafka={KAFKA_BOOTSTRAP_SERVERS}")
     backoff = 1
     count = 0
     try:
@@ -58,6 +57,8 @@ async def run() -> None:
             try:
                 async with websockets.connect(UPBIT_WS_URL, ping_interval=60) as ws:
                     backoff = 1
+                    symbols = resolve_symbols()  # (재)연결마다 재해석 → 콜드스타트 실패 후 복구 반영
+                    print(f"[ingester] subscribing {len(symbols)} symbols")
                     await ws.send(build_subscribe(symbols))
                     async for raw in ws:
                         msg = json.loads(raw, parse_float=Decimal)

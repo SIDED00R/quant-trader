@@ -65,6 +65,7 @@ _entry_time: dict[tuple, float] = {}    # (acct,symbol) -> 진입 monotonic
 _last_exit: dict[tuple, float] = {}     # (acct,symbol) -> 마지막 청산 monotonic(재진입 쿨다운)
 _exit_pending: dict[tuple, float] = {}  # (acct,symbol) -> 매도 발행 monotonic(중복 매도 방지)
 _entry_pending: dict[tuple, float] = {} # (acct,symbol) -> 매수 발행 monotonic(중복 매수 방지)
+_reserved: dict[tuple, Decimal] = {}    # (acct,symbol) -> 미체결 매수 예산(가용잔고 차감 → 버스트 과발주 방지)
 _started_at = 0.0                       # 프로세스 기동 monotonic(워밍업)
 _accounts: list[str] = []
 _accounts_at = -1e9
@@ -99,14 +100,28 @@ def refresh_positions(now: float, accounts: list[str]) -> None:
         _positions = {}
         return
     with pool.connection() as conn:
-        rows = conn.execute(
+        prows = conn.execute(
             "SELECT account_id, symbol, quantity, avg_buy_price FROM positions "
             "WHERE quantity > 0 AND account_id = ANY(%s)",
             (accounts,),
         ).fetchall()
+        orows = conn.execute(
+            "SELECT account_id, symbol, side FROM orders "
+            "WHERE status='PENDING' AND side IN ('BUY','SELL') AND account_id = ANY(%s)",
+            (accounts,),
+        ).fetchall()
     _positions = {
-        (r[0], r[1]): (Decimal(str(r[2])), Decimal(str(r[3] or 0))) for r in rows
+        (r[0], r[1]): (Decimal(str(r[2])), Decimal(str(r[3] or 0))) for r in prows
     }
+    # 미체결 추적을 실제 PENDING 주문과 동기화: 더 이상 PENDING이 아닌(체결/거부) 보류는 해제
+    # → _entry_pending 누수로 인한 open_count 동결·예약 예산 누수 방지
+    acct_set = set(accounts)
+    pending_buy = {(r[0], r[1]) for r in orows if r[2] == "BUY"}
+    pending_sell = {(r[0], r[1]) for r in orows if r[2] == "SELL"}
+    for key in [k for k in _entry_pending if k[0] in acct_set and k not in pending_buy]:
+        _release_entry(key)
+    for key in [k for k in _exit_pending if k[0] in acct_set and k not in pending_sell]:
+        _exit_pending.pop(key, None)
 
 
 def held_position(account_id: str, symbol: str) -> tuple[Decimal, Decimal]:
@@ -141,20 +156,29 @@ def _has_pending(account_id: str, symbol: str, side: str) -> bool:
 
 
 def _awaiting(book: dict, key: tuple, now: float, side: str) -> bool:
-    """직전 발행 주문이 아직 체결/거부되지 않았는지(중복 주문 방지).
+    """직전 발행 주문이 아직 체결/거부되지 않았는지(중복 주문 방지, 순수 판정).
 
     빠른 경로: 발행 후 SETTLE_SEC 이내면 True(DB 조회 없음).
-    이후엔 orders 테이블에 해당 PENDING 주문이 남아있는지로 확정(체결 확인 기반).
+    이후엔 orders 테이블에 해당 PENDING 주문이 남아있는지로 확정.
+    보류 해제(누수 방지)는 refresh_positions의 PENDING 동기화/보유 감지가 전담한다(여기선 부수효과 없음).
     """
     ts = book.get(key)
     if ts is None:
         return False
     if now - ts < SETTLE_SEC:
         return True
-    if _has_pending(key[0], key[1], side):
-        return True
-    book.pop(key, None)  # 체결/거부 확정 → 보류 해제
-    return False
+    return _has_pending(key[0], key[1], side)
+
+
+def _release_entry(key: tuple) -> None:
+    """매수 보류 + 예약 예산 동시 해제(체결/거부 확정 시)."""
+    _entry_pending.pop(key, None)
+    _reserved.pop(key, None)
+
+
+def reserved_for(account_id: str) -> Decimal:
+    """해당 계정의 미체결 매수 예약 예산 합계."""
+    return sum((v for (a, _), v in _reserved.items() if a == account_id), Decimal(0))
 
 
 def sma_gap(prices: deque) -> Decimal | None:
@@ -247,7 +271,7 @@ def enter(symbol: str, now: float, gap: Decimal) -> None:
         key = (acct, symbol)
         held, _ = held_position(acct, symbol)
         if held > 0:
-            _entry_pending.pop(key, None)  # 매수 체결 확인 → 보류 해제
+            _release_entry(key)  # 매수 체결 확인 → 보류/예약 해제
             continue
         if _awaiting(_entry_pending, key, now, "BUY"):
             continue  # 직전 매수 체결 대기(중복 매수 방지)
@@ -255,7 +279,9 @@ def enter(symbol: str, now: float, gap: Decimal) -> None:
             continue
         if open_count(acct) >= STRATEGY_MAX_POSITIONS:
             continue  # 최대 보유 종목 수 도달 → 신규 진입 보류
-        budget = account_balance(acct) * frac
+        # 가용잔고 = 현금 − 미체결 매수 예약(버스트 동시진입 과발주 방지)
+        available = account_balance(acct) - reserved_for(acct)
+        budget = available * frac if available > 0 else Decimal(0)
         if budget < MIN_ORDER_KRW:
             continue
         qty = (budget / price).quantize(Decimal("0.00000001"))
@@ -263,6 +289,7 @@ def enter(symbol: str, now: float, gap: Decimal) -> None:
             continue
         place_order(acct, symbol, "BUY", "MARKET", qty)
         _entry_pending[key] = now
+        _reserved[key] = budget
         _entry_time[key] = now
         _peak.pop(key, None)
         print(f"[strategy] BUY {symbol} qty={qty} (~{budget:.0f}KRW, frac={frac * 100:.1f}%) acct={acct} (ENTRY)")
