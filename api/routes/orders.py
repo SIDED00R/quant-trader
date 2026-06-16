@@ -7,9 +7,10 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from api.security import current_account_id
 from common.postgres_client import pool
 from common.schemas import Order
 
@@ -20,7 +21,6 @@ TYPES = {"MARKET", "LIMIT"}
 
 
 class OrderRequest(BaseModel):
-    account_id: str = "demo"
     symbol: str
     side: str
     type: str = "MARKET"
@@ -29,7 +29,7 @@ class OrderRequest(BaseModel):
 
 
 @router.post("/orders")
-def create_order(req: OrderRequest):
+def create_order(req: OrderRequest, account_id: str = Depends(current_account_id)):
     if req.side not in SIDES:
         raise HTTPException(400, f"side must be one of {SIDES}")
     if req.type not in TYPES:

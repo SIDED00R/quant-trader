@@ -1,13 +1,17 @@
-"""계좌 조회 라우트 (단일 책임: 잔고/포지션 조회)."""
-from fastapi import APIRouter, HTTPException
+"""계좌 조회 라우트 (단일 책임: 잔고/포지션 조회).
 
+계정은 항상 로그인 세션에서 결정한다(요청 파라미터로 타인 계정 조회 불가).
+"""
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.security import current_account_id
 from common.postgres_client import pool
 
 router = APIRouter()
 
 
-@router.get("/accounts/{account_id}")
-def get_account(account_id: str):
+@router.get("/account")
+def get_account(account_id: str = Depends(current_account_id)):
     with pool.connection() as conn:
         row = conn.execute(
             "SELECT account_id, krw_balance FROM accounts WHERE account_id=%s",

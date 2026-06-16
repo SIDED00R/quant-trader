@@ -35,6 +35,27 @@ FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 WEB_USER = os.getenv("WEB_USER", "admin")
 WEB_PASSWORD = os.getenv("WEB_PASSWORD", "")
 
+# ── 구글 OAuth / 세션 인증 ──
+# GOOGLE_CLIENT_ID/SECRET 가 모두 설정되면 OAuth 인증 활성. 미설정 시 비활성(로컬 개발).
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+AUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+# 로그인 허용 이메일(allowlist). 신원확인 != 권한부여이므로 반드시 제한한다.
+ALLOWED_EMAILS = {
+    e.strip().lower() for e in os.getenv("ALLOWED_EMAILS", "").split(",") if e.strip()
+}
+# 세션 쿠키 서명 키. 운영에서는 반드시 강한 무작위 값으로 설정(openssl rand -hex 32).
+SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-insecure-change-me")
+# 공개 도메인(Caddy). OAuth redirect_uri 구성에 사용.
+SITE_ADDRESS = os.getenv("SITE_ADDRESS", "")
+OAUTH_REDIRECT_URI = (
+    f"https://{SITE_ADDRESS}/auth/callback"
+    if SITE_ADDRESS
+    else "http://localhost:8000/auth/callback"
+)
+# 신규 계정 초기 가상자금(원)
+INITIAL_BALANCE = Decimal(os.getenv("INITIAL_BALANCE", "10000000"))
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))

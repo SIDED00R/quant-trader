@@ -1,27 +1,45 @@
-"""웹 대시보드 인증 (단일 책임: Basic Auth 검증).
+"""세션 인증 게이트 (단일 책임: 로그인 보호 + 현재 계정 식별).
 
-WEB_PASSWORD 가 비어 있으면 인증을 건너뛴다(로컬 개발). 운영에서는 환경변수로 설정.
+구글 OAuth(common.config.AUTH_ENABLED) 활성 시: 로그인 + 허용 이메일 세션만 통과.
+미설정 시: 인증 비활성(로컬 개발) — 모든 요청 통과, 계정은 demo.
 """
-import secrets
+from fastapi import HTTPException, Request
+from starlette.responses import JSONResponse, RedirectResponse
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
-from common.config import WEB_PASSWORD, WEB_USER
-
-_basic = HTTPBasic(auto_error=False)
+from common.config import ALLOWED_EMAILS, AUTH_ENABLED
 
 
-def require_auth(credentials: HTTPBasicCredentials | None = Depends(_basic)) -> None:
-    if not WEB_PASSWORD:  # 인증 비활성(로컬)
-        return
-    ok = credentials is not None and (
-        secrets.compare_digest(credentials.username, WEB_USER)
-        and secrets.compare_digest(credentials.password, WEB_PASSWORD)
+def _is_public(path: str) -> bool:
+    """인증 없이 접근 가능한 경로(로그인 흐름 + favicon)."""
+    return (
+        path in ("/login", "/logout", "/favicon.ico")
+        or path.startswith("/auth/")
     )
-    if not ok:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+
+
+def _session_user(request: Request) -> dict | None:
+    user = request.session.get("user")
+    if user and user.get("email", "").lower() in ALLOWED_EMAILS:
+        return user
+    return None
+
+
+async def auth_gate(request: Request, call_next):
+    """로그인하지 않은 요청을 차단(HTML은 /login 리다이렉트, API는 401)."""
+    if not AUTH_ENABLED or _is_public(request.url.path):
+        return await call_next(request)
+    if _session_user(request) is not None:
+        return await call_next(request)
+    if "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse("/login")
+    return JSONResponse({"detail": "unauthorized"}, status_code=401)
+
+
+def current_account_id(request: Request) -> str:
+    """로그인 사용자의 account_id (인증 비활성 시 demo)."""
+    if not AUTH_ENABLED:
+        return "demo"
+    user = _session_user(request)
+    if user is None:
+        raise HTTPException(401, "unauthorized")
+    return user["account_id"]

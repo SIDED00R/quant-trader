@@ -2,8 +2,9 @@
 
 시각은 UTC(timestamptz) ISO 문자열로 반환하고, KST 변환은 화면에서 수행한다.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.security import current_account_id
 from common.postgres_client import pool
 
 router = APIRouter(prefix="/history")
@@ -14,7 +15,7 @@ def _limit(n: int) -> int:
 
 
 @router.get("/orders")
-def orders(account_id: str = "demo", limit: int = 20):
+def orders(account_id: str = Depends(current_account_id), limit: int = 20):
     with pool.connection() as conn:
         rows = conn.execute(
             "SELECT order_id, symbol, side, type, price, quantity, status, created_at "
@@ -37,7 +38,7 @@ def orders(account_id: str = "demo", limit: int = 20):
 
 
 @router.get("/executions")
-def executions(account_id: str = "demo", limit: int = 20):
+def executions(account_id: str = Depends(current_account_id), limit: int = 20):
     with pool.connection() as conn:
         rows = conn.execute(
             "SELECT execution_id, symbol, side, price, quantity, fee, executed_at "
