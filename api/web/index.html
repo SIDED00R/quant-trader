@@ -70,13 +70,14 @@
 <body>
 <header>
   <h1>coin-auto-trader</h1>
-  <div class="stat"><span class="label">계좌</span><span class="value" id="acctId">demo</span></div>
+  <div class="stat"><span class="label">계정</span><span class="value" id="acctId">-</span></div>
   <div class="stat"><span class="label">보유 현금</span><span class="value" id="krw">-</span></div>
   <div class="stat"><span class="label">총 평가자산</span><span class="value" id="equity">-</span></div>
   <div class="stat"><span class="label">총 손익</span><span class="value" id="totalPnl">-</span></div>
   <div class="spacer"></div>
   <div class="stat"><span class="label">갱신 (KST)</span><span class="value" id="updated" style="font-size:13px">-</span></div>
   <div id="status">연결 중…</div>
+  <a id="logout" href="/logout" style="display:none; color:var(--muted); font-size:12px; text-decoration:none; margin-left:8px">로그아웃</a>
 </header>
 
 <div style="padding: 14px 20px 0;">
@@ -136,7 +137,6 @@
 </main>
 
 <script>
-const ACCOUNT = "demo";
 let prices = {};
 let prevPrices = {};
 let side = "BUY";
@@ -170,10 +170,18 @@ function renderTickers() {
     el.onclick = () => { chartSym = el.dataset.sym; document.getElementById("chartSym").textContent = chartSym; loadChart(); renderTickers(); });
 }
 
+// ── 로그인 사용자 ──
+async function loadMe() {
+  try {
+    const me = await api("/me");
+    document.getElementById("acctId").textContent = me.email || me.account_id;
+    if (me.auth_enabled) document.getElementById("logout").style.display = "inline";
+  } catch (e) { /* 게이트가 /login 으로 보냄 */ }
+}
+
 // ── 계좌 / 포지션 ──
 async function loadAccount() {
-  const a = await api(`/accounts/${ACCOUNT}`);
-  document.getElementById("acctId").textContent = a.account_id;
+  const a = await api("/account");
   document.getElementById("krw").textContent = won(a.krw_balance);
   let posValue = 0, cost = 0;
   const tbody = document.getElementById("positions");
@@ -203,7 +211,7 @@ async function loadAccount() {
 
 // ── 체결 내역 ──
 async function loadExecs() {
-  const rows = await api(`/history/executions?account_id=${ACCOUNT}&limit=20`);
+  const rows = await api("/history/executions?limit=20");
   const tbody = document.getElementById("execs");
   tbody.innerHTML = rows.length ? rows.map(e =>
     `<tr><td>${fmtTime(e.ts)}</td><td>${e.symbol}</td>
@@ -271,7 +279,6 @@ function initForm() {
     e.preventDefault();
     const msg = document.getElementById("orderMsg");
     const body = {
-      account_id: ACCOUNT,
       symbol: document.getElementById("oSymbol").value,
       side, type: otype,
       quantity: parseFloat(document.getElementById("oQty").value),
@@ -310,6 +317,7 @@ async function refresh() {
 
 async function boot() {
   initForm();
+  await loadMe();
   const syms = await api("/market/symbols");
   document.getElementById("oSymbol").innerHTML = syms.map(s => `<option>${s}</option>`).join("");
   chartSym = syms[0];

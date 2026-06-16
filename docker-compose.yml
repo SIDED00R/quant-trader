@@ -14,6 +14,12 @@ x-app: &app
     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
     WEB_USER: ${WEB_USER:-admin}
     WEB_PASSWORD: ${WEB_PASSWORD:-}
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+    SESSION_SECRET: ${SESSION_SECRET:-dev-insecure-change-me}
+    SITE_ADDRESS: ${SITE_ADDRESS:-}
+    INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
   depends_on:
     kafka:
       condition: service_healthy
