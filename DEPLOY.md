@@ -188,6 +188,28 @@ gcloud compute ssh coin-trader-vm --zone=us-central1-a -- -L 3000:localhost:3000
 > 외부 IP는 기본 임시(ephemeral)라 VM stop/start 시 바뀔 수 있다. 고정하려면 정적 IP 예약(소량 과금).
 > 시각은 전부 KST(Asia/Seoul) 표시(데이터는 UTC 저장).
 
+### 고정 주소 + 자동 HTTPS (Caddy + 정적 IP + DuckDNS)
+
+IP가 stop/start마다 바뀌고 http:8000 직접 노출은 불편/불안하므로, **정적 IP로 주소를 고정**하고
+**Caddy 리버스프록시로 자동 HTTPS**(Let's Encrypt)를 적용한다. 단일 VM 구조는 그대로 유지된다.
+
+1. **정적 IP 예약 + VM 연결**:
+   ```bash
+   gcloud compute addresses create coin-trader-ip --project=$PROJECT --region=us-central1
+   IP=$(gcloud compute addresses describe coin-trader-ip --project=$PROJECT --region=us-central1 --format="value(address)")
+   gcloud compute instances delete-access-config coin-trader-vm --zone=us-central1-a --access-config-name="external-nat" --project=$PROJECT
+   gcloud compute instances add-access-config coin-trader-vm --zone=us-central1-a --access-config-name="external-nat" --address=$IP --project=$PROJECT
+   ```
+2. **방화벽 80/443 허용**(8000 직접 노출은 더 이상 불필요):
+   ```bash
+   gcloud compute firewall-rules create allow-web-https --project=$PROJECT --network=default \
+     --direction=INGRESS --action=ALLOW --rules=tcp:80,tcp:443 --source-ranges=0.0.0.0/0 --target-tags=coin-web
+   ```
+3. **DuckDNS 도메인 연결**(무료): duckdns.org에서 서브도메인 생성 → IP를 예약한 정적 IP로 설정.
+4. **VM `.env`**: `SITE_ADDRESS=<도메인>` 설정, `API_BIND` 은 비워둠(루프백), `WEB_PASSWORD` 강한 값.
+5. 재기동: `docker compose --profile app up -d`. Caddy가 인증서를 자동 발급.
+6. 접속: **`https://<도메인>`** (Basic Auth 입력). 인증서 발급에 80 포트로의 도달이 필요하다.
+
 ### 💰 비용 절감 — 안 쓸 때 VM 중지/삭제 (중요)
 ```bash
 gcloud compute instances stop  coin-trader-vm --zone=us-central1-a   # 중지(디스크만 ~$2/월)

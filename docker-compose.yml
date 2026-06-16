@@ -189,11 +189,32 @@ services:
     container_name: api
     command: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
     ports:
-      # 로컬은 루프백(127.0.0.1) 유지, VM은 .env 의 API_BIND=0.0.0.0 으로 외부 노출
+      # 외부 공개는 Caddy(HTTPS)가 담당. api 자체는 루프백만 바인딩(SSH 터널용).
       - "${API_BIND:-127.0.0.1}:8000:8000"
+
+  # ── Caddy 리버스프록시 (HTTPS 종단 → api:8000) ─────────────────────
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    profiles: ["app"]
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # 공개 도메인 지정 시 자동 HTTPS, 미설정 시 :80(평문) — infra/Caddyfile 참고
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data        # 발급된 인증서 영속(재시작 시 재발급 방지)
+      - caddyconfig:/config
 
 volumes:
   kafkadata:
   pgdata:
   chdata:
   grafanadata:
+  caddydata:
+  caddyconfig:
