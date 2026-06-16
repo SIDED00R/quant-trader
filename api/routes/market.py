@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 
 from common.clickhouse_client import create_client
-from common.config import SYMBOLS
+from common.symbols import resolve_symbols
 
 router = APIRouter(prefix="/market")
 
@@ -18,7 +18,7 @@ def _ch():
 
 @router.get("/symbols")
 def symbols():
-    return SYMBOLS
+    return resolve_symbols()
 
 
 @router.get("/prices")
@@ -34,7 +34,7 @@ def prices():
 @router.get("/candles/{symbol}")
 def candles(symbol: str):
     """최근 2시간 1분봉 (차트용)."""
-    if symbol not in SYMBOLS:
+    if symbol not in resolve_symbols():
         raise HTTPException(404, "unknown symbol")
     res = _ch().query(
         "SELECT window_start, open, high, low, close, volume "

@@ -28,7 +28,8 @@
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
   .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600;
     text-transform: uppercase; letter-spacing: .5px; }
-  .tickers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tickers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+    max-height: 200px; overflow-y: auto; }
   .ticker { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
     padding: 10px 14px; cursor: pointer; min-width: 130px; transition: border-color .15s; }
   .ticker:hover { border-color: var(--accent); }

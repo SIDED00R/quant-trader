@@ -10,9 +10,10 @@ from decimal import Decimal
 
 import websockets
 
-from common.config import KAFKA_BOOTSTRAP_SERVERS, SYMBOLS, TOPIC_TICKS
+from common.config import KAFKA_BOOTSTRAP_SERVERS, TOPIC_TICKS
 from common.kafka_client import create_producer
 from common.schemas import Tick
+from common.symbols import resolve_symbols
 
 UPBIT_WS_URL = "wss://api.upbit.com/websocket/v1"
 MAX_BACKOFF = 30
@@ -48,7 +49,8 @@ def _on_delivery(err, msg) -> None:
 
 async def run() -> None:
     producer = create_producer()
-    print(f"[ingester] connecting Upbit | symbols={SYMBOLS} | kafka={KAFKA_BOOTSTRAP_SERVERS}")
+    symbols = resolve_symbols()
+    print(f"[ingester] connecting Upbit | {len(symbols)} symbols | kafka={KAFKA_BOOTSTRAP_SERVERS}")
     backoff = 1
     count = 0
     try:
@@ -56,7 +58,7 @@ async def run() -> None:
             try:
                 async with websockets.connect(UPBIT_WS_URL, ping_interval=60) as ws:
                     backoff = 1
-                    await ws.send(build_subscribe(SYMBOLS))
+                    await ws.send(build_subscribe(symbols))
                     async for raw in ws:
                         msg = json.loads(raw, parse_float=Decimal)
                         if msg.get("type") != "trade":
