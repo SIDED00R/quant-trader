@@ -30,9 +30,12 @@ from common.config import (
     STRATEGY_CONFIRM_TICKS,
     STRATEGY_COOLDOWN_SEC,
     STRATEGY_ENTRY_BAND,
+    STRATEGY_MAX_POSITIONS,
     STRATEGY_MIN_HOLD_SEC,
-    STRATEGY_ORDER_KRW,
+    STRATEGY_ORDER_FRACTION_MAX,
+    STRATEGY_ORDER_FRACTION_MIN,
     STRATEGY_STOP_LOSS_PCT,
+    STRATEGY_STRONG_GAP,
     STRATEGY_TAKE_PROFIT_PCT,
     STRATEGY_TRAIL_ARM_PCT,
     STRATEGY_TRAIL_GIVEBACK_PCT,
@@ -46,6 +49,8 @@ from common.postgres_client import close_pool, open_pool, pool
 GROUP_ID = "strategy"
 SETTLE_SEC = 5.0       # 주문 후 체결 반영 전 중복 주문 방지 빠른 윈도우(이후엔 PENDING 조회로 확인)
 ACCOUNTS_TTL = 3.0     # auto_trade 계정 목록 캐시 TTL(초)
+POSITIONS_TTL = 1.5    # 보유 포지션 캐시 bulk 갱신 주기(초) — 매 틱 DB조회 제거(전체 종목 스케일링)
+MIN_ORDER_KRW = Decimal("5000")  # 업비트 최소 주문 금액(이하 매수 스킵)
 
 # 퍼센트 → 비율(Decimal)
 _STOP = STRATEGY_STOP_LOSS_PCT / Decimal(100)
@@ -60,9 +65,12 @@ _entry_time: dict[tuple, float] = {}    # (acct,symbol) -> 진입 monotonic
 _last_exit: dict[tuple, float] = {}     # (acct,symbol) -> 마지막 청산 monotonic(재진입 쿨다운)
 _exit_pending: dict[tuple, float] = {}  # (acct,symbol) -> 매도 발행 monotonic(중복 매도 방지)
 _entry_pending: dict[tuple, float] = {} # (acct,symbol) -> 매수 발행 monotonic(중복 매수 방지)
+_reserved: dict[tuple, Decimal] = {}    # (acct,symbol) -> 미체결 매수 예산(가용잔고 차감 → 버스트 과발주 방지)
 _started_at = 0.0                       # 프로세스 기동 monotonic(워밍업)
 _accounts: list[str] = []
 _accounts_at = -1e9
+_positions: dict[tuple, tuple] = {}     # (acct,symbol) -> (qty, avg) 보유분 캐시(bulk 갱신)
+_positions_at = -1e9
 
 
 def enabled_accounts(now: float) -> list[str]:
@@ -78,16 +86,63 @@ def enabled_accounts(now: float) -> list[str]:
     return _accounts
 
 
+def refresh_positions(now: float, accounts: list[str]) -> None:
+    """enabled 계정의 보유분(quantity>0)을 한 번의 bulk 쿼리로 캐시 갱신(TTL).
+
+    매 틱 계정별 DB 조회를 없애 전체 종목(고빈도 틱)에서도 DB 부하를 일정하게 유지한다.
+    체결 미반영 윈도우는 _entry_pending/_exit_pending 보류 가드가 별도로 막는다.
+    """
+    global _positions, _positions_at
+    if now - _positions_at < POSITIONS_TTL:
+        return
+    _positions_at = now
+    if not accounts:
+        _positions = {}
+        return
+    with pool.connection() as conn:
+        prows = conn.execute(
+            "SELECT account_id, symbol, quantity, avg_buy_price FROM positions "
+            "WHERE quantity > 0 AND account_id = ANY(%s)",
+            (accounts,),
+        ).fetchall()
+        orows = conn.execute(
+            "SELECT account_id, symbol, side FROM orders "
+            "WHERE status='PENDING' AND side IN ('BUY','SELL') AND account_id = ANY(%s)",
+            (accounts,),
+        ).fetchall()
+    _positions = {
+        (r[0], r[1]): (Decimal(str(r[2])), Decimal(str(r[3] or 0))) for r in prows
+    }
+    # 미체결 추적을 실제 PENDING 주문과 동기화: 더 이상 PENDING이 아닌(체결/거부) 보류는 해제
+    # → _entry_pending 누수로 인한 open_count 동결·예약 예산 누수 방지
+    acct_set = set(accounts)
+    pending_buy = {(r[0], r[1]) for r in orows if r[2] == "BUY"}
+    pending_sell = {(r[0], r[1]) for r in orows if r[2] == "SELL"}
+    for key in [k for k in _entry_pending if k[0] in acct_set and k not in pending_buy]:
+        _release_entry(key)
+    for key in [k for k in _exit_pending if k[0] in acct_set and k not in pending_sell]:
+        _exit_pending.pop(key, None)
+
+
 def held_position(account_id: str, symbol: str) -> tuple[Decimal, Decimal]:
-    """(보유수량, 평균매수가). 없으면 (0,0)."""
+    """(보유수량, 평균매수가). 포지션 캐시에서 조회(없으면 (0,0))."""
+    return _positions.get((account_id, symbol), (Decimal(0), Decimal(0)))
+
+
+def open_count(account_id: str) -> int:
+    """보유 + 매수 대기 중인 종목 수(최대 보유 캡 판정용)."""
+    syms = {s for (a, s) in _positions if a == account_id}
+    syms |= {s for (a, s) in _entry_pending if a == account_id}
+    return len(syms)
+
+
+def account_balance(account_id: str) -> Decimal:
+    """현재 KRW 현금 잔고(매수 금액 산정용). 매수 직전에만 조회."""
     with pool.connection() as conn:
         row = conn.execute(
-            "SELECT quantity, avg_buy_price FROM positions WHERE account_id=%s AND symbol=%s",
-            (account_id, symbol),
+            "SELECT krw_balance FROM accounts WHERE account_id=%s", (account_id,)
         ).fetchone()
-    if not row or row[0] is None:
-        return Decimal(0), Decimal(0)
-    return Decimal(str(row[0])), Decimal(str(row[1] or 0))
+    return Decimal(str(row[0])) if row and row[0] is not None else Decimal(0)
 
 
 def _has_pending(account_id: str, symbol: str, side: str) -> bool:
@@ -101,34 +156,63 @@ def _has_pending(account_id: str, symbol: str, side: str) -> bool:
 
 
 def _awaiting(book: dict, key: tuple, now: float, side: str) -> bool:
-    """직전 발행 주문이 아직 체결/거부되지 않았는지(중복 주문 방지).
+    """직전 발행 주문이 아직 체결/거부되지 않았는지(중복 주문 방지, 순수 판정).
 
     빠른 경로: 발행 후 SETTLE_SEC 이내면 True(DB 조회 없음).
-    이후엔 orders 테이블에 해당 PENDING 주문이 남아있는지로 확정(체결 확인 기반).
+    이후엔 orders 테이블에 해당 PENDING 주문이 남아있는지로 확정.
+    보류 해제(누수 방지)는 refresh_positions의 PENDING 동기화/보유 감지가 전담한다(여기선 부수효과 없음).
     """
     ts = book.get(key)
     if ts is None:
         return False
     if now - ts < SETTLE_SEC:
         return True
-    if _has_pending(key[0], key[1], side):
-        return True
-    book.pop(key, None)  # 체결/거부 확정 → 보류 해제
-    return False
+    return _has_pending(key[0], key[1], side)
 
 
-def sma_state(prices: deque) -> str | None:
-    """이격 밴드 기반 추세 상태: 'BUY' | 'SELL' | None(NEUTRAL/데이터부족)."""
+def _release_entry(key: tuple) -> None:
+    """매수 보류 + 예약 예산 동시 해제(체결/거부 확정 시)."""
+    _entry_pending.pop(key, None)
+    _reserved.pop(key, None)
+
+
+def reserved_for(account_id: str) -> Decimal:
+    """해당 계정의 미체결 매수 예약 예산 합계."""
+    return sum((v for (a, _), v in _reserved.items() if a == account_id), Decimal(0))
+
+
+def sma_gap(prices: deque) -> Decimal | None:
+    """단기/장기 이평선의 부호있는 간격 (short-long)/long. 데이터 부족/비정상이면 None."""
     if len(prices) < SMA_LONG:
         return None
     p = list(prices)
     short = sum(p[-SMA_SHORT:]) / Decimal(SMA_SHORT)
     long_ = sum(p[-SMA_LONG:]) / Decimal(SMA_LONG)
-    if short >= long_ * (1 + STRATEGY_ENTRY_BAND):
+    if long_ <= 0:
+        return None
+    return (short - long_) / long_
+
+
+def sma_state(prices: deque) -> str | None:
+    """이격 밴드 기반 추세 상태: 'BUY' | 'SELL' | None(NEUTRAL/데이터부족)."""
+    gap = sma_gap(prices)
+    if gap is None:
+        return None
+    if gap >= STRATEGY_ENTRY_BAND:
         return "BUY"
-    if short <= long_ * (1 - STRATEGY_ENTRY_BAND):
+    if gap <= -STRATEGY_ENTRY_BAND:
         return "SELL"
     return None
+
+
+def position_fraction(gap: Decimal) -> Decimal:
+    """신호 강도(이평선 간격)에 비례한 매수 비율: 약하면 MIN, 강하면 MAX (그 사이 선형)."""
+    span = STRATEGY_STRONG_GAP - STRATEGY_ENTRY_BAND
+    if span <= 0:
+        return STRATEGY_ORDER_FRACTION_MAX
+    t = (abs(gap) - STRATEGY_ENTRY_BAND) / span
+    t = max(Decimal(0), min(Decimal(1), t))
+    return STRATEGY_ORDER_FRACTION_MIN + (STRATEGY_ORDER_FRACTION_MAX - STRATEGY_ORDER_FRACTION_MIN) * t
 
 
 def liquidation_reason(pnl: Decimal, peak: Decimal) -> str | None:
@@ -172,31 +256,43 @@ def check_liquidations(symbol: str, price: Decimal, now: float) -> None:
             _sell(acct, symbol, qty, reason, now)
 
 
-def enter(symbol: str, now: float) -> None:
-    """확정 BUY 추세 진입(미보유 & 재진입 쿨다운 경과). 매 틱 호출되며 계정별 가드가 과진입 방어."""
+def enter(symbol: str, now: float, gap: Decimal) -> None:
+    """확정 BUY 추세 진입(미보유 & 재진입 쿨다운 경과).
+
+    매수액 = 현재 현금 × 신호강도 비율(이평선 간격이 클수록 큼). 매 틱 호출되며 계정별 가드가 과진입 방어.
+    """
     if now - _started_at < STRATEGY_WARMUP_SEC:
         return
     price = _last_price.get(symbol)
     if price is None or price <= 0:
         return
-    qty = (STRATEGY_ORDER_KRW / price).quantize(Decimal("0.00000001"))
-    if qty <= 0:
-        return
+    frac = position_fraction(gap)
     for acct in enabled_accounts(now):
         key = (acct, symbol)
         held, _ = held_position(acct, symbol)
         if held > 0:
-            _entry_pending.pop(key, None)  # 매수 체결 확인 → 보류 해제
+            _release_entry(key)  # 매수 체결 확인 → 보류/예약 해제
             continue
         if _awaiting(_entry_pending, key, now, "BUY"):
             continue  # 직전 매수 체결 대기(중복 매수 방지)
         if now - _last_exit.get(key, -1e9) < STRATEGY_COOLDOWN_SEC:
             continue
+        if open_count(acct) >= STRATEGY_MAX_POSITIONS:
+            continue  # 최대 보유 종목 수 도달 → 신규 진입 보류
+        # 가용잔고 = 현금 − 미체결 매수 예약(버스트 동시진입 과발주 방지)
+        available = account_balance(acct) - reserved_for(acct)
+        budget = available * frac if available > 0 else Decimal(0)
+        if budget < MIN_ORDER_KRW:
+            continue
+        qty = (budget / price).quantize(Decimal("0.00000001"))
+        if qty <= 0:
+            continue
         place_order(acct, symbol, "BUY", "MARKET", qty)
         _entry_pending[key] = now
+        _reserved[key] = budget
         _entry_time[key] = now
         _peak.pop(key, None)
-        print(f"[strategy] BUY {symbol} qty={qty} acct={acct} (ENTRY)")
+        print(f"[strategy] BUY {symbol} qty={qty} (~{budget:.0f}KRW, frac={frac * 100:.1f}%) acct={acct} (ENTRY)")
 
 
 def exit_deadcross(symbol: str, now: float) -> None:
@@ -228,7 +324,8 @@ def run() -> None:
     pending: dict[str, list] = {}    # symbol -> [후보상태, 연속틱수] (확인봉)
     print(f"[strategy] started SMA({SMA_SHORT}/{SMA_LONG}) band={STRATEGY_ENTRY_BAND} "
           f"confirm={STRATEGY_CONFIRM_TICKS} stop={STRATEGY_STOP_LOSS_PCT}% take={STRATEGY_TAKE_PROFIT_PCT}% "
-          f"trail({STRATEGY_TRAIL_ARM_PCT}/{STRATEGY_TRAIL_GIVEBACK_PCT})% order={STRATEGY_ORDER_KRW}KRW "
+          f"trail({STRATEGY_TRAIL_ARM_PCT}/{STRATEGY_TRAIL_GIVEBACK_PCT})% "
+          f"order={STRATEGY_ORDER_FRACTION_MIN * 100:.0f}-{STRATEGY_ORDER_FRACTION_MAX * 100:.0f}% maxpos={STRATEGY_MAX_POSITIONS} "
           f"cooldown={STRATEGY_COOLDOWN_SEC}s minhold={STRATEGY_MIN_HOLD_SEC}s warmup={STRATEGY_WARMUP_SEC}s")
     try:
         while True:
@@ -242,6 +339,7 @@ def run() -> None:
             dq = prices.setdefault(symbol, deque(maxlen=SMA_LONG))
             dq.append(price)
             now = time.monotonic()
+            refresh_positions(now, enabled_accounts(now))  # 보유 포지션 캐시 갱신(TTL)
 
             # (1) 보유 포지션 매 틱 청산 우선 (손절/익절/트레일링)
             check_liquidations(symbol, price, now)
@@ -264,7 +362,7 @@ def run() -> None:
             # (3) 확정 추세가 현재 틱과 일치할 때만 매매 자격 재평가
             #     (NEUTRAL/미확정 반전 틱은 건너뜀. 계정별 보유·쿨다운 가드가 과매매 방어)
             if state.get(symbol) == "BUY" and raw == "BUY":
-                enter(symbol, now)
+                enter(symbol, now, sma_gap(dq))
             elif state.get(symbol) == "SELL" and raw == "SELL":
                 exit_deadcross(symbol, now)
     finally:

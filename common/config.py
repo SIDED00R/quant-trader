@@ -13,6 +13,8 @@ SYMBOLS = [
     for s in os.getenv("SYMBOLS", "KRW-BTC,KRW-ETH,KRW-XRP,KRW-SOL,KRW-DOGE").split(",")
     if s.strip()
 ]
+# True 면 업비트 전체 KRW 마켓을 동적 구독(SYMBOLS 무시), False 면 위 정적 목록 사용.
+SUBSCRIBE_ALL_KRW = os.getenv("SUBSCRIBE_ALL_KRW", "false").strip().lower() in ("1", "true", "yes")
 
 TOPIC_TICKS = "market.ticks"
 
@@ -59,7 +61,10 @@ INITIAL_BALANCE = Decimal(os.getenv("INITIAL_BALANCE", "10000000"))
 # ── 자동매매 전략 (규율 기반 SMA) ──
 SMA_SHORT = int(os.getenv("SMA_SHORT", "7"))             # 단기 이동평균(틱 수)
 SMA_LONG = int(os.getenv("SMA_LONG", "25"))              # 장기 이동평균(틱 수)
-STRATEGY_ORDER_KRW = Decimal(os.getenv("STRATEGY_ORDER_KRW", "500000"))   # 매수 1회 금액
+# 매수 1회 금액 = 현재 현금 잔고 × (신호 강도에 비례한 비율). 약한 교차→MIN, 강한 교차→MAX.
+STRATEGY_ORDER_FRACTION_MIN = Decimal(os.getenv("STRATEGY_ORDER_FRACTION_MIN", "0.05"))  # 약신호 매수 비율
+STRATEGY_ORDER_FRACTION_MAX = Decimal(os.getenv("STRATEGY_ORDER_FRACTION_MAX", "0.20"))  # 강신호 매수 비율
+STRATEGY_STRONG_GAP = Decimal(os.getenv("STRATEGY_STRONG_GAP", "0.015"))  # 이 이평선 간격(비율) 이상이면 MAX 비율
 STRATEGY_COOLDOWN_SEC = int(os.getenv("STRATEGY_COOLDOWN_SEC", "15"))     # (계정,종목) 재진입 쿨다운(초)
 STRATEGY_STOP_LOSS_PCT = Decimal(os.getenv("STRATEGY_STOP_LOSS_PCT", "1.2"))       # 손절 %(평단 대비)
 STRATEGY_TAKE_PROFIT_PCT = Decimal(os.getenv("STRATEGY_TAKE_PROFIT_PCT", "2.0"))   # 익절 %
@@ -69,6 +74,7 @@ STRATEGY_ENTRY_BAND = Decimal(os.getenv("STRATEGY_ENTRY_BAND", "0.0015"))  # SMA
 STRATEGY_CONFIRM_TICKS = int(os.getenv("STRATEGY_CONFIRM_TICKS", "2"))     # 확인봉 틱 수
 STRATEGY_MIN_HOLD_SEC = int(os.getenv("STRATEGY_MIN_HOLD_SEC", "20"))      # 데드크로스 청산 최소보유(초)
 STRATEGY_WARMUP_SEC = int(os.getenv("STRATEGY_WARMUP_SEC", "30"))          # 기동 후 신규 진입/데드크로스 청산 보류(초)
+STRATEGY_MAX_POSITIONS = int(os.getenv("STRATEGY_MAX_POSITIONS", "10"))    # 계정당 동시 보유 종목 수 상한(현금 소진·과분산 방지)
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
