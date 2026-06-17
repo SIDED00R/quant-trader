@@ -8,7 +8,7 @@
 - [x] 가상 체결·수수료·슬리피지 모델 (`backtest/fills.py` + `account.py`, 라이브 engine/portfolio와 동일 가정)
 - [x] 성과지표 모듈 (`backtest/metrics.py`): 누적수익률·승률·MDD·Sharpe·손익비·거래수·평균손익
 - [x] 결과 리포트(표/CSV) + 재현 메타 (`backtest/report.py`, run_meta.json)
-- [ ] **현 SMA 전략 baseline 측정** → "개선"의 기준 수치 확정 (Docker+ClickHouse 데이터 적재 후 `python -m backtest.run`)
+- [x] **현 SMA 전략 baseline 측정** → 2년·5종목 1분봉: **누적 −97.97%, 거래 46,212건, 수수료 8.3M(자본 83%)** — 과매매·수수료가 주범 (`docs/baseline.md`)
 
 ## 1단계 — 전략 추상화 (플러그인 구조)  (#48 / PR #49)
 - [x] `strategy/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
