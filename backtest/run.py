@@ -1,6 +1,6 @@
 """백테스트 실행 진입점 (단일 책임: CLI 조립 → 실행 → 리포트).
 
-예) .venv/Scripts/python -m backtest.run --symbols KRW-BTC,KRW-ETH --start "2026-06-16 00:00:00" --out runs/sma_base
+예) .venv/Scripts/python -m backtest.run --strategy sma --symbols KRW-BTC,KRW-ETH --start "2026-06-16 00:00:00" --out runs/sma_base
 ClickHouse(Docker)가 떠 있고 ticks에 과거 데이터가 있어야 한다.
 """
 import argparse
@@ -33,7 +33,7 @@ from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
 from backtest.metrics import compute_metrics
 from backtest.report import print_summary, write_outputs
-from backtest.strategy import SmaBaselineStrategy
+from strategy.registry import available, get_strategy
 
 
 def _git_commit() -> str:
@@ -45,6 +45,7 @@ def _git_commit() -> str:
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="전략 백테스트 (ClickHouse 틱 replay)")
+    p.add_argument("--strategy", default="sma", help=f"전략 이름 {available()}")
     p.add_argument("--symbols", default="", help="쉼표 구분(미지정=전체)")
     p.add_argument("--start", default="", help="UTC 시작 (예: '2026-06-16 00:00:00')")
     p.add_argument("--end", default="", help="UTC 끝(미포함)")
@@ -64,13 +65,13 @@ def main(argv=None) -> int:
     try:
         initial = Decimal(args.initial)
         fills = FillModel(fee_rate=Decimal(args.fee), slippage_bps=Decimal(args.slippage_bps))
+        strategy = get_strategy(args.strategy)
     except (InvalidOperation, ValueError) as e:
-        print(f"[backtest] 잘못된 숫자 인자(--initial/--fee/--slippage-bps): {e}", file=sys.stderr)
+        print(f"[backtest] 잘못된 인자(--initial/--fee/--slippage-bps/--strategy): {e}", file=sys.stderr)
         return 2
 
     account = BacktestAccount(initial)
     engine = BacktestEngine(account, fills, equity_sample_sec=args.sample_sec)
-    strategy = SmaBaselineStrategy()
 
     try:
         ticks = load_ticks(symbols=symbols or None, start=args.start or None,

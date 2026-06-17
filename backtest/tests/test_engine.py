@@ -1,6 +1,6 @@
 """엔진+SMA 전략 통합 검증 (합성 데이터, ClickHouse 불필요).
 
-또한 backtest.strategy → strategy.sma_trader import가 DB 연결 없이 안전한지 검증한다.
+또한 strategy.sma → strategy.sma_trader import가 DB 연결 없이 안전한지 검증한다.
 """
 import unittest
 from decimal import Decimal
@@ -10,7 +10,7 @@ from backtest.account import BacktestAccount
 from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
 from backtest.models import BTick
-from backtest.strategy import SmaBaselineStrategy
+from strategy.sma import SMAStrategy
 
 
 def _rising_ticks(n=120, step=Decimal("0.001"), base=Decimal("100"), dt=1.0):
@@ -22,7 +22,7 @@ class TestEngine(unittest.TestCase):
     def _run(self, ticks, initial="1000000"):
         acct = BacktestAccount(Decimal(initial))
         eng = BacktestEngine(acct, FillModel(), equity_sample_sec=10.0)
-        eng.run(ticks, SmaBaselineStrategy())
+        eng.run(ticks, SMAStrategy())
         return eng
 
     def test_uptrend_produces_take_profit_trades(self):

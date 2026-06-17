@@ -1,14 +1,11 @@
-"""백테스트 전략 어댑터 (단일 책임: 틱 → 매매 의사결정).
+"""SMA 전략 (단일 책임: 규율 기반 SMA 의사결정).
 
-SmaBaselineStrategy는 라이브 strategy.sma_trader.run()의 매 틱 로직을 단일 계좌·동기 체결로
-재현한다. 신호/사이징/청산 임계값은 sma_trader의 순수 함수·상수를 그대로 import해 발산을 없앤다.
-(라이브의 async 보류 가드 _entry_pending/_reserved는 지연=0에서 no-op이므로 생략된다.)
-
-Broker는 엔진이 구현하는 동기 체결 인터페이스다. 1단계에서 strategy/base.py의 정식 ABC와 정합시킨다.
+라이브 strategy.sma_trader.run()의 매 틱 로직을 단일 계좌·동기 체결로 수행하는 Strategy 구현.
+신호/사이징/청산 임계값은 sma_trader의 순수 함수·상수를 그대로 import해 라이브와 발산을 없앤다.
+(지연=0 이상화에서 라이브의 async 보류 가드 _entry_pending/_reserved는 no-op이라 생략된다.)
 """
 from collections import deque
 from decimal import Decimal
-from typing import Protocol
 
 from common.config import (
     SMA_LONG,
@@ -18,6 +15,7 @@ from common.config import (
     STRATEGY_MIN_HOLD_SEC,
     STRATEGY_WARMUP_SEC,
 )
+from strategy.base import Broker, MarketTick, Strategy
 from strategy.sma_trader import (
     MIN_ORDER_KRW,
     liquidation_reason,
@@ -25,22 +23,12 @@ from strategy.sma_trader import (
     sma_gap,
     sma_state,
 )
-from backtest.models import BTick
 
 _NEG_INF = -1e18  # 라이브의 -1e9 대용(시장시간 epoch는 1e9 규모라 충분히 작은 값 사용)
 
 
-class Broker(Protocol):
-    def position_qty(self, symbol: str) -> Decimal: ...
-    def position_avg(self, symbol: str) -> Decimal: ...
-    def cash(self) -> Decimal: ...
-    def open_symbol_count(self) -> int: ...
-    def buy(self, symbol: str, qty: Decimal, ts: float) -> bool: ...
-    def sell(self, symbol: str, qty: Decimal, reason: str, ts: float) -> bool: ...
-
-
-class SmaBaselineStrategy:
-    name = "sma_baseline"
+class SMAStrategy(Strategy):
+    name = "sma"
 
     def __init__(self):
         self.prices: dict[str, deque] = {}
@@ -51,7 +39,7 @@ class SmaBaselineStrategy:
         self.last_exit: dict[str, float] = {}
         self.started_at: float | None = None
 
-    def on_tick(self, tick: BTick, broker: Broker) -> None:
+    def on_tick(self, tick: MarketTick, broker: Broker) -> None:
         sym, price, now = tick.symbol, tick.price, tick.ts
         if self.started_at is None:
             # 워밍업 기준 시계: 라이브는 프로세스 기동 벽시계(time.monotonic), 백테스트는 replay

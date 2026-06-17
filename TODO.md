@@ -10,11 +10,12 @@
 - [x] 결과 리포트(표/CSV) + 재현 메타 (`backtest/report.py`, run_meta.json)
 - [ ] **현 SMA 전략 baseline 측정** → "개선"의 기준 수치 확정 (Docker+ClickHouse 데이터 적재 후 `python -m backtest.run`)
 
-## 1단계 — 전략 추상화 (플러그인 구조)
-- [ ] `strategy/base.py`: `Strategy` ABC (generate_signal / size / exit 규칙 인터페이스)
-- [ ] 기존 SMA 로직을 `strategy/sma.py`의 `SMAStrategy`로 추출 (신호/사이징/청산 분리)
-- [ ] 백테스트 회귀: `SMAStrategy` 결과가 기존 sma_trader와 동일함을 확인 (성공기준: 동일 매매/지표)
-- [ ] 전략 레지스트리 + env 설정 (`ACTIVE_STRATEGIES`, 파라미터)
+## 1단계 — 전략 추상화 (플러그인 구조)  (#48)
+- [x] `strategy/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
+- [x] SMA 로직을 `strategy/sma.py`의 `SMAStrategy`로 추출 (sma_trader 순수 함수 재사용, Kafka/DB 비의존)
+- [x] 백테스트 회귀: 추출 전 골든 동일 재현 + 청산 4경로(STOP/TAKE/TRAIL/DEADCROSS) 가드 (무행동 변경 증명)
+- [x] 전략 레지스트리(`strategy/registry.py`) + `ACTIVE_STRATEGIES` env + 백테스트 `--strategy`
+- 참고: 라이브 `sma_trader.py`는 무수정(채택은 4~5단계). 백테스트는 `SMAStrategy` 채택 → `backtest/strategy.py` 삭제(중복 제거).
 
 ## 2단계 — 후보 알고리즘 분석 & 구현
 - [ ] 대중적 투자 알고리즘 조사 정리 (RSI / MACD / 볼린저밴드 / 돌파·모멘텀 / 평균회귀 등) → `docs/algorithms.md`
