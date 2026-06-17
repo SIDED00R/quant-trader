@@ -26,9 +26,13 @@ def print_summary(metrics: dict, meta: dict, engine) -> None:
     print("=" * 56)
     print(f"  백테스트 결과 — {meta.get('strategy', '?')}")
     print("=" * 56)
-    print(f"  기간        : {meta.get('start') or '처음'} ~ {meta.get('end') or '끝'}")
+    src = f"{meta.get('source')} (unit={meta.get('unit_min')}m)"
+    if meta.get("days"):
+        print(f"  기간        : 최근 {meta['days']}일   소스: {src}")
+    else:
+        print(f"  기간        : {meta.get('start') or '처음'} ~ {meta.get('end') or '끝'}   소스: {src}")
     print(f"  심볼        : {meta.get('symbols') or '전체'}")
-    print(f"  틱 수       : {engine.n_ticks:,}")
+    print(f"  봉 수       : {engine.n_ticks:,}")
     print(f"  수수료율    : {meta.get('fee_rate')}   슬리피지: {meta.get('slippage_bps')}bps")
     print("-" * 56)
     print(f"  초기자산    : {_num(m['initial_equity'])} KRW")
