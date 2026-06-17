@@ -10,7 +10,7 @@
 - [x] 결과 리포트(표/CSV) + 재현 메타 (`backtest/report.py`, run_meta.json)
 - [ ] **현 SMA 전략 baseline 측정** → "개선"의 기준 수치 확정 (Docker+ClickHouse 데이터 적재 후 `python -m backtest.run`)
 
-## 1단계 — 전략 추상화 (플러그인 구조)  (#48)
+## 1단계 — 전략 추상화 (플러그인 구조)  (#48 / PR #49)
 - [x] `strategy/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
 - [x] SMA 로직을 `strategy/sma.py`의 `SMAStrategy`로 추출 (sma_trader 순수 함수 재사용, Kafka/DB 비의존)
 - [x] 백테스트 회귀: 추출 전 골든 동일 재현 + 청산 4경로(STOP/TAKE/TRAIL/DEADCROSS) 가드 (무행동 변경 증명)
