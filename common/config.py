@@ -76,6 +76,9 @@ STRATEGY_MIN_HOLD_SEC = int(os.getenv("STRATEGY_MIN_HOLD_SEC", "20"))      # 데
 STRATEGY_WARMUP_SEC = int(os.getenv("STRATEGY_WARMUP_SEC", "30"))          # 기동 후 신규 진입/데드크로스 청산 보류(초)
 STRATEGY_MAX_POSITIONS = int(os.getenv("STRATEGY_MAX_POSITIONS", "10"))    # 계정당 동시 보유 종목 수 상한(현금 소진·과분산 방지)
 
+# 활성 전략 목록(레지스트리 이름). 4단계 앙상블에서 부하 선택에 사용. 기본 단일 SMA.
+ACTIVE_STRATEGIES = [s.strip() for s in os.getenv("ACTIVE_STRATEGIES", "sma").split(",") if s.strip()]
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
