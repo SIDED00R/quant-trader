@@ -3,12 +3,12 @@
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
-## 0단계 — 토대: 백테스트 & 성과측정 하니스
-- [ ] ClickHouse 틱/캔들 replay 기반 백테스트 러너 (`backtest/runner.py`) — 기간/심볼 지정해 전략에 데이터 주입
-- [ ] 가상 체결·수수료·슬리피지 모델 (라이브 engine과 동일 가정)
-- [ ] 성과지표 모듈 (`backtest/metrics.py`): 누적수익률·승률·MDD·Sharpe·거래수·평균손익
-- [ ] 결과 리포트 출력(표/CSV) + 재현 가능한 시드/설정 기록
-- [ ] **현 SMA 전략 baseline 측정** → "개선"의 기준 수치 확정 (성공기준: baseline 지표가 산출됨)
+## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
+- [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
+- [x] 가상 체결·수수료·슬리피지 모델 (`backtest/fills.py` + `account.py`, 라이브 engine/portfolio와 동일 가정)
+- [x] 성과지표 모듈 (`backtest/metrics.py`): 누적수익률·승률·MDD·Sharpe·손익비·거래수·평균손익
+- [x] 결과 리포트(표/CSV) + 재현 메타 (`backtest/report.py`, run_meta.json)
+- [ ] **현 SMA 전략 baseline 측정** → "개선"의 기준 수치 확정 (Docker+ClickHouse 데이터 적재 후 `python -m backtest.run`)
 
 ## 1단계 — 전략 추상화 (플러그인 구조)
 - [ ] `strategy/base.py`: `Strategy` ABC (generate_signal / size / exit 규칙 인터페이스)
