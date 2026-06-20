@@ -13,15 +13,17 @@
 | 실시간 시세를 끊김 없이 받아 **여러 소비자**(저장·집계·전략)가 **독립적으로** 처리 | 내구성 있는 이벤트 스트림 + 소비자 분리·재처리 | **Apache Kafka** (KRaft, 컨슈머 그룹) |
 | **수년치** 시세를 빠르게 집계·백테스트(시간범위 스캔, OHLCV 집계) | 대용량 시계열 OLAP, 컬럼형 압축 | **ClickHouse** (ticks/candles, FINAL 중복정리) |
 | 계좌·주문·포지션의 **정합성**(잔고 음수 방지, 트랜잭션) | 제약·트랜잭션 강한 RDB + 신뢰 발행 | **PostgreSQL** (OLTP, **outbox 패턴**) |
-| **야간 재평가·배치**(재백테스트→가중치 갱신)를 스케줄·재시도·관측 | 워크플로 오케스트레이터 | **Airflow** (배치 DAG, 도입 예정) |
+| **정해진 시각에만** 매매를 실행해 상시 가동 비용을 없앰 | 서버리스 크론 + 온디맨드 VM | **Cloud Scheduler** (매일 매매 VM 기동→실행→자가종료) |
 | 공개 대시보드에 **고정주소 + 자동 HTTPS** | 리버스프록시 + 인증서 자동발급 | **Caddy** (Let's Encrypt) |
-| **재현 가능한 배포** | 컨테이너 오케스트레이션 + 단일 VM | **Docker Compose + GCE** |
+| **재현 가능한 배포** + 상시 비용 최소화 | 컨테이너 오케스트레이션 + **역할별 VM 분리** | **Docker Compose + GCE (2-VM)** |
+
+> *(보류) **Airflow**: 야간 재평가 배치를 오케스트레이션할 후보였으나, 현재 재평가 잡이 가볍고(수초) 무거운 정기 작업이 없어 **도입하지 않음**. 정해진 시각 트리거는 Cloud Scheduler로 충분 — DL 재학습 등 무거운 잡이 생기면 그때 정당. "필요해서 도입"의 반례로, 불필요한 기술은 배제.*
 
 → 각 기술은 호기심이 아니라 **요구를 만족시키려다 도달한 선택**이다.
 
-## 3. 구현 (파이프라인)
-`업비트 WebSocket(ingester)` → **Kafka `market.ticks`** → `sink`(ClickHouse 적재)·`aggregator`(1분봉 집계)·`strategy`(신호)
-→ `commander`(주문 결정) → **Postgres `orders`** → `relay` → `engine`(체결 시뮬레이션) → `portfolio`(잔고·포지션) → **FastAPI 대시보드**.
+## 3. 구현 (파이프라인 — 2-VM 분리)
+**[데이터 VM · 24/7 상시]** `업비트 WebSocket(ingester)` → **Kafka `market.ticks`** → `sink`(ClickHouse 적재) · `aggregator`(1분봉→일봉 집계) + **PostgreSQL**(계좌·주문·포지션) + **FastAPI/Caddy 대시보드**. ← Kafka가 한 틱 스트림을 *여러 독립 소비자*(적재·집계)에 나눠주는 **팬아웃**이 핵심.
+**[매매 VM · 온디맨드]** Cloud Scheduler가 매일 일봉 마감 후(01:00 UTC) 기동 → `trade_once`가 일봉 합성 목표비중을 산출하고 **주문·체결을 동기 처리**(SSH 터널로 데이터 VM의 DB 접근) → Postgres 기록 → **자가 종료**.
 별도로 **백테스트 하니스**(과거 replay·체결/수수료 모델·성과지표)와 **전략 플러그인 구조**(`Strategy` ABC + 레지스트리)를 구축.
 
 ## 4. 발생한 문제
@@ -43,18 +45,19 @@
 - **신호 버스(`strategy.signals`) + Commander** — 신호 발행과 주문 결정 분리(확장 가능한 지휘관 구조).
 - **ClickHouse 단일 저장소 통일** + **일봉 집계기**(데이터 일일 최신화).
 - **성과 패널**(FIFO 실현손익·승률·수수료) + **모델 카드**(`docs/model.md` — 학습 데이터 기간·검증법·한계 명시).
-- (진행 예정) **다부하 + 적응형 가중치 + Airflow 오케스트레이션** — 단 적응층은 과적합 위험이라 **기본 off·DSR 게이트로 격리**해 측정 후 적용.
+- **다부하 Commander**(5/40·10/60·20/100 속도 부하를 가중합) + **부하별 OOS 재평가 잡**(`reeval_weights`) — 단 적응형 가중치는 과적합 위험(walk-forward에서 고정>최적화)이라 **기본 off·DSR 게이트로 격리**, "열화 부하 자동 강등" 안전장치로만 보수적 설계.
+- **2-VM 이벤트 백본 재편 (비용·요구 정합)** — 상시 필요한 건 데이터 수집뿐이고 매매는 일봉 1회임을 인지해, **상시 데이터 VM + 온디맨드 매매 VM**으로 분리(Cloud Scheduler 기동→`trade_once` 동기 배치→자가종료). 라이브 매매를 스트리밍에서 **동기 배치로 단순화**(요구 빈도에 맞춰 right-size). Kafka는 매매에서 빠지고 **실시간 데이터 팬아웃**이라는 본래 정당한 역할로 유지. **상시 비용 ~$66→~$25/월**.
 
 ## 7. 성과 · 배운 것
-- **공정 기준선 −62% → walk-forward OOS 연율 Sharpe ~1.47 / PSR ≈ 1.0** 의 통계적으로 유의한 전략을 도출하고, **GCE VM에 라이브(모의) 배포**(자동 HTTPS 공개 대시보드).
+- **공정 기준선 −62% → walk-forward OOS 연율 Sharpe ~1.47 / PSR ≈ 1.0** 의 통계적으로 유의한 전략을 도출하고, **GCE 2-VM(상시 데이터 + 온디맨드 매매)에 라이브(모의) 배포**(자동 HTTPS 공개 대시보드). 온디맨드 분리로 **상시 비용 ~$66→~$25/월** 절감, 매매 VM은 스케줄러로 켜져 1회 매매 후 자가 종료.
 - 핵심 학습:
   1. **과매매·수수료가 수익의 1차 적** — 신호 개선보다 거래 빈도 통제가 먼저.
   2. **표본 길이가 유의성의 병목** — 전략 튜닝보다 데이터 확보가 효과적일 때가 있다.
   3. **walk-forward / Deflated Sharpe로 과적합을 정량 차단** — "전체 백테스트 수익"의 함정.
   4. **적대적 검증의 가치** — 멀티에이전트 리뷰가 사람·테스트가 놓친 결함을 잡았다.
-  5. **이벤트 스트림·OLAP·OLTP·오케스트레이터의 역할 분리** 설계.
+  5. **기술을 요구에 맞춰 right-size** — 요구(빈도·부하)가 바뀌면 도구도 바꾼다: 스트리밍→동기 배치, 단일 상시 VM→온디맨드 분리, 불필요한 Airflow 배제. Kafka는 *진짜 다소비자 팬아웃*이 있는 데이터 경로에만 남김.
 
 ## 기술 스택 (한눈에)
-Python · Apache Kafka(KRaft) · ClickHouse · PostgreSQL · FastAPI · Docker Compose · GCE · Caddy · (예정)Airflow · 백테스트 하니스(walk-forward·Deflated Sharpe) · 멀티에이전트 코드리뷰·딥리서치
+Python · Apache Kafka(KRaft, 데이터 팬아웃) · ClickHouse · PostgreSQL(outbox) · FastAPI · Caddy · **Docker Compose 프로파일(data/app/trade)** · **GCE 2-VM(상시 데이터 + 온디맨드 매매)** · **Cloud Scheduler**(매일 매매 VM 기동) · **SSH 터널**(VM 간 DB 접근) · 백테스트 하니스(walk-forward·Deflated Sharpe) · 멀티에이전트 코드리뷰·딥리서치
 
 > 영어판(원서용)이 필요하면 동일 내용으로 별도 작성 가능.
