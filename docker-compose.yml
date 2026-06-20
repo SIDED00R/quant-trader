@@ -169,6 +169,7 @@ services:
   db-init:
     <<: *app
     container_name: db-init
+    profiles: ["app", "data"]    # 데이터 VM도 스키마(pg/ch) 필요
     command: python -m scripts.init_db
     restart: "no"
     depends_on:
@@ -180,21 +181,25 @@ services:
   ingester:
     <<: *app
     container_name: ingester
+    profiles: ["app", "data"]
     command: python -m ingester.upbit_ws
 
   sink:
     <<: *app
     container_name: sink
+    profiles: ["app", "data"]
     command: python -m sink.tick_clickhouse
 
   candle:
     <<: *app
     container_name: candle
+    profiles: ["app", "data"]
     command: python -m aggregator.candle
 
   daily-aggregator:
     <<: *app
     container_name: daily-aggregator
+    profiles: ["app", "data"]
     command: python -m aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
 
   engine:
@@ -249,6 +254,7 @@ services:
   api:
     <<: *app
     container_name: api
+    profiles: ["app", "data"]
     command: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
     ports:
       # 외부 공개는 Caddy(HTTPS)가 담당. api 자체는 루프백만 바인딩(SSH 터널용).
@@ -259,7 +265,7 @@ services:
     image: caddy:2
     container_name: caddy
     restart: unless-stopped
-    profiles: ["app"]
+    profiles: ["app", "data"]
     depends_on:
       - api
     ports:
