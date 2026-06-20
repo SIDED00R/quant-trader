@@ -103,7 +103,8 @@ services:
     container_name: postgres
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5432:5432"
+      # 기본 loopback(로컬 개발). 데이터 VM은 .env DB_BIND=<사설IP>로 온디맨드 매매 VM에 노출(VPC 내부만).
+      - "${DB_BIND:-127.0.0.1}:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trader}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
@@ -122,7 +123,7 @@ services:
     container_name: clickhouse
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8123:8123"   # HTTP (루프백만 노출, native 9000은 미사용이라 비노출)
+      - "${DB_BIND:-127.0.0.1}:8123:8123"   # HTTP. 기본 loopback; 데이터 VM은 DB_BIND=<사설IP>(VPC 내부만). native 9000 비노출
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
