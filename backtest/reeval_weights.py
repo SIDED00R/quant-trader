@@ -45,9 +45,10 @@ def score_loads(bars, loads, initial, fills, sample_sec, is_sec, oos_sec, step_s
     from strategy.trend import TrendStrategy
 
     ppy = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
+    # 공통 prime = 부하 중 최장 warmup → 모든 부하를 동일 OOS 창에서 평가(부하 간 Sharpe 공정 비교).
+    prime_bars = max(TrendStrategy(short=s, long=l).warmup_bars for _n, s, l in loads)
     out = {}
     for name, short, long in loads:
-        prime_bars = TrendStrategy(short=short, long=long).warmup_bars
         rets = oos_returns(bars, lambda s=short, l=long: TrendStrategy(short=s, long=l),
                            prime_bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec)
         gate = deflated_sharpe(rets, 0.0, 1)        # 고정구성 → N=1 → benchmark 0의 PSR(=엣지 유의확률)
