@@ -4,13 +4,16 @@
 """
 import unittest
 from decimal import Decimal
+from unittest import mock
 
-from common.config import STRATEGY_WARMUP_SEC
+import strategy.sma as sma_mod
 from backtest.account import BacktestAccount
 from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
 from backtest.models import BTick
 from strategy.sma import SMAStrategy
+
+_TEST_WARMUP = 30  # 1.5단계 가드 재튜닝 전 조건으로 고정(엔진/전략 로직 검증은 튜닝 기본값과 분리)
 
 
 def _rising_ticks(n=120, step=Decimal("0.001"), base=Decimal("100"), dt=1.0):
@@ -19,6 +22,15 @@ def _rising_ticks(n=120, step=Decimal("0.001"), base=Decimal("100"), dt=1.0):
 
 
 class TestEngine(unittest.TestCase):
+    def setUp(self):
+        # SMA 전략 가드를 캡처 시점 값으로 고정(워밍업 짧게·수수료필터 off·데드크로스 on)
+        for attr, val in (("STRATEGY_WARMUP_SEC", _TEST_WARMUP),
+                          ("STRATEGY_MIN_EDGE_PCT", Decimal("0")),
+                          ("STRATEGY_DEADCROSS_EXIT", True)):
+            p = mock.patch.object(sma_mod, attr, val)
+            p.start()
+            self.addCleanup(p.stop)
+
     def _run(self, ticks, initial="1000000"):
         acct = BacktestAccount(Decimal(initial))
         eng = BacktestEngine(acct, FillModel(), equity_sample_sec=10.0)
@@ -37,11 +49,11 @@ class TestEngine(unittest.TestCase):
         # 모든 청산은 익절, 모든 진입은 워밍업 이후
         for t in eng.closed_trades:
             self.assertEqual(t.reason, "TAKE")
-            self.assertGreaterEqual(t.entry_ts, float(STRATEGY_WARMUP_SEC))
+            self.assertGreaterEqual(t.entry_ts, float(_TEST_WARMUP))
 
     def test_no_entry_before_warmup(self):
         # 워밍업 구간 안에서만 끝나는 짧은 상승 → 진입 없음
-        short = _rising_ticks(n=int(STRATEGY_WARMUP_SEC) - 1)
+        short = _rising_ticks(n=_TEST_WARMUP - 1)
         eng = self._run(short)
         self.assertEqual(len(eng.closed_trades), 0)
         self.assertEqual(eng.account.qty("KRW-BTC"), Decimal("0"))

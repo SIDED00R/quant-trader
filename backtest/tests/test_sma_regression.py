@@ -8,7 +8,9 @@ STOP/DEADCROSS 골든은 AST 동일성이 증명된 SMAStrategy로 캡처(추출
 """
 import unittest
 from decimal import Decimal
+from unittest import mock
 
+import strategy.sma as sma_mod
 from backtest.account import BacktestAccount
 from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
@@ -60,6 +62,18 @@ CASES = [
 
 
 class TestSmaRegression(unittest.TestCase):
+    def setUp(self):
+        # 골든은 1.5단계 가드 재튜닝 이전 조건에서 캡처됨 → 청산 4경로 로직 회귀를 튜닝 기본값과
+        # 분리해 고정한다(워밍업/쿨다운/최소보유 짧게, 수수료필터 off, 데드크로스 on).
+        for attr, val in (("STRATEGY_WARMUP_SEC", 30),
+                          ("STRATEGY_COOLDOWN_SEC", 15),
+                          ("STRATEGY_MIN_HOLD_SEC", 20),
+                          ("STRATEGY_MIN_EDGE_PCT", Decimal("0")),
+                          ("STRATEGY_DEADCROSS_EXIT", True)):
+            p = mock.patch.object(sma_mod, attr, val)
+            p.start()
+            self.addCleanup(p.stop)
+
     def test_liquidation_paths_match_golden(self):
         for build, golden, final_eq, mdd in CASES:
             with self.subTest(reason=golden[0][0]):
