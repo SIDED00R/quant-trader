@@ -87,7 +87,9 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description="전략 백테스트 (분봉 replay)")
     p.add_argument("--strategy", default="sma", help=f"전략 이름 {available()}")
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
-                   help="upbit=REST 백필 캐시 / clickhouse=candles_1m")
+                   help="upbit=REST 백필 캐시 / clickhouse=candles_1m·1d")
+    p.add_argument("--ch-table", default="candles_1m", choices=["candles_1m", "candles_1d"],
+                   help="clickhouse 소스 테이블(1d=장기 일봉)")
     p.add_argument("--symbols", default="", help="쉼표 구분(upbit는 미지정 시 config SYMBOLS, clickhouse는 전체)")
     p.add_argument("--unit", type=int, default=1, help="분봉 단위(upbit 캐시 unit과 일치)")
     p.add_argument("--bar-min", type=int, default=0,
@@ -132,7 +134,8 @@ def main(argv=None) -> int:
                                         bar_min=args.bar_min or None)
         else:
             candles = load_clickhouse_candles(symbols=symbols or None,
-                                              start=args.start or None, end=args.end or None)
+                                              start=args.start or None, end=args.end or None,
+                                              table=args.ch_table)
         engine.run(candles, strategy)
     except Exception as e:
         print(f"[backtest] 데이터 로드 실패: {e}", file=sys.stderr)

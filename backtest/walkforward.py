@@ -17,6 +17,7 @@ from decimal import Decimal, InvalidOperation
 
 from common.config import FEE_RATE, INITIAL_BALANCE, SYMBOLS
 from backtest.account import BacktestAccount
+from backtest.datasource import load_clickhouse_candles
 from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
 from backtest.metrics import SECONDS_PER_YEAR, deflated_sharpe
@@ -184,9 +185,13 @@ def _print(result):
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="저회전 추세 전략 walk-forward (롤링 IS/OOS + Deflated Sharpe)")
     p.add_argument("--symbols", default="", help="쉼표 구분(미지정 시 config SYMBOLS)")
-    p.add_argument("--unit", type=int, default=1, help="캐시 분봉 단위")
-    p.add_argument("--bar-min", type=int, default=1440, help="리샘플 타임프레임 분(기본 1440=일봉)")
-    p.add_argument("--days", type=int, default=730, help="최근 N일(기본 2년)")
+    p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
+                   help="upbit=CSV 캐시(리샘플) / clickhouse=candles_1d 장기 일봉")
+    p.add_argument("--ch-table", default="candles_1d", choices=["candles_1m", "candles_1d"],
+                   help="clickhouse 소스 테이블")
+    p.add_argument("--unit", type=int, default=1, help="캐시 분봉 단위(upbit)")
+    p.add_argument("--bar-min", type=int, default=1440, help="리샘플 타임프레임 분(upbit, 기본 1440=일봉)")
+    p.add_argument("--days", type=int, default=730, help="최근 N일(upbit 캐시 필터)")
     p.add_argument("--cache-dir", default="data/candles", help="upbit 캐시 디렉터리")
     p.add_argument("--is-days", type=int, default=180, help="IS(파라미터 선택) 일수")
     p.add_argument("--oos-days", type=int, default=90, help="OOS(평가) 일수")
@@ -210,18 +215,23 @@ def main(argv=None) -> int:
     except (InvalidOperation, ValueError) as e:
         print(f"[wf] 잘못된 인자(--initial/--fee): {e}", file=sys.stderr)
         return 2
-    start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
     try:
-        bars = list(load_candle_cache(symbols, args.unit, args.cache_dir,
-                                      start_ms=start_ms, bar_min=args.bar_min or None))
+        if args.source == "clickhouse":
+            bars = list(load_clickhouse_candles(symbols=symbols, table=args.ch_table))
+            sample_sec = 86400.0 if args.ch_table == "candles_1d" else 60.0
+        else:
+            start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
+            bars = list(load_candle_cache(symbols, args.unit, args.cache_dir,
+                                          start_ms=start_ms, bar_min=args.bar_min or None))
+            sample_sec = (args.bar_min or args.unit) * 60.0
     except Exception as e:
         print(f"[wf] 데이터 로드 실패: {e}", file=sys.stderr)
         return 2
     if not bars:
-        print("[wf] 0봉 — 먼저 백필: python -m backtest.backfill --days {} --unit {}".format(
-            args.days, args.unit), file=sys.stderr)
+        hint = ("python -m backtest.backfill_daily --symbols KRW-BTC,KRW-ETH" if args.source == "clickhouse"
+                else "python -m backtest.backfill --days {} --unit {}".format(args.days, args.unit))
+        print(f"[wf] 0봉 — 먼저 백필: {hint}", file=sys.stderr)
         return 1
-    sample_sec = (args.bar_min or args.unit) * 60.0
     result = run_walkforward(bars, initial, fills, sample_sec,
                              args.is_days * _DAY, args.oos_days * _DAY, args.step_days * _DAY)
     _print(result)
