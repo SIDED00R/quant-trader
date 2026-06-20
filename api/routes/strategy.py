@@ -17,7 +17,7 @@ router = APIRouter(prefix="/strategy")
 @router.get("/ensemble")
 def ensemble_state():
     """채택 앙상블의 종목별 현재 스탠스: 목표비중(0~1)·LONG/CASH·속도별 추세상태."""
-    from backtest.datasource import load_clickhouse_candles  # CH 의존을 라우트 호출 시점으로 지연
+    from common.candles import daily_candles   # CH 의존을 라우트 호출 시점으로 지연(backtest 비의존)
     out = []
     try:
         for sym in ENSEMBLE_SYMBOLS:
@@ -25,9 +25,9 @@ def ensemble_state():
             combined = 0.0
             last_day = None
             bars = 0
-            for bt in load_clickhouse_candles(symbols=[sym], table="candles_1d"):
-                combined = float(ens.combined_target(sym, bt.price))
-                last_day = bt.ts
+            for _sym, close, ts in daily_candles([sym]):
+                combined = float(ens.combined_target(sym, close))
+                last_day = ts
                 bars += 1
             speeds = [
                 {"short": s.short, "long": s.long,
