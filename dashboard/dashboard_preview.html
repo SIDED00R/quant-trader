@@ -1,16 +1,25 @@
 <title>coin-auto-trader — 터미널 리디자인 미리보기</title>
 <style>
-  :root{
+  :root{                                   /* 다크(기본) */
     --ink:#0b0e14; --panel:#12161f; --raise:#181d28; --line:#222a38; --line2:#2c3546;
     --text:#e9edf4; --muted:#7a8494; --faint:#4b5566;
     --up:#f6465d; --down:#4d8dff;               /* 시장: 한국 관례(상승=빨강·하락=파랑) */
     --algo:#2dd4bf; --algo-deep:#0f9e8e; --algo-glow:rgba(45,212,191,.22); --cash:#5b6677;
+    --bg-grad:radial-gradient(1200px 500px at 80% -10%, #131a26 0%, transparent 60%);
+    --field:#0a0d13;
     --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
     --sans:-apple-system,"Segoe UI","Malgun Gothic",system-ui,sans-serif;
   }
+  :root[data-theme="light"]{               /* 라이트 — 동일 아이덴티티(틸 유지), 종이 베이스 */
+    --ink:#eef1f6; --panel:#ffffff; --raise:#f3f5f9; --line:#e1e6ef; --line2:#d2d9e6;
+    --text:#161b26; --muted:#5d6675; --faint:#9aa4b4;
+    --up:#dc2f49; --down:#2767d8;
+    --algo:#0d9488; --algo-deep:#0f766e; --algo-glow:rgba(13,148,136,.16); --cash:#8b94a4;
+    --bg-grad:radial-gradient(1100px 460px at 82% -12%, #e3ecf5 0%, transparent 60%);
+    --field:#f6f8fb;
+  }
   *{box-sizing:border-box;}
-  body{margin:0;background:
-      radial-gradient(1200px 500px at 80% -10%, #131a26 0%, transparent 60%), var(--ink);
+  body{margin:0;background:var(--bg-grad), var(--ink);
     color:var(--text);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased;}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
   .lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;}
@@ -18,7 +27,10 @@
 
   /* ── 헤더 ── */
   header{display:flex;align-items:center;gap:26px;padding:14px 22px;
-    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#10141d,#0d1119);flex-wrap:wrap;}
+    border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap;}
+  .icon-btn{background:var(--raise);border:1px solid var(--line);color:var(--text);width:34px;height:30px;
+    border-radius:8px;cursor:pointer;font-size:15px;}
+  .icon-btn:hover{border-color:var(--algo);}
   .brand{display:flex;align-items:center;gap:10px;}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--algo);
     box-shadow:0 0 0 3px var(--algo-glow),0 0 14px var(--algo);}
@@ -49,7 +61,7 @@
   .state.LONG{color:var(--ink);background:var(--algo);}
   .state.CASH{color:var(--cash);background:rgba(91,102,119,.16);border:1px solid var(--line2);}
   /* 트랙 */
-  .track{position:relative;height:30px;border-radius:7px;background:#0a0d13;
+  .track{position:relative;height:30px;border-radius:7px;background:var(--field);
     border:1px solid var(--line);margin:6px 0 4px;}
   .ticks{position:absolute;inset:0;display:flex;justify-content:space-between;padding:0 1px;}
   .ticks i{width:1px;background:var(--line2);opacity:.6;}
@@ -59,7 +71,7 @@
   .thumb{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);
     box-shadow:0 0 8px rgba(255,255,255,.5);left:0;transition:left 1.1s cubic-bezier(.22,1,.36,1);}
   .wtxt{position:absolute;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;
-    color:var(--ink);left:10px;mix-blend-mode:difference;}
+    color:#03110e;left:10px;}
   .rail-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;}
   .ends{font-size:9px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;}
   .speeds{display:flex;gap:7px;}
@@ -103,7 +115,7 @@
   .seg button.buy{background:var(--up);color:#fff;} .seg button.sell{background:var(--down);color:#fff;}
   .seg button.on{background:var(--algo);color:var(--ink);font-weight:600;}
   label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;}
-  input,select{width:100%;background:#0a0d13;border:1px solid var(--line);color:var(--text);
+  input,select{width:100%;background:var(--field);border:1px solid var(--line);color:var(--text);
     padding:10px;border-radius:8px;font-size:14px;font-family:var(--mono);}
   input:focus,select:focus{outline:none;border-color:var(--algo);box-shadow:0 0 0 3px var(--algo-glow);}
   .submit{padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;color:#fff;
@@ -122,6 +134,7 @@
   <div class="kpi"><span class="lbl">총손익</span><span class="v big num up">+₩2,438,210</span></div>
   <div class="sp"></div>
   <div class="live">실시간 · 갱신 17:21:04 KST</div>
+  <button class="icon-btn" id="themeToggle" title="라이트/다크 전환">☀️</button>
 </header>
 
 <!-- 시그니처: 알고리즘의 현재 스탠스 -->
@@ -210,6 +223,12 @@
 </main>
 
 <script>
+  // 라이트/다크 토글
+  const tt = document.getElementById("themeToggle");
+  function setTheme(t){ document.documentElement.setAttribute("data-theme", t); tt.textContent = t==="light"?"🌙":"☀️"; }
+  tt.onclick = () => setTheme(document.documentElement.getAttribute("data-theme")==="light"?"dark":"light");
+  setTheme(matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+
   // 레일 채움 애니메이션(로드 후 목표비중으로 sweep)
   requestAnimationFrame(() => setTimeout(() => {
     document.querySelectorAll(".fill,.thumb").forEach(el => {
