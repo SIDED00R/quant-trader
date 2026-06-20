@@ -18,6 +18,8 @@ class BollingerStrategy(DisciplinedStrategy):
         if band is None:
             return None
         lower, _mid, upper = band
+        if upper <= lower:          # 변동성 0(밴드 붕괴, 평탄 구간) → 엣지 없음, 신호 억제
+            return None
         price = float(prices[-1])
         if price <= lower:
             return "BUY"

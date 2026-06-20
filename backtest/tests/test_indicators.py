@@ -18,6 +18,9 @@ class TestRSI(unittest.TestCase):
         r = rsi([10, 11] * 8, 14)  # 16개, 등락 반복
         self.assertTrue(0.0 < r < 100.0)
 
+    def test_flat_series_is_50(self):
+        self.assertEqual(rsi([10] * 15, 14), 50.0)  # 무변동(이득=손실=0) → 50 분기
+
 
 class TestBollinger(unittest.TestCase):
     def test_flat_series_zero_width(self):

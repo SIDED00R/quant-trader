@@ -185,7 +185,7 @@ class TestUpbitBackfill(unittest.TestCase):
             out = uc._get(client, 1, {"market": "KRW-BTC", "count": 200}, req_sleep=0)
         self.assertEqual(out, [{"x": 1}])
         self.assertEqual(len(client.calls), 3)
-        self.assertGreaterEqual(sl.call_count, 2)
+        self.assertEqual(sl.call_count, 3)  # 429×2 백오프 + 성공 시 req_sleep 1회
 
     def test_get_retries_on_5xx_then_succeeds(self):
         # 일시적 5xx도 429처럼 재시도해야 한다(전체 백필이 한 번의 서버 오류로 죽지 않게)

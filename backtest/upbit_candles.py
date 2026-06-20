@@ -52,10 +52,12 @@ def _get(client: httpx.Client, unit: int, params: dict, req_sleep: float) -> lis
         try:
             r = client.get(url, params=params)
         except httpx.TransportError:               # 타임아웃/연결오류 → 지수 백오프 재시도
-            time.sleep(_backoff(attempt))
+            if attempt < _MAX_RETRIES - 1:         # 마지막 시도면 곧 raise하므로 sleep 생략
+                time.sleep(_backoff(attempt))
             continue
         if r.status_code == 429 or r.status_code >= 500:  # 레이트리밋/일시적 서버오류 → 지수 백오프 재시도
-            time.sleep(_backoff(attempt))
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(_backoff(attempt))
             continue
         r.raise_for_status()
         time.sleep(req_sleep)
@@ -81,7 +83,8 @@ def _scan_dt(path: str):
 def backfill(markets, unit, days, cache_dir, req_sleep=0.12, log=print):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
-    complete_until_ms = int(now.replace(second=0, microsecond=0).timestamp() * 1000)  # 진행 중(미마감) 현재 분봉 제외 경계
+    bucket_sec = unit * 60                                                        # unit분 봉 길이(초)
+    complete_until_ms = (int(now.timestamp()) // bucket_sec) * bucket_sec * 1000  # 진행 중(미마감) 현재 봉 제외 경계(unit봉 시작으로 내림)
     for market in markets:
         _backfill_one(market, unit, cutoff, complete_until_ms, cache_dir, req_sleep, log)
         _finalize(cache_path(cache_dir, market, unit), market, log)

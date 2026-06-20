@@ -15,7 +15,7 @@ class MACDStrategy(DisciplinedStrategy):
 
     def __init__(self):
         super().__init__()
-        self._state: dict[str, dict] = {}  # sym -> {fast, slow, sig, prev_hist, n}
+        self._state: dict[str, dict] = {}  # sym -> {fast, slow, sig, prev, n}
 
     def _signal(self, symbol, prices):
         price = prices[-1]

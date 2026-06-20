@@ -24,7 +24,7 @@
 | Kafka (KRaft) | **Managed Service for Apache Kafka** | Confluent Cloud / GKE self-host | 사설 IP, 최소 노드 |
 | PostgreSQL | **Cloud SQL for PostgreSQL** | GCE self-host | 사설 IP, 최소 티어 |
 | ClickHouse | **GCE 단일 VM(self-host)** | ClickHouse Cloud | 학습/비용상 단일 e2-small VM 권장 |
-| 수집기/싱크/체결엔진/포트폴리오/릴레이 (상시 consumer) | **GKE Autopilot** | GCE + systemd | 상시 구동 long-running |
+| 수집기/싱크/캔들집계기/체결엔진/포트폴리오/전략/릴레이 (상시 consumer) | **GKE Autopilot** | GCE + systemd | 상시 구동 long-running |
 | 주문 API (FastAPI) | **Cloud Run** | GKE | 사설 리소스 접근 위해 VPC 커넥터 필요 |
 | Grafana | **Grafana Cloud(무료 티어)** | GKE/GCE | 비용 절감 |
 | 컨테이너 이미지 | **Artifact Registry** | — | 빌드 산출물 저장 |
@@ -59,7 +59,7 @@
 
 - 서비스별 `Dockerfile`(또는 단일 이미지 + 엔트리포인트 분기). `python:3.13-slim` 베이스.
 - 빌드 → **Artifact Registry** push (`asia-northeast3` 서울 리전 권장).
-- **GKE Deployments** (consumer 5종): 각 `replicas: 1`(체결엔진은 단일 강제), `restartPolicy: Always`.
+- **GKE Deployments** (consumer 7종: 수집기/싱크/캔들집계기/체결엔진/포트폴리오/전략/릴레이): 각 `replicas: 1`(체결엔진은 단일 강제), `restartPolicy: Always`.
 - **Cloud Run** 서비스: 주문 API. min-instances=1(콜드스타트 회피, 비용 주의) 또는 0.
 - 스키마 적용(`scripts/init_db`)은 **1회성 Job**(GKE Job / Cloud Run Job)으로.
 - 토픽 생성은 Managed Kafka 콘솔/Terraform 또는 init Job.
@@ -91,6 +91,8 @@
 
 ## 7. Terraform(IaC) 개요
 
+> ⚠️ 아래는 매니지드 전환 시의 **설계안**이며 아직 생성되지 않았다(`infra/terraform/` 미존재). 실제 배포는 섹션 11의 단일 GCE VM docker-compose 풀스택으로 대체됐다.
+
 ```
 infra/terraform/
 ├── main.tf            # provider, 백엔드(GCS)
@@ -117,7 +119,7 @@ infra/terraform/
 2. Terraform: 네트워크 + Artifact Registry + Secret Manager.
 3. 데이터스토어 프로비저닝: Cloud SQL, Managed Kafka(+토픽), ClickHouse VM.
 4. 이미지 빌드 → Artifact Registry push, 스키마 적용 Job 실행.
-5. consumer 5종 GKE 배포(체결엔진 replicas=1), 주문 API Cloud Run 배포.
+5. consumer 7종 GKE 배포(체결엔진 replicas=1), 주문 API Cloud Run 배포.
 6. Grafana(Cloud) 연결 + 데이터소스/대시보드.
 7. 스모크 테스트(주문→체결→잔고, 대시보드 데이터) + 예산/모니터링 확인.
 
