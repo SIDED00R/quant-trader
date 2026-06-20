@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from api import auth_google
-from api.routes import account, autotrade, history, market, orders, web
+from api.routes import account, autotrade, history, market, orders, strategy, web
 from api.security import auth_gate
 from common.config import SESSION_SECRET, SITE_ADDRESS
 from common.postgres_client import close_pool, open_pool
@@ -37,3 +37,4 @@ app.include_router(history.router)
 app.include_router(orders.router)
 app.include_router(account.router)
 app.include_router(autotrade.router)
+app.include_router(strategy.router)
