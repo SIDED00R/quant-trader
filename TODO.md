@@ -24,13 +24,14 @@
 - [x] 데드크로스 청산 재검토 → 토글화(`STRATEGY_DEADCROSS_EXIT`, 기본 off; on/off 백테스트 비교)
 - [x] 재튜닝 후 SMA baseline 재측정 → **공정 기준선 −62.32%, 거래 5,937건(−87%), 수수료 3.9M(−53%)** (`docs/baseline.md`)
 
-## 2단계 — 후보 알고리즘 분석 & 구현
-- [ ] 대중적 투자 알고리즘 조사 정리 (RSI / MACD / 볼린저밴드 / 돌파·모멘텀 / 평균회귀 등) → `docs/algorithms.md`
-- [ ] RSI 전략 구현 (`strategy/rsi.py`)
-- [ ] MACD 전략 구현 (`strategy/macd.py`)
-- [ ] 볼린저밴드 전략 구현 (`strategy/bollinger.py`)
-- [ ] 돌파/모멘텀 전략 구현 (`strategy/breakout.py`)
-- [ ] (선택) 평균회귀 등 추가 전략
+## 2단계 — 후보 알고리즘 분석 & 구현  (#54)
+- [x] 대중적 투자 알고리즘 조사 정리 (RSI / MACD / 볼린저밴드 / 돌파·모멘텀 / 평균회귀) → `docs/algorithms.md`
+- [x] RSI 전략 구현 (`strategy/rsi.py`)
+- [x] MACD 전략 구현 (`strategy/macd.py`)
+- [x] 볼린저밴드 전략 구현 (`strategy/bollinger.py`)
+- [x] 돌파/모멘텀 전략 구현 (`strategy/breakout.py`)
+- [x] 공통 규율 베이스(`strategy/disciplined.py`) + 지표 순수함수(`strategy/indicators.py`) + 레지스트리 등록 + 단위/엔진 테스트
+- [ ] (선택) 평균회귀 등 추가 전략 — 필요 시 동일 `DisciplinedStrategy` 패턴으로 확장
 
 ## 3단계 — 검증 & 부하 선별
 - [ ] 전 알고리즘 백테스트 일괄 실행 (동일 기간·심볼·자금)
