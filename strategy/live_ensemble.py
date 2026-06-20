@@ -78,13 +78,12 @@ class LiveEnsemble:
 
 
 def _load_history(symbols) -> dict:
-    """candles_1d에서 종목별 (day, close) 시간오름차순 로드(워밍업용)."""
-    from backtest.datasource import load_clickhouse_candles
+    """candles_1d에서 종목별 (day, close) 시간오름차순 로드(워밍업용). common.candles 사용(backtest 비의존)."""
+    from common.candles import daily_candles
     hist: dict = {s: [] for s in symbols}
-    for bt in load_clickhouse_candles(symbols=list(symbols), table="candles_1d"):
-        if bt.symbol in hist:
-            day = datetime.fromtimestamp(bt.ts, timezone.utc).date()
-            hist[bt.symbol].append((day, bt.price))
+    for sym, close, ts in daily_candles(symbols):
+        if sym in hist:
+            hist[sym].append((datetime.fromtimestamp(ts, timezone.utc).date(), close))
     return hist
 
 
