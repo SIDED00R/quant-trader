@@ -15,6 +15,16 @@ from strategy.trend_signal import TrendSignal
 _DEFAULT_SPECS = [(5, 40), (10, 60), (20, 100)]
 
 
+def load_name(short, long) -> str:
+    """부하(전략) 식별자 — 다부하 Commander 신호 태그/가중치 키. 워커·commander 공유."""
+    return f"trend-{short}-{long}"
+
+
+def default_loads() -> list[tuple]:
+    """채택 구성의 부하 목록 [(name, short, long), ...] (5단계 다부하 분리용)."""
+    return [(load_name(s, l), s, l) for s, l in _DEFAULT_SPECS]
+
+
 class EnsembleStrategy(Strategy):
     name = "ensemble"
 

@@ -44,8 +44,8 @@ class Order:
 class Signal:
     """전략 부하 → commander 신호(strategy.signals). target_weight=목표 비중(0~max, 0=현금)."""
     symbol: str
-    strategy: str           # 전략명(예: 'ensemble')
-    target_weight: Decimal  # 합성 목표 비중(0=현금)
+    strategy: str           # 부하(전략) 식별자(예: 'trend-5-40') — commander 합성/가중치 키
+    target_weight: Decimal  # 해당 부하의 목표 비중(0=현금)
     bar_ts: str             # 신호 산출 봉(일봉) 시각 ISO8601(UTC)
     ts: str                 # 발행 시각 ISO8601(UTC)
 

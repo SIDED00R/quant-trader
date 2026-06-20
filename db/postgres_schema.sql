@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS executions (
     executed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 전략 부하 가중치(5단계): 재평가 잡이 갱신, commander가 읽어 신호 합성. 없으면 commander는 동일가중.
+CREATE TABLE IF NOT EXISTS strategy_weights (
+    strategy    TEXT PRIMARY KEY,
+    weight      NUMERIC(10,6) NOT NULL DEFAULT 1 CHECK (weight >= 0),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 주문 발행 아웃박스: 주문 INSERT와 같은 트랜잭션에 기록 → orders 토픽 발행을 원자적으로 보장
 CREATE TABLE IF NOT EXISTS order_outbox (
     id          BIGSERIAL PRIMARY KEY,

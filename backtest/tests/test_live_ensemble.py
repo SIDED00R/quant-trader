@@ -27,10 +27,11 @@ class TestPrime(unittest.TestCase):
         closes = [100 + i for i in range(130)]
         out = le.prime({"KRW-BTC": _hist(closes)})
         self.assertEqual(len(out), 1)
-        sym, day, t = out[0]
+        sym, day, per_load = out[0]
         self.assertEqual(sym, "KRW-BTC")
-        self.assertGreater(t, 0)                 # 상승추세 → 보유 목표
-        self.assertIn("KRW-BTC", le.cur_day)     # 상태 세팅됨
+        self.assertEqual(len(per_load), 3)                  # 부하 3개(5/40·10/60·20/100)
+        self.assertTrue(all(t > 0 for _, t in per_load))    # 상승추세 → 모든 부하 보유 목표
+        self.assertIn("KRW-BTC", le.cur_day)                # 상태 세팅됨
 
     def test_prime_empty_history_no_signal(self):
         le = LiveEnsemble(["KRW-BTC"])
