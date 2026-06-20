@@ -3,10 +3,10 @@
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
-> **📌 현재 운영/배포 상태 (2026-06-20)**: 백테스트로 3·4단계 완료(앙상블 채택).
-> - **운영 VM은 가동 중**: GCE `coin-trader-vm` 2026-06-13~ 가동(외부 공개 HTTPS 대시보드, ≈$24/월). 단 **구버전(main)** — 이번 3·4단계는 미반영.
-> - **이번 세션 작업물은 로컬 전용**: `feat/#59`(PR #60, main 미머지) + 백필 데이터(`candles_1d`)는 내 PC Docker에만. VM 미반영. 상세 = `DEPLOY.md` 상단.
-> - 라이브 실시간 매매(commander 워커)는 **미착수**. (앞선 "전부 미배포" 기록은 오류 — VM 가동 확인됨)
+> **📌 현재 운영/배포 상태 (2026-06-20)**: **앙상블 라이브 배포 완료(모의)**.
+> - GCE VM 가동 + 최신 main 배포. 공개 대시보드 `https://jh-coinlab.duckdns.org`(Basic Auth). ≈$24/월.
+> - 파이프라인: ensemble-signals → commander(모의주문) + daily-aggregator(candles_1d 최신화). 모델 출처 = `docs/model.md`.
+> - 계정 초기화 완료(본인 2계정 → ₩10M). 현재 앙상블 CASH(추세 미진입). 상세 = `DEPLOY.md` 상단.
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
 - [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
@@ -79,12 +79,15 @@
 - [x] 채택안 = **5/40·10/60·20/100 + band 0.5**(BTC/ETH 6.6년: OOS Sharpe 1.45·양수 65%, 종목별 교차검증 강건)
 - [x] 단일 SMA baseline(−62%) 대비 대폭 개선 + 단일 trend 대비 일관성↑(양수 fold 50%→65%)
 
-### 라이브 배선 (#61, 진행 중)
-- [x] 신호 스키마/토픽: `strategy.signals` + `common/schemas.Signal`(목표비중) + config TOPIC_SIGNALS/ENSEMBLE_SYMBOLS
-- [x] 앙상블 신호 워커: `strategy/live_ensemble.py` — candles_1d 워밍업 → market.ticks → 일봉 마감마다 신호 발행(주문 없음)
-- [ ] **(다음, consequential)** `strategy/commander.py`(라이브): `strategy.signals` 소비 → place_order 경로로 모의주문
-- [ ] docker-compose 서비스화(ensemble-signals/commander) + 모의매매 라이브 검증
-> ※ 순서: 신호워커(완료) → **프론트 수정** → commander·주문경로(신중) → VM 모의매매
+### 라이브 배선 (#61) ✅ 배포됨
+- [x] 신호 스키마/토픽 + `common/schemas.Signal` + config TOPIC_SIGNALS/ENSEMBLE_SYMBOLS
+- [x] 앙상블 신호 워커 `strategy/live_ensemble.py`(candles_1d 워밍업 → 일봉 마감 신호 발행)
+- [x] `strategy/commander.py`: `strategy.signals` → 목표비중 모의주문(place_order, 실거래 아님)
+- [x] docker-compose 서비스화(ensemble-signals/commander, sma_trader 교체) + GCE VM 배포(공개 대시보드)
+- [x] 대시보드 리디자인(터미널·라이트/다크·앙상블 스탠스·순손익(수수료반영)) + `/strategy/ensemble`
+- [x] `aggregator/daily.py`: candles_1m → candles_1d 일일 최신화(대시보드 스탠스 freshness)
+- [x] 계정 초기화(`scripts/reset_account.py`) + 모델 출처 문서(`docs/model.md`)
+- [ ] 모의매매 라이브 검증(일정 기간 — 현재 CASH, 추세 진입 시 commander 동작 확인)
 
 ## 5단계 — 병렬화 & 오케스트레이션
 - [ ] 각 부하 워커 + commander를 `docker-compose.yml`에 서비스로 추가 (컨슈머 그룹 분리)

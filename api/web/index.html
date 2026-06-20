@@ -148,7 +148,7 @@
 
 <section class="stance">
   <div class="stance-head"><span class="lbl">앙상블 스탠스</span>
-    <span class="sub num" id="stanceSub">일봉 3속도 · 변동성 타게팅 · band 0.5</span></div>
+    <span class="sub num" id="stanceSub">모델 2026-06-20(데이터 2019-11~2026-06) · 일봉 3속도 · band 0.5</span></div>
   <div class="rails" id="rails"><div class="muted" style="padding:8px">전략 상태 로딩…</div></div>
 </section>
 
@@ -243,7 +243,7 @@ async function loadStrategy(){
     const data = await api("/strategy/ensemble");
     if(!data.length){ box.innerHTML = `<div class="muted" style="padding:8px">유니버스 없음</div>`; return; }
     if(data[0].bar_ts) document.getElementById("stanceSub").textContent =
-      `일봉 3속도(5/40·10/60·20/100) · 변동성 타게팅 · band 0.5 · 봉 ${data[0].bar_ts}`;
+      `모델 2026-06-20(데이터 2019-11~) · 일봉 3속도 5/40·10/60·20/100 · band 0.5 · 최신봉 ${data[0].bar_ts}`;
     box.innerHTML = data.map(railHTML).join("");
     requestAnimationFrame(() => setTimeout(() => box.querySelectorAll(".fill,.thumb").forEach(el => {
       const w = +el.dataset.w;
