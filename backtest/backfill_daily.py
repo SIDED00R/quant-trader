@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
+from common.upbit_markets import fetch_krw_markets
 from backtest.upbit_daily import fetch_daily, upsert_clickhouse
 
 
@@ -21,12 +22,20 @@ def main(argv=None) -> int:
         pass
     p = argparse.ArgumentParser(description="업비트 일봉 장기 백필 → ClickHouse candles_1d")
     p.add_argument("--symbols", default=",".join(SYMBOLS), help="쉼표 구분")
+    p.add_argument("--all-krw", action="store_true", help="업비트 전체 KRW 마켓(--symbols 무시)")
     p.add_argument("--days", type=int, default=2000, help="과거 일수(기본 ~5.5년)")
     p.add_argument("--table", default="candles_1d", help="대상 ClickHouse 테이블")
     a = p.parse_args(argv)
-    markets = [s.strip() for s in a.symbols.split(",") if s.strip()]
+    if a.all_krw:
+        try:
+            markets = fetch_krw_markets()
+        except Exception as e:
+            print(f"[daily] 마켓 목록 조회 실패: {e}", file=sys.stderr)
+            return 2
+    else:
+        markets = [s.strip() for s in a.symbols.split(",") if s.strip()]
     if not markets:
-        print("[daily] --symbols 가 비었습니다.", file=sys.stderr)
+        print("[daily] 대상 종목이 없습니다.", file=sys.stderr)
         return 2
     # 진행 중(미마감) 당일 일봉 제외 경계 = 오늘 00:00 UTC
     complete_until = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)

@@ -51,16 +51,20 @@
 - [x] **비용 인지**: 수수료 양자화 여유분 예약 사이징 + 추세 반전 청산(왕복비용 ≪ 추세 포착폭). sma_trader/kafka 비의존
 - [ ] (선택·보류) 청산 임계값 OU Monte-Carlo — 현 추세반전 청산으로 충분, 필요 시 후속
 
-### 3.3 유니버스 선정 — 결과 도출, **기준 확정 대기**
-- [x] 측정: BTC만 > BTC/ETH > 5종목 순으로 OOS 개선(알트 DOGE/SOL이 과매매·손실 주범 — 0단계와 일관)
-- [ ] **결정 필요**: 운용 유니버스 확정(BTC 단독 / BTC+ETH / 메이저 소수)
+### 데이터 인프라 — ClickHouse 통일 + 장기 표본 (#11 / #12)
+- [x] 업비트 일봉 장기 백필 → `candles_1d`(BTC/ETH/XRP 2019-11~, 6.6년) — `backtest/backfill_daily.py`(`--all-krw` 전체 마켓 지원)
+- [x] datasource `--ch-table`(candles_1m/1d) + run/walkforward `--source clickhouse` 연동
+- [x] CSV 분봉 캐시 → `candles_1m` 적재(523만 행) — 저장소 ClickHouse 통일
 
-### 3.4 선별 & 다음 — **성공기준 함께 확정 필요**
-- [x] walk-forward 측정 완료(`docs/baseline.md` 3단계): 일봉 trend 전체 +2.88%(거래 −99.5%, 수수료 2.2%),
-      OOS 고정 5/40 +8~19%(양수 3~4/5). 단 **Deflated Sharpe < 0.95**(다중시도 보정 후 유의성 미달)
-- [x] 발견: 빠른 추세(5/40) OOS 양수 일반화, 느린(20/60) 전구간 음수, per-fold 그리드최적화는 과적합(고정<최적화는 거짓)
-- [ ] **결정 필요**: 성공기준(OOS 양수만? Deflated Sharpe 임계? MDD 상한?) + 채택 파라미터(5/40 등) 확정
-- [ ] 통과 시 → 4단계 앙상블로 (초기 가중치 산정)
+### 3.3 유니버스 선정 ✅ — **BTC/ETH 확정**
+- [x] 측정: BTC만 > BTC/ETH > 5종목. 알트(DOGE/SOL) 과매매·손실 주범 → 운용 = **BTC + ETH**
+
+### 3.4 선별 ✅ — **엄격 기준 충족** (성공기준: OOS 양수 AND Deflated Sharpe ≥ 0.90)
+- [x] 채택 파라미터 = **고정 5/40**(per-fold 그리드 최적화는 과적합으로 OOS 더 나쁨)
+- [x] 6.6년 표본 충족: 그리드 DSR 0.997 / 고정 5/40 PSR 1.000, OOS Sharpe 1.37~1.51 (`docs/baseline.md`)
+- [x] 교훈: 2년에선 DSR<0.95(미달) → **표본 길이(T)가 병목**, 장기 데이터로 해소
+- [ ] (선택) 전략 보강: 변동성 타게팅 리밸런싱으로 MDD(45%)↓ + 강세장 편향 점검(타 레짐 OOS)
+- [ ] → **4단계 앙상블**로: trend를 첫 부하로 + 초기 가중치
 
 > 리서치 근거(검증 13건, 출처 20): TS momentum>cross-sectional · 추세 초과수익=하락회피 · 변동성타게팅 Sharpe 1.12→1.42 · 10/40일 SMA 10년 walk-forward(Sharpe 0.5~1.5) · naive sign-trading은 10bps에서 사망 · Deflated Sharpe로 다중시도 보정. (보류: 임포트 분리·중복통합·MACD 래치 = 코드리뷰 #57 deferred, 본 재설계와 함께)
 
