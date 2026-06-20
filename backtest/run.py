@@ -4,7 +4,7 @@
   .venv/Scripts/python -m backtest.run --source upbit --days 730 --sample-sec 86400 --out runs/sma_base
 예) ClickHouse candles_1m로 백테스트:
   .venv/Scripts/python -m backtest.run --source clickhouse --symbols KRW-BTC --start "2026-06-01 00:00:00"
-업비트 소스는 사전 백필 필요: python -m backtest.backfill --days 730
+업비트 소스는 사전 백필 필요: python -m backtest.backfill --days 730 --symbols KRW-BTC,KRW-ETH
 """
 import argparse
 import subprocess
@@ -40,6 +40,25 @@ from backtest.metrics import compute_metrics
 from backtest.report import print_summary, write_outputs
 from backtest.upbit_candles import load as load_candle_cache
 from strategy.registry import available, get_strategy
+
+
+def _strategy_params(name: str) -> dict:
+    """전략별 재현에 필요한 파라미터만 기록(비SMA 전략에 SMA 파라미터를 섞지 않기 위해 분기)."""
+    common = {
+        "STOP_LOSS_PCT": str(STRATEGY_STOP_LOSS_PCT), "TAKE_PROFIT_PCT": str(STRATEGY_TAKE_PROFIT_PCT),
+        "TRAIL_ARM_PCT": str(STRATEGY_TRAIL_ARM_PCT), "TRAIL_GIVEBACK_PCT": str(STRATEGY_TRAIL_GIVEBACK_PCT),
+        "COOLDOWN_SEC": STRATEGY_COOLDOWN_SEC, "MIN_HOLD_SEC": STRATEGY_MIN_HOLD_SEC,
+        "WARMUP_SEC": STRATEGY_WARMUP_SEC, "MAX_POSITIONS": STRATEGY_MAX_POSITIONS,
+        "ORDER_FRACTION_MAX": str(STRATEGY_ORDER_FRACTION_MAX),
+    }
+    if name == "sma":
+        common.update({
+            "SMA_SHORT": SMA_SHORT, "SMA_LONG": SMA_LONG,
+            "ENTRY_BAND": str(STRATEGY_ENTRY_BAND), "CONFIRM_TICKS": STRATEGY_CONFIRM_TICKS,
+            "STRONG_GAP": str(STRATEGY_STRONG_GAP),
+            "ORDER_FRACTION_MIN": str(STRATEGY_ORDER_FRACTION_MIN),
+        })
+    return common
 
 
 def _git_commit() -> str:
@@ -91,7 +110,7 @@ def main(argv=None) -> int:
     try:
         if args.source == "upbit":
             markets = symbols or SYMBOLS
-            start_ms = int((time.time() - args.days * 86400) * 1000) if args.days else None
+            start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
             candles = load_candle_cache(markets, args.unit, args.cache_dir, start_ms=start_ms)
         else:
             candles = load_clickhouse_candles(symbols=symbols or None,
@@ -124,17 +143,7 @@ def main(argv=None) -> int:
         "slippage_bps": str(fills.slippage_bps),
         "sample_sec": args.sample_sec,
         "git_commit": _git_commit(),
-        "strategy_params": {
-            "SMA_SHORT": SMA_SHORT, "SMA_LONG": SMA_LONG,
-            "ENTRY_BAND": str(STRATEGY_ENTRY_BAND), "CONFIRM_TICKS": STRATEGY_CONFIRM_TICKS,
-            "STRONG_GAP": str(STRATEGY_STRONG_GAP),
-            "ORDER_FRACTION_MIN": str(STRATEGY_ORDER_FRACTION_MIN),
-            "ORDER_FRACTION_MAX": str(STRATEGY_ORDER_FRACTION_MAX),
-            "STOP_LOSS_PCT": str(STRATEGY_STOP_LOSS_PCT), "TAKE_PROFIT_PCT": str(STRATEGY_TAKE_PROFIT_PCT),
-            "TRAIL_ARM_PCT": str(STRATEGY_TRAIL_ARM_PCT), "TRAIL_GIVEBACK_PCT": str(STRATEGY_TRAIL_GIVEBACK_PCT),
-            "COOLDOWN_SEC": STRATEGY_COOLDOWN_SEC, "MIN_HOLD_SEC": STRATEGY_MIN_HOLD_SEC,
-            "WARMUP_SEC": STRATEGY_WARMUP_SEC, "MAX_POSITIONS": STRATEGY_MAX_POSITIONS,
-        },
+        "strategy_params": _strategy_params(strategy.name),
     }
     print_summary(metrics, meta, engine)
     if args.out:

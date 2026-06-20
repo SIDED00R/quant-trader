@@ -57,6 +57,11 @@ class TestSignalDirection(unittest.TestCase):
         self.assertEqual(s._signal("KRW-BTC", _dq([100] * 19 + [90])), "BUY")   # 하단 이탈
         self.assertEqual(s._signal("KRW-BTC", _dq([100] * 19 + [110])), "SELL") # 상단 돌파
 
+    def test_bollinger_flat_series_returns_none(self):
+        # σ=0(평탄) 시 lower==mid==upper==price → price<=lower True여서 BUY 오발 방지
+        s = get_strategy("bollinger")
+        self.assertIsNone(s._signal("KRW-BTC", _dq([100] * 20)))
+
     def test_macd_emits_buy_on_upward_reversal(self):
         s = get_strategy("macd")
         prices = [100 - i for i in range(40)] + [60 + 2 * i for i in range(40)]  # 하락 후 반등

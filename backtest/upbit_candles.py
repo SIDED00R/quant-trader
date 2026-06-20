@@ -81,7 +81,8 @@ def _scan_dt(path: str):
 def backfill(markets, unit, days, cache_dir, req_sleep=0.12, log=print):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
-    complete_until_ms = int(now.replace(second=0, microsecond=0).timestamp() * 1000)  # 진행 중(미마감) 현재 분봉 제외 경계
+    bucket_sec = unit * 60
+    complete_until_ms = (int(now.timestamp()) // bucket_sec) * bucket_sec * 1000  # unit 경계 정렬 — unit>1 시 미마감 봉 올바르게 제외
     for market in markets:
         _backfill_one(market, unit, cutoff, complete_until_ms, cache_dir, req_sleep, log)
         _finalize(cache_path(cache_dir, market, unit), market, log)
