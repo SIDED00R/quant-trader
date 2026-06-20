@@ -41,6 +41,7 @@ class LiveEnsemble:
         self.day_close: dict[str, Decimal] = {}
 
     def _targets(self, symbol, close):
+        """각 부하의 (load_name, 목표비중). 부작용: 각 TrendSignal 내부 상태(가격버퍼·래치) 갱신(봉당 1회 호출)."""
         return [(name, sig.update(symbol, close)) for name, sig in self.loads]
 
     def prime(self, history: dict) -> list:

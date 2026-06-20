@@ -23,21 +23,22 @@ GROUP_ID = "ensemble-commander"
 _FEE_QUANT = Decimal("0.0001")
 
 
-def combined_for_bar(latest: dict, roster: list, bar_ts: str, weights: dict):
-    """roster 모든 부하가 같은 bar_ts로 신호했으면 가중평균 목표비중 반환, 아직 불완전이면 None.
+def _roster_ready(sym_latest: dict, roster: list, bar_ts: str) -> bool:
+    """roster의 모든 부하가 같은 bar_ts로 신호했는지(=합성 가능 여부). sym_latest={load:(bar_ts, target)}."""
+    return all(sym_latest.get(n, (None,))[0] == bar_ts for n in roster)
 
-    latest={load_name:(bar_ts, target)}, weights={load_name: w}. 동일가중이면 부하 목표의 평균.
+
+def combined_for_bar(latest: dict, roster: list, bar_ts: str, weights: dict):
+    """roster 모든 부하가 같은 bar_ts로 신호했으면 가중평균 목표비중 반환, 불완전/가중합0이면 None.
+
+    latest={load:(bar_ts, target)}, weights={load: w}. 동일가중이면 부하 목표의 평균(현 동작 보존).
     """
-    vals = []
-    for name in roster:
-        e = latest.get(name)
-        if e is None or e[0] != bar_ts:    # 아직 모든 부하가 이 봉으로 신호 안 함 → 대기
-            return None
-        vals.append((weights.get(name, 0.0), e[1]))
-    wsum = sum(w for w, _ in vals)
+    if not _roster_ready(latest, roster, bar_ts):    # 일부 부하 미보고 → 대기
+        return None
+    wsum = sum(weights.get(n, 0.0) for n in roster)
     if wsum <= 0:
         return None
-    return sum(w * t for w, t in vals) / wsum
+    return sum(weights.get(n, 0.0) * latest[n][1] for n in roster) / wsum
 
 
 def decide(qty: Decimal, price: Decimal, cash: Decimal, equity: Decimal,
@@ -149,11 +150,12 @@ def run() -> None:
                 continue
             if strategy not in roster:           # 로스터 외 부하 → 무시
                 continue
-            latest[symbol][strategy] = (bar_ts, target)
-            if last_acted.get(symbol) == bar_ts:  # 이 봉은 이미 합성·발주 완료
-                continue
-            combined = combined_for_bar(latest[symbol], roster, bar_ts, load_weights(roster))
-            if combined is None:                  # 아직 일부 부하 미보고 → 대기(조기 발주 방지)
+            sym_latest = latest[symbol]
+            sym_latest[strategy] = (bar_ts, target)
+            if last_acted.get(symbol) == bar_ts or not _roster_ready(sym_latest, roster, bar_ts):
+                continue                          # 이미 발주했거나 일부 부하 미보고 → 대기(DB 미조회)
+            combined = combined_for_bar(sym_latest, roster, bar_ts, load_weights(roster))
+            if combined is None:                  # 가중합 0 등 비정상 → 안전상 대기
                 continue
             prices = _latest_prices(client)
             for acct in _enabled_accounts():

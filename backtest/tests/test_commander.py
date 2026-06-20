@@ -71,7 +71,7 @@ class TestCombinedForBar(unittest.TestCase):
             combined_for_bar(latest, _ROSTER, "d1", {"a": 2.0, "b": 1.0, "c": 1.0}), 0.5)
 
     def test_zero_weight_sum_returns_none(self):
-        # 가중치 합 0 → 0 나눗셈 방지 위해 None(상위서 동일가중 폴백 처리)
+        # 순수 함수의 0 나눗셈 방어(런타임에선 load_weights가 합0이면 equal 반환해 도달 안 함)
         latest = {"a": ("d1", 1.0), "b": ("d1", 1.0), "c": ("d1", 1.0)}
         self.assertIsNone(combined_for_bar(latest, _ROSTER, "d1", {"a": 0.0, "b": 0.0, "c": 0.0}))
 

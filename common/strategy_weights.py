@@ -18,6 +18,7 @@ def load_weights(load_names) -> dict:
             "SELECT strategy, weight FROM strategy_weights WHERE strategy = ANY(%s)", (names,)
         ).fetchall()
     out = {n: float(dict(rows).get(n, 0.0)) for n in names}
-    if sum(out.values()) <= 0:        # 미설정/전부 0 → 안전 동일가중
+    # 일부 부하 미등록 / 합 0 → 안전 동일가중(부분 가중치로 일부 부하가 합성서 누락되는 것 방지)
+    if len(rows) < len(names) or sum(out.values()) <= 0:
         return equal
     return out
