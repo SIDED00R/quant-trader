@@ -2,23 +2,30 @@
 
 실시간 코인 모의거래 시스템 — Kafka 기반 실시간 이벤트 파이프라인 학습 프로젝트.
 
-업비트 실시간 시세를 받아 가상 자금으로 매수/매도하고, 체결·포트폴리오·손익을 실시간으로 보여준다.
+업비트 실시간 시세를 수집·저장하고, **일봉 추세추종 앙상블 전략**으로 가상 자금을 자동 매매하며, 체결·포트폴리오·손익을 대시보드로 보여준다. 데이터 수집은 상시, 매매는 일봉 1회(온디맨드)로 분리한 구조다.
 
 ## 아키텍처 개요
 
 ```
-업비트 WS → [market.ticks] → ┬→ ClickHouse(틱/캔들)
-                             └→ 체결 엔진 → [executions] → 포트폴리오 → PostgreSQL
-사용자 → FastAPI → [orders] ──┘
+[수집·저장 (상시)]
+업비트 WS → ingester → [Kafka market.ticks] ─┬→ sink → ClickHouse(틱)
+                                             └→ candle → 1분봉 → daily-aggregator → 일봉(candles_1d)
+[자동매매]
+live_ensemble (일봉 마감마다 부하별 목표비중 신호)
+trade_once (일봉 합성 목표비중 → 주문·체결 동기 처리) → PostgreSQL(계좌/주문/포지션)
+[조회] FastAPI 대시보드 · Grafana
 ```
 
-- **메시지**: Apache Kafka (KRaft)
-- **OLTP**: PostgreSQL (잔고/주문/포지션)
+- **메시지**: Apache Kafka (KRaft) — 틱 한 스트림을 적재·집계 소비자에게 **팬아웃**
+- **OLTP**: PostgreSQL (잔고/주문/포지션/전략가중치, outbox 패턴)
 - **OLAP**: ClickHouse (틱/캔들/분석)
-- **API**: FastAPI
-- **대시보드**: Grafana
+- **API/대시보드**: FastAPI + Grafana (+ Caddy 자동 HTTPS)
+- **전략**: 일봉 저회전 추세추종 앙상블(5/40·10/60·20/100), walk-forward·Deflated Sharpe 검증 (`docs/model.md`)
+- **프로덕션 배포**: **2-VM** — 상시 데이터 VM + Cloud Scheduler가 매일 01:00 UTC 켜는 온디맨드 매매 VM([DEPLOY.md](DEPLOY.md) §11)
 
-전체 설계는 [DESIGN.md](DESIGN.md) 참고.
+> 참고: 위 자동매매 외에, 수동 주문 API(`POST /orders`)와 실시간 스트리밍 체결 파이프라인(`commander`/`engine`/`portfolio`)도 코드로 존재한다(로컬 개발·디버깅용). 프로덕션 라이브 매매 경로는 `trade_once`(동기 배치)다.
+
+전체 설계/흐름은 [DESIGN.md](DESIGN.md) · [project_flow.md](project_flow.md) 참고.
 
 ## 로컬 실행 (인프라)
 
@@ -51,7 +58,18 @@ docker compose down -v         # 볼륨까지 삭제
 접속 정보: 웹 대시보드 `127.0.0.1:8000` · Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123` · Grafana `127.0.0.1:3000` (admin/admin)
 (컨테이너 포트는 보안상 `127.0.0.1` 루프백에만 바인딩. Windows에서 `localhost`가 IPv6 `::1`로 풀리는 문제를 피하려 호스트 접속은 `127.0.0.1`을 사용합니다.)
 
-### 서비스 실행 (각각 별도 터미널)
+### 서비스 실행
+
+docker-compose는 프로파일로 묶여 있다(서비스 코드는 동일, 실행 묶음만 다름):
+
+```bash
+docker compose --profile app  up -d --build   # 로컬 풀스택(수집+스트리밍 매매+대시보드)
+docker compose --profile data up -d --build   # 프로덕션 데이터 VM(수집·저장·대시보드만)
+docker compose --profile trade run --rm trade-once python -m strategy.trade_once   # 온디맨드 1회 매매
+docker compose --profile batch run --rm reeval                                     # 부하 재평가 배치
+```
+
+개별 워커를 디버깅용으로 직접 돌릴 수도 있다(각각 별도 터미널):
 
 ```bash
 .venv/Scripts/python -m ingester.upbit_ws      # 업비트 WS → market.ticks
@@ -90,4 +108,7 @@ curl 127.0.0.1:8000/accounts/demo
 - [x] 6. 캔들 집계기 → ClickHouse
 - [x] 7. 지정가 주문
 - [x] 8. Grafana 대시보드
-- [x] 9. GCP 배포 (저비용 단일 VM — [DEPLOY.md](DEPLOY.md) §11)
+- [x] 9. GCP 배포 — **2-VM**(상시 데이터 + 온디맨드 매매), Cloud Scheduler ([DEPLOY.md](DEPLOY.md) §11)
+- [x] 10. 자동매매 전략 — 일봉 추세추종 앙상블 + walk-forward/Deflated Sharpe 검증 + 라이브(모의) 배포
+
+> 전략·인프라 로드맵 상세는 [TODO.md](TODO.md) · [project_flow.md](project_flow.md) 참고.
