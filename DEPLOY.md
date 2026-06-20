@@ -5,6 +5,13 @@
 - 생성된 프로젝트: `coin-auto-trader-jvfhgq` (프로젝트만 생성됨, 결제 미연결)
 - 계정: `mywinningtime@gmail.com`
 
+> ## ⚠️ 현재 배포 상태 (2026-06-20): **미배포 — 전부 로컬 전용**
+> - **아무것도 원격/클라우드에 배포되지 않았다.** ClickHouse·Kafka·Postgres·Grafana·앱 서비스 모두 **내 PC의 Docker**에서만 실행(`127.0.0.1` 바인딩, 외부 접속 불가).
+> - 데이터(`candles_1m`/`candles_1d`)는 로컬 Docker 볼륨 `coin-auto-trader_chdata`(WSL2 가상디스크 `…\Docker\wsl\disk\docker_data.vhdx`)에만 존재 — 정상 종료엔 보존되나 PC가 꺼진 동안은 실시간 수집 공백.
+> - `ch_browser.html`·Grafana(3000)·ClickHouse Play(8123)는 전부 로컬 뷰어 — 호스팅 안 됨.
+> - 코드도 미배포: `feat/#59` 등 작업 브랜치는 GitHub PR 단계(아래 GCP 설계는 **실행 전 설계**).
+> - **24시간 실시간 운용·원격 접속을 원하면** 아래 GCP 설계대로 항상 켜진 서버에 배포해야 함(현재 미실행).
+
 ---
 
 ## 1. 원칙

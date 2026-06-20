@@ -3,6 +3,10 @@
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
+> **📌 현재 운영/배포 상태 (2026-06-20)**: 백테스트로 3·4단계 완료(앙상블 채택). **배포는 미완료 — 전부 로컬 전용**
+> (ClickHouse 등 모두 내 PC Docker `127.0.0.1`, 외부 미공개). 데이터는 로컬 Docker 볼륨에만 존재. 상세 = `DEPLOY.md` 상단.
+> 라이브 실시간 매매(commander 워커)·원격 배포는 **미착수**. 코드 `feat/#59` = PR 단계.
+
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
 - [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
 - [x] 가상 체결·수수료·슬리피지 모델 (`backtest/fills.py` + `account.py`, 라이브 engine/portfolio와 동일 가정)
