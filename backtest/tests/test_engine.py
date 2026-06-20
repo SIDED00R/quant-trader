@@ -29,7 +29,7 @@ class TestEngine(unittest.TestCase):
         ticks = _rising_ticks()
         eng = self._run(ticks)
 
-        self.assertEqual(eng.n_ticks, len(ticks))
+        self.assertEqual(eng.n_bars, len(ticks))
         self.assertGreaterEqual(len(eng.closed_trades), 1, "상승장에서 최소 1회 매매가 있어야 함")
         first = eng.closed_trades[0]
         self.assertEqual(first.reason, "TAKE", "단조 상승이면 청산 사유는 익절")

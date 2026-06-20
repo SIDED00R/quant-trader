@@ -29,13 +29,13 @@ def _client():
     )
 
 
-def load_clickhouse_candles(symbols=None, start=None, end=None, use_final=True):
+def load_clickhouse_candles(symbols=None, start=None, end=None):
     """candles_1m를 전역 시간순으로 스트리밍 yield(종가 기준).
 
     symbols: 종목 리스트(None이면 전체). start/end: 'YYYY-MM-DD HH:MM:SS' 등 문자열(UTC, None이면 무제한).
+    ReplacingMergeTree 중복 정리를 위해 항상 FINAL로 읽는다(오프라인이므로 정확성 우선).
     """
     client = _client()
-    final = "FINAL" if use_final else ""
     conds = ["1=1"]
     params: dict = {}
     if symbols:
@@ -50,7 +50,7 @@ def load_clickhouse_candles(symbols=None, start=None, end=None, use_final=True):
     where = " AND ".join(conds)
     query = (
         "SELECT symbol, close, toUnixTimestamp64Milli(toDateTime64(window_start, 3)) AS ts_ms "
-        f"FROM candles_1m {final} WHERE {where} ORDER BY window_start, symbol"
+        f"FROM candles_1m FINAL WHERE {where} ORDER BY window_start, symbol"
     )
     with client.query_row_block_stream(query, parameters=params) as stream:
         for block in stream:

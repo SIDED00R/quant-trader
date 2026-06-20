@@ -7,7 +7,7 @@ epoch ms다(업비트 candle_date_time_utc 기준) — ClickHouse 소스의 wind
 
 재개·증분: 캐시가 있으면 ① 최신 방향(newest_cached~now)과 ② 과거 방향(oldest_cached~cutoff)을 모두 보충한다.
 완료 시 시간 오름차순 정렬·중복제거(finalize)하며, tmp+os.replace로 원자적 교체해 중단 시 캐시를 보존한다.
-공개 API라 인증 불필요. 429/네트워크 오류는 점증 백오프 재시도, 요청 간 sleep으로 호출량 절제.
+공개 API라 인증 불필요. 429/5xx/네트워크 오류는 지수 백오프 재시도, 요청 간 sleep으로 호출량 절제. 진행 중(미마감) 현재 분봉은 기록하지 않는다.
 로드는 종목별 정렬 캐시를 (ts, symbol) 전역 순서로 merge해 BTick(종가)을 yield한다.
 """
 import csv
@@ -24,6 +24,13 @@ from backtest.models import BTick
 _URL = "https://api.upbit.com/v1/candles/minutes/{unit}"
 _HEADER = ["ts_ms", "open", "high", "low", "close", "volume", "dt_utc"]
 _PAGE = 200
+_MAX_RETRIES = 6
+_MAX_BACKOFF = 30.0
+
+
+def _backoff(attempt: int) -> float:
+    """지수 백오프 초(상한 _MAX_BACKOFF) — 라이브 ingester(upbit_ws.py)와 동일 house 패턴."""
+    return min(1.0 * (2 ** attempt), _MAX_BACKOFF)
 
 
 def cache_path(cache_dir: str, market: str, unit: int) -> str:
@@ -41,14 +48,14 @@ def _ws_ms(candle: dict) -> int:
 
 def _get(client: httpx.Client, unit: int, params: dict, req_sleep: float) -> list:
     url = _URL.format(unit=unit)
-    for attempt in range(6):
+    for attempt in range(_MAX_RETRIES):
         try:
             r = client.get(url, params=params)
-        except httpx.TransportError:           # 타임아웃/연결오류 → 점증 백오프 재시도
-            time.sleep(1.0 + attempt)
+        except httpx.TransportError:               # 타임아웃/연결오류 → 지수 백오프 재시도
+            time.sleep(_backoff(attempt))
             continue
-        if r.status_code == 429:               # 레이트리밋 → 점증 백오프 재시도
-            time.sleep(1.0 + attempt)
+        if r.status_code == 429 or r.status_code >= 500:  # 레이트리밋/일시적 서버오류 → 지수 백오프 재시도
+            time.sleep(_backoff(attempt))
             continue
         r.raise_for_status()
         time.sleep(req_sleep)
@@ -72,14 +79,17 @@ def _scan_dt(path: str):
 
 
 def backfill(markets, unit, days, cache_dir, req_sleep=0.12, log=print):
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    complete_until_ms = int(now.replace(second=0, microsecond=0).timestamp() * 1000)  # 진행 중(미마감) 현재 분봉 제외 경계
     for market in markets:
-        _backfill_one(market, unit, cutoff, cache_dir, req_sleep, log)
+        _backfill_one(market, unit, cutoff, complete_until_ms, cache_dir, req_sleep, log)
         _finalize(cache_path(cache_dir, market, unit), market, log)
 
 
-def _fetch_backward(client, writer, fh, market, unit, to, lower_bound, req_sleep, log):
-    """'to'부터 과거로 페이지네이션하며 append. oldest<=lower_bound 또는 페이지<200이면 종료."""
+def _fetch_backward(client, writer, fh, market, unit, to, lower_bound, complete_until_ms, req_sleep, log):
+    """'to'부터 과거로 페이지네이션하며 append. oldest<=lower_bound 또는 페이지<200이면 종료.
+    진행 중(window_start >= complete_until_ms)인 현재 분봉은 종가 미확정이라 기록하지 않는다."""
     fetched = 0
     while True:
         params = {"market": market, "count": _PAGE}
@@ -89,7 +99,10 @@ def _fetch_backward(client, writer, fh, market, unit, to, lower_bound, req_sleep
         if not rows:
             break
         for c in rows:
-            writer.writerow([_ws_ms(c), c["opening_price"], c["high_price"], c["low_price"],
+            ws = _ws_ms(c)
+            if ws >= complete_until_ms:          # 미마감 현재 분봉은 건너뜀(종가 미확정)
+                continue
+            writer.writerow([ws, c["opening_price"], c["high_price"], c["low_price"],
                              c["trade_price"], c["candle_acc_trade_volume"], c["candle_date_time_utc"]])
         fh.flush()                              # 페이지마다 영속(중단 시 보존)
         fetched += len(rows)
@@ -101,7 +114,7 @@ def _fetch_backward(client, writer, fh, market, unit, to, lower_bound, req_sleep
     return fetched
 
 
-def _backfill_one(market, unit, cutoff, cache_dir, req_sleep, log):
+def _backfill_one(market, unit, cutoff, complete_until_ms, cache_dir, req_sleep, log):
     path = cache_path(cache_dir, market, unit)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     oldest, newest = _scan_dt(path)
@@ -110,10 +123,10 @@ def _backfill_one(market, unit, cutoff, cache_dir, req_sleep, log):
         w = csv.writer(f)
         if new_file:
             w.writerow(_HEADER)
-        if newest is not None:                  # 최신 방향 보충: (newest, now]
-            _fetch_backward(client, w, f, market, unit, None, newest, req_sleep, log)
+        if newest is not None:                  # 최신 방향 보충: (newest, 직전 완료 분]
+            _fetch_backward(client, w, f, market, unit, None, newest, complete_until_ms, req_sleep, log)
         if oldest is None or oldest > cutoff:   # 과거 방향 보충/신규: [cutoff, oldest)
-            _fetch_backward(client, w, f, market, unit, oldest, cutoff, req_sleep, log)
+            _fetch_backward(client, w, f, market, unit, oldest, cutoff, complete_until_ms, req_sleep, log)
 
 
 def _finalize(path: str, market: str, log):

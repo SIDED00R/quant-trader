@@ -69,8 +69,9 @@ def parse_args(argv=None):
 
 
 def main(argv=None) -> int:
-    try:  # 한글/기호 리포트가 cp949 콘솔에서 깨지거나 크래시하지 않도록 UTF-8 강제
+    try:  # 한글/기호 출력이 cp949 콘솔에서 깨지거나 크래시하지 않도록 UTF-8 강제(stdout=리포트, stderr=진단)
         sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         pass
     args = parse_args(argv)
@@ -100,7 +101,7 @@ def main(argv=None) -> int:
         print(f"[backtest] 데이터 로드 실패: {e}", file=sys.stderr)
         return 2
 
-    if engine.n_ticks == 0:
+    if engine.n_bars == 0:
         if args.source == "upbit":
             print("[backtest] 0봉 — 캐시가 비었습니다. 먼저 백필: "
                   "python -m backtest.backfill --days {} --unit {}".format(args.days, args.unit), file=sys.stderr)
