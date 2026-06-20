@@ -6,12 +6,12 @@ whipsaw를 분산한다(부하 다수가 동의할수록 비중↑). config/base
 """
 from decimal import Decimal
 
-from common.config import MIN_ORDER_KRW, TREND_REBALANCE_BAND
+from common.config import ENSEMBLE_REBALANCE_BAND, MIN_ORDER_KRW
 from strategy.base import Broker, MarketTick, Strategy
 from strategy.trend import affordable_qty
 from strategy.trend_signal import TrendSignal
 
-# 빠름/중간/느림 — 단일 5/40의 속도 편중을 분산(파라미터 리스크↓)
+# 빠름/중간/느림 — 단일 5/40의 속도 편중을 분산(파라미터 리스크↓). BTC/ETH 6.6년 교차검증 채택 구성.
 _DEFAULT_SPECS = [(5, 40), (10, 60), (20, 100)]
 
 
@@ -25,8 +25,8 @@ class EnsembleStrategy(Strategy):
         if len(self.weights) != len(self.signals):
             raise ValueError("weights 길이가 specs와 다릅니다")
         self._wsum = sum(self.weights)
-        # 합성 목표비중 재조정 밴드(상대). 0이면 매 봉 목표 추종(앙상블은 신호가 연속적이라 기본 재조정 권장).
-        self.rebalance_band = float(TREND_REBALANCE_BAND if rebalance_band is None else rebalance_band)
+        # 합성 목표비중 재조정 밴드(상대). 기본 0.5(교차검증 채택). 0이면 매 봉 목표 추종(거래 급증).
+        self.rebalance_band = float(ENSEMBLE_REBALANCE_BAND if rebalance_band is None else rebalance_band)
 
     def on_tick(self, tick: MarketTick, broker: Broker) -> None:
         sym, price, now = tick.symbol, tick.price, tick.ts

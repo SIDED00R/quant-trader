@@ -63,17 +63,22 @@
 - [x] 채택 파라미터 = **고정 5/40**(per-fold 그리드 최적화는 과적합으로 OOS 더 나쁨)
 - [x] 6.6년 표본 충족: 그리드 DSR 0.997 / 고정 5/40 PSR 1.000, OOS Sharpe 1.37~1.51 (`docs/baseline.md`)
 - [x] 교훈: 2년에선 DSR<0.95(미달) → **표본 길이(T)가 병목**, 장기 데이터로 해소
-- [ ] (선택) 전략 보강: 변동성 타게팅 리밸런싱으로 MDD(45%)↓ + 강세장 편향 점검(타 레짐 OOS)
-- [ ] → **4단계 앙상블**로: trend를 첫 부하로 + 초기 가중치
+- [x] 전략 보강: 변동성 타게팅 리밸런싱(`TREND_REBALANCE_BAND`) — Sharpe 소폭↑, MDD는 추세 본질이라 미개선(기본 off)
 
 > 리서치 근거(검증 13건, 출처 20): TS momentum>cross-sectional · 추세 초과수익=하락회피 · 변동성타게팅 Sharpe 1.12→1.42 · 10/40일 SMA 10년 walk-forward(Sharpe 0.5~1.5) · naive sign-trading은 10bps에서 사망 · Deflated Sharpe로 다중시도 보정. (보류: 임포트 분리·중복통합·MACD 래치 = 코드리뷰 #57 deferred, 본 재설계와 함께)
 
 ## 4단계 — 지휘관(Commander) 앙상블
-- [ ] 신호 스키마/토픽 설계: 신규 토픽 `strategy.signals` (`common/schemas.py`에 Signal 추가)
+### 백테스트 앙상블 ✅ — 채택(일관성 우선)
+- [x] `strategy/ensemble.py`: 다중 추세속도 목표비중 가중합 → 합성 목표 주문(Commander 백테스트 구현)
+- [x] `strategy/trend_signal.py`: 추세 결정 코어(래치) 분리 — 실행과 신호 분리, 앙상블 재사용
+- [x] 채택안 = **5/40·10/60·20/100 + band 0.5**(BTC/ETH 6.6년: OOS Sharpe 1.45·양수 65%, 종목별 교차검증 강건)
+- [x] 단일 SMA baseline(−62%) 대비 대폭 개선 + 단일 trend 대비 일관성↑(양수 fold 50%→65%)
+
+### 라이브 배선 (5단계 성격, 후속)
+- [ ] 신호 스키마/토픽: 신규 토픽 `strategy.signals` (`common/schemas.py`에 Signal 추가)
 - [ ] 각 부하를 독립 워커로 — `market.ticks` 소비 → `strategy.signals` 발행 (전략명/신호/confidence)
-- [ ] `strategy/commander.py`: `strategy.signals` 소비 → 심볼별 윈도우 집계 → 가중 합의 → 최종 BUY/SELL/HOLD
-- [ ] Commander 결정 → 기존 `place_order` 경로로 주문 (사이징/청산 규율 적용)
-- [ ] 앙상블 백테스트: 단일 SMA baseline 대비 지표 개선 확인 (성공기준: 핵심지표 ≥ baseline)
+- [ ] `strategy/commander.py`(라이브): `strategy.signals` 소비 → 가중 합의 → `place_order` 경로로 주문
+- [ ] docker-compose 서비스화 + 모의매매로 라이브 검증
 
 ## 5단계 — 병렬화 & 오케스트레이션
 - [ ] 각 부하 워커 + commander를 `docker-compose.yml`에 서비스로 추가 (컨슈머 그룹 분리)
