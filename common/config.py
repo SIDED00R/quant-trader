@@ -108,6 +108,16 @@ ENSEMBLE_SYMBOLS = [s.strip() for s in os.getenv("ENSEMBLE_SYMBOLS", "KRW-BTC,KR
 # ⚠️ 적응 가중치는 과적합 위험(walk-forward에서 고정>최적화). 검증 전까지 기본 off.
 ENSEMBLE_ADAPTIVE = os.getenv("ENSEMBLE_ADAPTIVE", "false").strip().lower() in ("1", "true", "yes")
 
+# ── 부하 재평가 잡 가중치 정책(5.4, backtest/reeval_weights.py) ──
+# 보수적 가드: "최적화로 향상"이 아니라 "열화 부하 자동 강등"이 목적. 동일가중 기준 소폭 이탈만 허용.
+# 각 가중치 하한/상한 = 동일가중 × 배수(부하 수 무관). floor>0 → demote≠delete(완전 제거 금지).
+ENSEMBLE_WEIGHT_FLOOR_MULT = float(os.getenv("ENSEMBLE_WEIGHT_FLOOR_MULT", "0.5"))  # 동일가중의 50% 이상 보장
+ENSEMBLE_WEIGHT_CAP_MULT = float(os.getenv("ENSEMBLE_WEIGHT_CAP_MULT", "1.5"))      # 동일가중의 150% 이하(독점 차단)
+# DSR(=고정구성이라 PSR) 게이트: 부하의 OOS 엣지 유의확률이 이 값 미만이면 강등(floor로). 3단계 성공기준과 동일.
+ENSEMBLE_DSR_GATE = float(os.getenv("ENSEMBLE_DSR_GATE", "0.90"))
+# EWMA 평활: 신규 타깃 반영 비율(작을수록 느린 갱신 → 급변·과적합 추격 방지).
+ENSEMBLE_WEIGHT_EWMA = float(os.getenv("ENSEMBLE_WEIGHT_EWMA", "0.2"))
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
