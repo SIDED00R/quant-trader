@@ -223,6 +223,29 @@ services:
     container_name: relay
     command: python -m relay.order_relay
 
+  # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
+  # 라이브와 분리: `docker compose run --rm reeval python -m backtest.reeval_weights [--dry-run]`.
+  # 5.5 Airflow DAG가 이 서비스를(또는 온디맨드 VM에서) 주기 실행한다. kafka 불요(postgres+clickhouse만).
+  reeval:
+    build:
+      context: .
+      dockerfile: Dockerfile.batch
+    image: coin-auto-trader-batch
+    profiles: ["batch"]
+    restart: "no"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+      INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: python -m backtest.reeval_weights
+
   api:
     <<: *app
     container_name: api
