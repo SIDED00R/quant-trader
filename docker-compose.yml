@@ -252,6 +252,22 @@ services:
         condition: service_healthy
     command: python -m backtest.reeval_weights
 
+  # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
+  # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB는 매매 VM .env의
+  # POSTGRES_HOST/CLICKHOUSE_HOST(=데이터 VM 사설 IP)로 원격 접속. depends_on 없음(원격 DB라 로컬 인프라 미기동).
+  trade-once:
+    image: coin-auto-trader-app
+    build: .
+    profiles: ["trade"]
+    restart: "no"
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+      INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
+    command: python -m strategy.trade_once
+
   api:
     <<: *app
     container_name: api

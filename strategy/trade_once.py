@@ -120,8 +120,8 @@ def _execute(conn, acct, symbol, side, qty: Decimal, price: Decimal) -> str:
     return apply_execution(conn, ex)
 
 
-def run() -> int:
-    """1회 매매 실행. 거부(잔고/보유 부족)가 있으면 경고 후 비정상 종료코드(스케줄러·모니터링 감지용)."""
+def run(dry_run: bool = False) -> int:
+    """1회 매매 실행. dry_run이면 목표·계획 주문만 출력(주문 미발생). 거부 시 비정상 종료코드(스케줄러 감지)."""
     open_pool()
     ch = create_client()
     rejected = 0
@@ -133,7 +133,13 @@ def run() -> int:
         snapshots = {a: {"cash": cash(a), "positions": positions(a), "prices": prices} for a in accts}
         orders = plan_orders(targets, snapshots, band)
         shown = {k: round(v, 4) for k, v in targets.items()}
-        print(f"[trade_once] targets={shown} accounts={len(accts)} orders={len(orders)}")
+        tag = " [DRY-RUN]" if dry_run else ""
+        print(f"[trade_once]{tag} targets={shown} accounts={len(accts)} orders={len(orders)}")
+        if dry_run:
+            for acct, sym, side, qty in orders:
+                print(f"[trade_once] (dry-run) would {side} {sym} qty={qty} acct={acct} @ {prices[sym]}")
+            print("[trade_once] dry-run done")
+            return 0
         for acct, sym, side, qty in orders:
             with pool.connection() as conn:
                 result = _execute(conn, acct, sym, side, qty, prices[sym])
@@ -149,4 +155,7 @@ def run() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(run())
+    import argparse
+    p = argparse.ArgumentParser(description="온디맨드 1회 매매 (5.5)")
+    p.add_argument("--dry-run", action="store_true", help="목표·계획 주문만 출력(주문 미발생)")
+    raise SystemExit(run(p.parse_args().dry_run))
