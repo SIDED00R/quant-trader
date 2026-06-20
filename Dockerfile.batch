@@ -1,0 +1,17 @@
+# 배치(분석) 이미지 — 라이브 이미지(Dockerfile)는 backtest를 일부러 제외하지만,
+# 재평가 잡(backtest.reeval_weights)은 walk-forward/metrics가 필요하므로 backtest를 포함한다.
+# 온디맨드 실행 전용(profile=batch). 라이브 서비스는 이 이미지를 쓰지 않는다(이중 매매·의존 격리).
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY common ./common
+COPY strategy ./strategy
+COPY backtest ./backtest
+
+ENV PYTHONUNBUFFERED=1
+
+# 기본 커맨드 없음 — compose/Airflow에서 `python -m backtest.reeval_weights [--dry-run]`로 지정
