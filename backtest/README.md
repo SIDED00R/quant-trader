@@ -25,7 +25,30 @@
 
 결과는 표준출력 요약 + `--out` 디렉터리에 `trades.csv`, `equity.csv`, `run_meta.json`(재현용 설정·git 커밋)으로 저장된다.
 
-## 3) 테스트 (네트워크/Docker 불필요 — 합성 데이터)
+### 상위 타임프레임 리샘플 (`--bar-min`)
+
+1분봉 캐시를 더 큰 봉으로 다운샘플해 신호·거래 빈도를 구조적으로 줄인다(저회전 추세 전략용).
+
+```bash
+# 일봉(1440분)으로 리샘플해 추세 전략 백테스트
+.venv/Scripts/python -m backtest.run --source upbit --days 730 --bar-min 1440 --strategy trend --sample-sec 86400
+```
+
+리샘플은 종목별(merge 전) 수행해 전역 시간순을 보존하고, 각 버킷의 **마지막 종가**를 그 버킷 마지막 봉 시각으로 emit한다(종가 확정 시점 = 룩어헤드 없음).
+
+## 3) Walk-forward 검증 (`backtest.walkforward`)
+
+전체데이터 일괄 측정은 과적합을 숨긴다. 롤링 IS(파라미터 선택)/OOS(평가) 윈도우로 측정하고 다중시도 선택편향을 **Deflated Sharpe**로 보정한다.
+
+```bash
+.venv/Scripts/python -m backtest.walkforward --days 730 --bar-min 1440 --is-days 180 --oos-days 90
+```
+
+- fold마다 IS에서 (단기,장기) SMA 그리드 중 최선을 고르고 **직후 OOS** 성과만 집계한다.
+- OOS 직전 prime 구간은 **NullBroker로 지표만 priming**(거래 0 보장) → OOS는 새 계좌(initial)로만 평가해 prime 손익이 OOS에 새지 않는다.
+- 출력: fold별 OOS 수익 + 합성수익·양수 fold 수·OOS Sharpe·Deflated Sharpe(시도 수 N 보정).
+
+## 4) 테스트 (네트워크/Docker 불필요 — 합성 데이터)
 
 ```bash
 .venv/Scripts/python -m unittest discover -s backtest/tests -t .
