@@ -137,7 +137,8 @@
   <div class="kpi"><span class="lbl">계정</span><span class="v num" id="acctId">-</span></div>
   <div class="kpi"><span class="lbl">평가자산</span><span class="v big num" id="equity">-</span></div>
   <div class="kpi"><span class="lbl">현금</span><span class="v num" id="krw">-</span></div>
-  <div class="kpi"><span class="lbl">총손익</span><span class="v big num" id="totalPnl">-</span></div>
+  <div class="kpi"><span class="lbl">순손익 (수수료 반영)</span><span class="v big num" id="totalPnl">-</span></div>
+  <div class="kpi"><span class="lbl">누적 수수료</span><span class="v num" id="fees">-</span></div>
   <div class="sp"></div>
   <div class="live" id="status">연결 중…</div>
   <span class="num muted" id="updated" style="font-size:11px">-</span>
@@ -294,11 +295,15 @@ async function loadAccount(){
         <td class="num ${cls}">${pnl>=0?"+":""}${won(pnl)} (${pct.toFixed(2)}%)</td></tr>`;
     }).join("");
   }
-  const equity = a.krw_balance + posValue, totalPnl = posValue - cost;
+  const equity = a.krw_balance + posValue;
   document.getElementById("equity").textContent = won(equity);
+  // 순손익 = 평가자산 − 초기자본. 수수료가 이미 차감된 잔고 기반이라 매수·매도 수수료·실현손실 전부 반영(정직한 손익).
+  const netPnl = equity - (a.initial_balance ?? equity);
+  const pct = a.initial_balance > 0 ? netPnl / a.initial_balance * 100 : 0;
   const pe = document.getElementById("totalPnl");
-  pe.textContent = (totalPnl>=0?"+":"") + won(totalPnl);
-  pe.className = "v big num " + (totalPnl>0?"up":totalPnl<0?"down":"");
+  pe.textContent = (netPnl>=0?"+":"") + won(netPnl) + ` (${pct.toFixed(2)}%)`;
+  pe.className = "v big num " + (netPnl>0?"up":netPnl<0?"down":"");
+  document.getElementById("fees").textContent = won(a.total_fees ?? 0);
 }
 async function loadExecs(){
   const rows = await api("/history/executions?limit=20");
