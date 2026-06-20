@@ -89,19 +89,24 @@
 - [x] 계정 초기화(`scripts/reset_account.py`) + 모델 출처 문서(`docs/model.md`)
 - [ ] 모의매매 라이브 검증(일정 기간 — 현재 CASH, 추세 진입 시 commander 동작 확인)
 
-## 5단계 — 병렬화 & 오케스트레이션
-- [ ] 각 부하 워커 + commander를 `docker-compose.yml`에 서비스로 추가 (컨슈머 그룹 분리)
-- [ ] 부하 N개 병렬 실행 확인 (Kafka 파티션/컨슈머 그룹)
-- [ ] Airflow 도입 — 백테스트/야간 재평가 **배치 DAG** (라이브 워커는 제외)
-- [ ] 주기적 재평가 → 가중치 자동 갱신 + 기준치 미달 부하 강등/교체 루프
+## 5단계 — 다부하 Commander + 적응형 가중치 + 오케스트레이션 (의존성 순서)
+> 목표: 단일 앙상블 → **전략 여럿을 성과로 저울질하는 진짜 Commander**. 단 채택 앙상블은 고정 파라미터라
+> 적응형 가중치는 과적합으로 성과를 *악화*시킬 수 있음(walk-forward에서 그리드<고정 입증) →
+> **적응층 기본 off·DSR 게이트로 격리**해 효과 측정 후 켠다("올바른 순서로 전부 짓되 위험한 한 층만 toggle").
+- [ ] **5.1 부하 분리**: 3 trend 속도(이미 `TrendSignal` 분리) + (선택)후보전략 일봉화 → 각 부하가 `strategy.signals`에 **전략명 태그**로 발행(`live_ensemble` 다부하 확장)
+- [ ] **5.2 가중치 저장소**: Postgres `strategy_weights(strategy, weight, updated_at)` — 잡/DAG write, commander read
+- [ ] **5.3 commander 적응형 합의**: 동일가중 → `strategy_weights` 가중합 (**적응 toggle, 기본 off=동일가중**)
+- [ ] **5.4 부하별 성과추적 + 재평가 잡**: 각 부하 롤링 OOS 성과(`walkforward`/`metrics` DSR 재사용) → 새 가중치(역분산/softmax, floor·cap, **demote≠delete**, **EWMA 느린 갱신**, DSR<임계 강등)
+- [ ] **5.5 스케줄러**: 주기 잡(`daily-aggregator` 패턴)으로 검증 → **Airflow** 승격(야간 재백테스트→가중치 갱신 배치 DAG, 재시도·관측성). 라이브 워커는 DAG 밖
+- [ ] **5.6 병렬성 확인**: Kafka 파티션/컨슈머 그룹으로 부하 N개 독립 실행
+> ⚠️ **가드(절대)**: 적응층 기본 off · DSR 게이트 · EWMA/일변동 캡 · demote≠delete · 가중식 자체 OOS 검증.
+> "재학습으로 향상"이 아니라 "**열화 부하 자동 강등**" 안전장치로 보수적 사용.
+> 검증: 적응 on/off A/B(동일 OOS) · 잡/DAG 수동 트리거 성공 + `strategy_weights` 갱신 + commander 반영 확인.
 
 ## 6단계 — 코인 마무리 & 성과 검증
 - [ ] 라이브 모의매매로 앙상블 vs 단일 SMA 성과 비교 (일정 기간 — **실제 시장 경과 필요**, 현재 CASH)
 - [x] 대시보드 성과 패널 — 실현손익·승률·거래수·수수료(`/performance` FIFO, `api/web`) #61
 - [x] 코인 단계 회고/문서화 (`BACKLOG.md` 회고 + `docs/model.md` 모델카드) #61
-
-## 5단계 보류 사유
-- Airflow 배치 DAG·가중치 자동갱신 루프는 대형 인프라이고, **채택 앙상블은 고정 파라미터**라 재학습 루프 불요 → 현 설계엔 미적용(필요 시 별도).
 
 ## 7단계 — 주식(키움) 토대
 - [ ] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md`
