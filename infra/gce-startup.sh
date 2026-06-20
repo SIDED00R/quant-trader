@@ -24,13 +24,16 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-# 레포 클론 + 풀스택 기동 (public repo)
+# 레포 클론/갱신 + 풀스택 기동 (public repo)
 cd /opt
 if [ ! -d coin-auto-trader ]; then
   git clone https://github.com/SIDED00R/coin-auto-trader.git
 fi
 cd coin-auto-trader
+git fetch origin main && git reset --hard origin/main   # 부팅 시 최신 main 반영(.env는 gitignore라 보존)
 cp -n .env.example .env || true
-docker compose --profile app up -d --build
+docker compose --profile app up -d --build              # db-init(스키마, candles_1d 포함)은 app 의존성으로 자동 실행
 
+# 일봉(candles_1d)은 디스크 볼륨에 영속 → 최초 1회만 백필 필요(부팅마다 X). 미적재 시:
+#   docker compose run --rm commander python -m backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
 echo "STARTUP_DONE"
