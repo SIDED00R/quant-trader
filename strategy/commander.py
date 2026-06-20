@@ -1,13 +1,14 @@
-"""앙상블 commander (단일 책임: strategy.signals 소비 → 목표비중으로 모의주문).
+"""다부하 Commander (단일 책임: strategy.signals 소비 → 부하 가중합 목표로 모의주문).
 
-신호 워커(live_ensemble)가 발행한 일봉 목표비중 신호를 받아, auto_trade=TRUE 계정의 보유 비중을
-목표로 재조정한다(밴드 초과 시만). 주문은 place_order(내부 orders→relay→엔진 시뮬레이션) — **실거래 아님(모의)**.
-종목당 미체결(PENDING) 주문이 있으면 보류(중복 방지). 신호는 일봉당 1회라 저빈도 동작.
+각 추세 부하(live_ensemble)가 발행한 일봉 목표비중을 종목별로 모아, **모든 부하가 같은 봉으로 신호한 뒤**
+가중치(strategy_weights, 적응 off면 동일가중)로 합성한 목표비중으로 auto_trade 계정을 재조정한다(밴드 초과 시만).
+**한 봉당 1회만** 주문(부분 신호로 조기 발주 방지 — 미체결 가드와의 충돌 회피). 주문=place_order(내부 시뮬, 모의).
 
-decide()는 백테스트 EnsembleStrategy._order_to_target과 동일한 재조정 규칙의 순수 함수(테스트 가능).
-run()이 Kafka/Postgres/ClickHouse I/O를 얇게 감싼다. latest offset 구독(기동 시 과거 신호 재실행 안 함).
+decide()=백테스트 _order_to_target과 동일 규칙, combined_for_bar()=가중합(둘 다 순수 함수, 테스트 가능).
+동일가중이면 합성목표=부하 목표의 평균 = 기존 EnsembleStrategy와 동일(현 동작 보존). latest offset 구독.
 """
 import json
+from collections import defaultdict
 from decimal import ROUND_DOWN, Decimal
 
 from common.clickhouse_client import create_client
@@ -15,9 +16,29 @@ from common.config import ENSEMBLE_REBALANCE_BAND, FEE_RATE, MIN_ORDER_KRW, TOPI
 from common.kafka_client import create_consumer
 from common.order_writer import place_order
 from common.postgres_client import close_pool, open_pool, pool
+from common.strategy_weights import load_weights
+from strategy.ensemble import default_loads
 
 GROUP_ID = "ensemble-commander"
 _FEE_QUANT = Decimal("0.0001")
+
+
+def _roster_ready(sym_latest: dict, roster: list, bar_ts: str) -> bool:
+    """roster의 모든 부하가 같은 bar_ts로 신호했는지(=합성 가능 여부). sym_latest={load:(bar_ts, target)}."""
+    return all(sym_latest.get(n, (None,))[0] == bar_ts for n in roster)
+
+
+def combined_for_bar(latest: dict, roster: list, bar_ts: str, weights: dict):
+    """roster 모든 부하가 같은 bar_ts로 신호했으면 가중평균 목표비중 반환, 불완전/가중합0이면 None.
+
+    latest={load:(bar_ts, target)}, weights={load: w}. 동일가중이면 부하 목표의 평균(현 동작 보존).
+    """
+    if not _roster_ready(latest, roster, bar_ts):    # 일부 부하 미보고 → 대기
+        return None
+    wsum = sum(weights.get(n, 0.0) for n in roster)
+    if wsum <= 0:
+        return None
+    return sum(weights.get(n, 0.0) * latest[n][1] for n in roster) / wsum
 
 
 def decide(qty: Decimal, price: Decimal, cash: Decimal, equity: Decimal,
@@ -111,7 +132,10 @@ def run() -> None:
     consumer = create_consumer(GROUP_ID, enable_auto_commit=True, auto_offset_reset="latest")
     consumer.subscribe([TOPIC_SIGNALS])
     band = float(ENSEMBLE_REBALANCE_BAND)
-    print(f"[commander] started — {TOPIC_SIGNALS} → place_order (모의), band={band}")
+    roster = [name for name, _, _ in default_loads()]      # 합성에 필요한 부하 전체
+    latest: dict = defaultdict(dict)    # symbol → {load: (bar_ts, target)} — 부하별 최신 신호 버퍼
+    last_acted: dict = {}               # symbol → bar_ts — 이미 합성·발주한 봉(중복 방지)
+    print(f"[commander] started — {TOPIC_SIGNALS} → place_order (모의), roster={roster}, band={band}")
     try:
         while True:
             msg = consumer.poll(1.0)
@@ -119,13 +143,25 @@ def run() -> None:
                 continue
             try:
                 sig = json.loads(msg.value())
-                symbol, target_w = sig["symbol"], float(sig["target_weight"])
+                symbol, strategy = sig["symbol"], sig["strategy"]
+                bar_ts, target = str(sig["bar_ts"]), float(sig["target_weight"])
             except (KeyError, ValueError, TypeError) as e:
                 print(f"[commander] skip bad signal: {e}")
                 continue
+            if strategy not in roster:           # 로스터 외 부하 → 무시
+                continue
+            sym_latest = latest[symbol]
+            sym_latest[strategy] = (bar_ts, target)
+            if last_acted.get(symbol) == bar_ts or not _roster_ready(sym_latest, roster, bar_ts):
+                continue                          # 이미 발주했거나 일부 부하 미보고 → 대기(DB 미조회)
+            combined = combined_for_bar(sym_latest, roster, bar_ts, load_weights(roster))
+            if combined is None:                  # 가중합 0 등 비정상 → 안전상 대기
+                continue
             prices = _latest_prices(client)
             for acct in _enabled_accounts():
-                _rebalance(acct, symbol, target_w, prices, band)
+                _rebalance(acct, symbol, combined, prices, band)
+            last_acted[symbol] = bar_ts
+            print(f"[commander] combined {symbol} target={combined:.4f} (bar={bar_ts}, loads={len(roster)})")
     finally:
         consumer.close()
         close_pool()

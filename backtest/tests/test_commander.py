@@ -1,11 +1,13 @@
-"""앙상블 commander 주문 결정 로직 검증 (순수 함수 decide — DB/Kafka 불필요)."""
+"""앙상블 commander 순수 함수 검증 (decide·combined_for_bar — DB/Kafka 불필요)."""
 import unittest
 from decimal import Decimal
 
-from strategy.commander import decide
+from strategy.commander import combined_for_bar, decide
 
 _EQ = Decimal("1000000")     # 총자산 100만(계산 편의)
 _PX = Decimal("1000")        # 가격
+_ROSTER = ["a", "b", "c"]
+_EQUAL = {"a": 1.0, "b": 1.0, "c": 1.0}
 
 
 class TestDecide(unittest.TestCase):
@@ -44,6 +46,34 @@ class TestDecide(unittest.TestCase):
     def test_min_order_suppressed(self):
         # 목표가 현재보다 미세하게만 커서 차액<최소주문(5000) → 주문 없음
         self.assertIsNone(decide(Decimal("500"), _PX, _EQ, _EQ, 0.5005, 0.0))
+
+
+class TestCombinedForBar(unittest.TestCase):
+    def test_equal_weight_is_mean(self):
+        # 동일가중 → 부하 목표의 평균(현 EnsembleStrategy 동작 보존)
+        latest = {"a": ("d1", 1.0), "b": ("d1", 0.0), "c": ("d1", 0.5)}
+        self.assertAlmostEqual(combined_for_bar(latest, _ROSTER, "d1", _EQUAL), 0.5)
+
+    def test_incomplete_roster_returns_none(self):
+        # 한 부하 미보고 → 합성 보류(조기 발주 방지)
+        latest = {"a": ("d1", 1.0), "b": ("d1", 1.0)}
+        self.assertIsNone(combined_for_bar(latest, _ROSTER, "d1", _EQUAL))
+
+    def test_stale_bar_returns_none(self):
+        # 한 부하가 직전 봉 신호만 가짐 → 같은 봉 아님 → 보류
+        latest = {"a": ("d1", 1.0), "b": ("d1", 1.0), "c": ("d0", 1.0)}
+        self.assertIsNone(combined_for_bar(latest, _ROSTER, "d1", _EQUAL))
+
+    def test_weighted_combination(self):
+        # 가중치 2:1:1, 목표 1/0/0 → (2*1)/(4) = 0.5
+        latest = {"a": ("d1", 1.0), "b": ("d1", 0.0), "c": ("d1", 0.0)}
+        self.assertAlmostEqual(
+            combined_for_bar(latest, _ROSTER, "d1", {"a": 2.0, "b": 1.0, "c": 1.0}), 0.5)
+
+    def test_zero_weight_sum_returns_none(self):
+        # 순수 함수의 0 나눗셈 방어(런타임에선 load_weights가 합0이면 equal 반환해 도달 안 함)
+        latest = {"a": ("d1", 1.0), "b": ("d1", 1.0), "c": ("d1", 1.0)}
+        self.assertIsNone(combined_for_bar(latest, _ROSTER, "d1", {"a": 0.0, "b": 0.0, "c": 0.0}))
 
 
 if __name__ == "__main__":

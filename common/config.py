@@ -104,6 +104,9 @@ TREND_REBALANCE_BAND = Decimal(os.getenv("TREND_REBALANCE_BAND", "0.0"))
 ENSEMBLE_REBALANCE_BAND = Decimal(os.getenv("ENSEMBLE_REBALANCE_BAND", "0.5"))
 # 라이브 앙상블 운용 유니버스(채택안 = BTC/ETH). 라이브 신호 워커가 이 종목만 일봉 신호 산출.
 ENSEMBLE_SYMBOLS = [s.strip() for s in os.getenv("ENSEMBLE_SYMBOLS", "KRW-BTC,KRW-ETH").split(",") if s.strip()]
+# 적응형 가중치 사용 여부(5단계). False=동일가중(현 동작 보존). True=strategy_weights 테이블 값 사용.
+# ⚠️ 적응 가중치는 과적합 위험(walk-forward에서 고정>최적화). 검증 전까지 기본 off.
+ENSEMBLE_ADAPTIVE = os.getenv("ENSEMBLE_ADAPTIVE", "false").strip().lower() in ("1", "true", "yes")
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
