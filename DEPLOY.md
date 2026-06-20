@@ -5,11 +5,11 @@
 - 생성된 프로젝트: `coin-auto-trader-jvfhgq` (프로젝트만 생성됨, 결제 미연결)
 - 계정: `mywinningtime@gmail.com`
 
-> ## 현재 배포 상태 (2026-06-20): **GCE VM 가동 중 — 단, 이번 세션 작업물은 로컬 전용**
-> 두 환경을 구분할 것:
-> - **운영(배포됨)**: GCE VM `coin-trader-vm`(us-central1-a, e2-medium)이 **2026-06-13부터 가동 중**(§11). `docker compose --profile app` 풀스택 + **인터넷 공개 HTTPS 대시보드**(방화벽 `allow-web-https` tcp:80/443 `0.0.0.0/0`, Caddy, Basic Auth). 외부 IP `34.28.69.174`. **e2-medium ≈ $24/월 과금 중** — 미사용 시 `gcloud compute instances stop`(§11 하단).
-> - **로컬(미배포)**: 이번 세션의 3·4단계 코드(`feat/#59`/PR #60, **main 미머지**)와 백필 데이터(`candles_1d` 265종목 등)는 **내 PC Docker에만** 존재 → **VM엔 미반영**(VM은 `main` 기준 구버전 가동). 로컬 ClickHouse와 VM ClickHouse는 **별개 인스턴스**.
-> - 즉 "인프라·라이브 파이프라인은 배포됨, **이번 재설계 결과물은 아직 VM에 안 올라감**". 반영하려면 PR 머지 → VM에서 `git pull` + 재기동, 그리고 일봉 백필을 VM에서 재실행 필요.
+> ## 현재 배포 상태 (2026-06-20): **앙상블 라이브 배포됨 (모의)**
+> - **운영 VM**: GCE `coin-trader-vm`(us-central1-a, e2-medium) **가동 중**, 최신 `main` 배포(부팅 시 git pull). **e2-medium ≈ $24/월** — 중지: `gcloud compute instances stop coin-trader-vm --zone=us-central1-a`.
+> - **공개 대시보드**: `https://jh-coinlab.duckdns.org` (Caddy 자동 HTTPS, Basic Auth). 리디자인 + 라이트/다크 + 앙상블 스탠스 + 순손익(수수료 반영).
+> - **라이브 파이프라인**: `ensemble-signals`(일봉 신호) → `strategy.signals` → `commander`(모의주문) + `daily-aggregator`(candles_1d 일일 최신화). 옛 sma_trader는 교체(중단).
+> - **데이터**: VM ClickHouse에 candles_1d(BTC/ETH 2019-11~) 적재 완료. **모의 거래**(실거래 API 없음, 가상자본 ₩10M). 모델 출처 = `docs/model.md`.
 
 ---
 

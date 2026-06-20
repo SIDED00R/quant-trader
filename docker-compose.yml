@@ -192,6 +192,11 @@ services:
     container_name: candle
     command: python -m aggregator.candle
 
+  daily-aggregator:
+    <<: *app
+    container_name: daily-aggregator
+    command: python -m aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
+
   engine:
     <<: *app
     container_name: engine
