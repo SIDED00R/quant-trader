@@ -169,8 +169,33 @@ def _read_rows(market, unit, cache_dir, start_ms, end_ms):
             yield (ts, market, row["close"])
 
 
-def load(markets, unit, cache_dir, start_ms=None, end_ms=None):
-    """종목별 정렬 캐시를 (ts, symbol) 전역 순서로 merge해 BTick(종가) yield."""
+def _resample(rows, bar_ms):
+    """(ts_ms, market, close) 오름차순 stream을 bar_ms 버킷의 **마지막 종가**로 다운샘플.
+
+    버킷 = floor(ts/bar_ms). 버킷이 바뀌는 순간 직전 버킷을 그 버킷의 마지막 봉 ts·종가로 emit
+    (종가 확정 시점=룩어헤드 없음). 스트림 종료 시 마지막 버킷 emit. ts 오름차순 보존(merge 전제).
+    """
+    cur_bucket = None
+    last_ts = last_market = last_close = None
+    for ts, market, close in rows:
+        bucket = ts // bar_ms
+        if cur_bucket is not None and bucket != cur_bucket:
+            yield (last_ts, last_market, last_close)
+        cur_bucket = bucket
+        last_ts, last_market, last_close = ts, market, close
+    if cur_bucket is not None:
+        yield (last_ts, last_market, last_close)
+
+
+def load(markets, unit, cache_dir, start_ms=None, end_ms=None, bar_min=None):
+    """종목별 정렬 캐시를 (ts, symbol) 전역 순서로 merge해 BTick(종가) yield.
+
+    bar_min 지정 시 캐시 unit을 그 분 단위로 다운샘플(예 1440=일봉)한다 — 신호·거래 빈도를
+    구조적으로 줄이는 상위 타임프레임 백테스트용. 리샘플은 **종목별(merge 전)** 수행해 전역 시간순을 보존한다.
+    """
     streams = [_read_rows(m, unit, cache_dir, start_ms, end_ms) for m in markets]
+    if bar_min:
+        bar_ms = bar_min * 60 * 1000
+        streams = [_resample(s, bar_ms) for s in streams]
     for ts, market, close in heapq.merge(*streams, key=lambda x: (x[0], x[1])):
         yield BTick(market, Decimal(close), ts / 1000.0)

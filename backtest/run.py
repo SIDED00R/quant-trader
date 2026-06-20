@@ -31,6 +31,14 @@ from common.config import (
     STRATEGY_TRAIL_GIVEBACK_PCT,
     STRATEGY_WARMUP_SEC,
     SYMBOLS,
+    TREND_BARS_PER_YEAR,
+    TREND_ENTRY_BAND,
+    TREND_LONG,
+    TREND_MAX_WEIGHT,
+    TREND_REGIME_MAX_VOL,
+    TREND_SHORT,
+    TREND_VOL_LOOKBACK,
+    TREND_VOL_TARGET,
 )
 from backtest.account import BacktestAccount
 from backtest.datasource import load_clickhouse_candles
@@ -58,6 +66,13 @@ def _strategy_params(name: str) -> dict:
             "STRONG_GAP": str(STRATEGY_STRONG_GAP),
             "ORDER_FRACTION_MIN": str(STRATEGY_ORDER_FRACTION_MIN),
         })
+    elif name == "trend":  # 저회전 추세 전략은 봉 기반 가드라 위 초 단위 공통 가드와 무관 — 자체 파라미터만 기록
+        return {
+            "TREND_SHORT": TREND_SHORT, "TREND_LONG": TREND_LONG,
+            "TREND_ENTRY_BAND": str(TREND_ENTRY_BAND), "TREND_VOL_TARGET": str(TREND_VOL_TARGET),
+            "TREND_VOL_LOOKBACK": TREND_VOL_LOOKBACK, "TREND_MAX_WEIGHT": str(TREND_MAX_WEIGHT),
+            "TREND_REGIME_MAX_VOL": str(TREND_REGIME_MAX_VOL), "TREND_BARS_PER_YEAR": TREND_BARS_PER_YEAR,
+        }
     return common
 
 
@@ -75,6 +90,8 @@ def parse_args(argv=None):
                    help="upbit=REST 백필 캐시 / clickhouse=candles_1m")
     p.add_argument("--symbols", default="", help="쉼표 구분(upbit는 미지정 시 config SYMBOLS, clickhouse는 전체)")
     p.add_argument("--unit", type=int, default=1, help="분봉 단위(upbit 캐시 unit과 일치)")
+    p.add_argument("--bar-min", type=int, default=0,
+                   help="상위 타임프레임 리샘플 분(0=원본 unit, 예 1440=일봉). 신호·거래 빈도 축소")
     p.add_argument("--days", type=int, default=730, help="upbit: 최근 N일 (기본 2년)")
     p.add_argument("--cache-dir", default="data/candles", help="upbit 캐시 디렉터리")
     p.add_argument("--start", default="", help="clickhouse: UTC 시작 (예: '2026-06-16 00:00:00')")
@@ -111,7 +128,8 @@ def main(argv=None) -> int:
         if args.source == "upbit":
             markets = symbols or SYMBOLS
             start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
-            candles = load_candle_cache(markets, args.unit, args.cache_dir, start_ms=start_ms)
+            candles = load_candle_cache(markets, args.unit, args.cache_dir, start_ms=start_ms,
+                                        bar_min=args.bar_min or None)
         else:
             candles = load_clickhouse_candles(symbols=symbols or None,
                                               start=args.start or None, end=args.end or None)
@@ -135,6 +153,7 @@ def main(argv=None) -> int:
         "strategy": strategy.name,
         "source": args.source,
         "unit_min": args.unit if args.source == "upbit" else 1,  # clickhouse는 candles_1m(1분) 고정
+        "bar_min": args.bar_min or None,                          # 리샘플 타임프레임(None=원본)
         "symbols": symbols or (SYMBOLS if args.source == "upbit" else None),
         "days": args.days if args.source == "upbit" else None,
         "start": args.start or None,

@@ -8,6 +8,70 @@ import statistics
 from decimal import Decimal
 
 SECONDS_PER_YEAR = 31_536_000  # 365d (코인 24/7)
+_EULER_MASCHERONI = 0.5772156649015329  # γ — 극값분포 기대치 보정 상수(Deflated Sharpe)
+_NORM = statistics.NormalDist()         # 표준정규 CDF/역CDF (scipy 불요)
+
+
+def _per_period_sharpe(returns: list[float]) -> float | None:
+    """봉별(비연율) Sharpe = 평균/표준편차. 표본<2 또는 표준편차 0이면 None."""
+    if len(returns) < 2:
+        return None
+    sd = statistics.pstdev(returns)
+    if sd == 0:
+        return None
+    return statistics.mean(returns) / sd
+
+
+def _skew_kurt(returns: list[float]) -> tuple[float, float]:
+    """표본 왜도(skew)·첨도(kurtosis, **비초과**: 정규=3.0). 표본<2 또는 표준편차 0이면 (0,3)."""
+    n = len(returns)
+    if n < 2:
+        return 0.0, 3.0
+    mean = statistics.mean(returns)
+    sd = statistics.pstdev(returns)
+    if sd == 0:
+        return 0.0, 3.0
+    skew = sum(((x - mean) / sd) ** 3 for x in returns) / n
+    kurt = sum(((x - mean) / sd) ** 4 for x in returns) / n
+    return skew, kurt
+
+
+def probabilistic_sharpe(sr: float, n: int, skew: float, kurt: float, benchmark: float = 0.0):
+    """PSR — 관측 Sharpe(sr, 봉별)가 benchmark를 초과할 확률(Bailey & López de Prado 2014).
+
+    sr·benchmark는 동일 주기(봉별, 비연율). kurt는 비초과 첨도(정규=3). 표본<2/분모<=0이면 None.
+    """
+    denom = 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * sr * sr
+    if n < 2 or denom <= 0:
+        return None
+    z = (sr - benchmark) * math.sqrt(n - 1) / math.sqrt(denom)
+    return _NORM.cdf(z)
+
+
+def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
+    """N회 독립 시도 시 귀무가설 하 기대 최대 Sharpe(봉별). 시도<2/분산<=0이면 0.
+
+    SR0 = √V·[(1-γ)·Z⁻¹(1-1/N) + γ·Z⁻¹(1-1/(N·e))] — 다중시도 선택편향의 기준선.
+    """
+    if n_trials < 2 or sr_variance <= 0:
+        return 0.0
+    z1 = _NORM.inv_cdf(1.0 - 1.0 / n_trials)
+    z2 = _NORM.inv_cdf(1.0 - 1.0 / (n_trials * math.e))
+    return math.sqrt(sr_variance) * ((1.0 - _EULER_MASCHERONI) * z1 + _EULER_MASCHERONI * z2)
+
+
+def deflated_sharpe(returns: list[float], sr_variance: float, n_trials: int):
+    """DSR — N회 시도로 부풀려진 기준선(expected_max_sharpe) 대비 관측 Sharpe의 PSR.
+
+    returns: OOS 봉별 수익률 시퀀스. sr_variance: 시도들의 Sharpe 분산. n_trials: 시도 수 N.
+    N<2면 deflation 불가 → benchmark=0의 PSR(=비편향 유의도)로 보고. 산출 불가 시 None.
+    """
+    sr = _per_period_sharpe(returns)
+    if sr is None:
+        return None
+    skew, kurt = _skew_kurt(returns)
+    sr_star = expected_max_sharpe(sr_variance, n_trials)
+    return probabilistic_sharpe(sr, len(returns), skew, kurt, benchmark=sr_star)
 
 
 def total_return(initial: Decimal, final: Decimal) -> Decimal:

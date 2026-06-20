@@ -36,7 +36,8 @@ def print_summary(metrics: dict, meta: dict, engine) -> None:
     print("=" * 56)
     print(f"  백테스트 결과 — {meta.get('strategy', '?')}")
     print("=" * 56)
-    src = f"{meta.get('source')} (unit={meta.get('unit_min')}m)"
+    bar = f", bar={meta['bar_min']}m" if meta.get("bar_min") else ""
+    src = f"{meta.get('source')} (unit={meta.get('unit_min')}m{bar})"
     if meta.get("days"):
         print(f"  기간        : 최근 {meta['days']}일{_actual_span(engine)}   소스: {src}")
     else:

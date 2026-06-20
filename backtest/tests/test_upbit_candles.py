@@ -140,6 +140,32 @@ class TestUpbitCacheLoad(unittest.TestCase):
             self.assertEqual([t.ts for t in out], [60.0, 60.0, 120.0])
 
 
+class TestResample(unittest.TestCase):
+    def test_downsample_keeps_last_close_of_bucket(self):
+        # 1분봉 6개를 5분봉으로 → 버킷[0,5분),[5,10분) 각각 마지막 종가, ts는 그 마지막 봉 시각
+        with tempfile.TemporaryDirectory() as d:
+            rows = [(i * 60000, str(100 + i)) for i in range(7)]  # ts=0,60k,...,360k(=6분)
+            _write(d, "KRW-BTC", 1, rows)
+            out = list(load(["KRW-BTC"], 1, d, bar_min=5))
+            # 버킷1: ts 0~240k(분0~4) 마지막=분4(ts=240k,close=104). 버킷2: 분5~6 마지막=분6(ts=360k,close=106)
+            self.assertEqual([(t.ts, t.price) for t in out],
+                             [(240.0, Decimal("104")), (360.0, Decimal("106"))])
+
+    def test_resample_preserves_global_order_across_symbols(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "KRW-BTC", 1, [(i * 60000, str(100 + i)) for i in range(10)])
+            _write(d, "KRW-ETH", 1, [(i * 60000, str(10 + i)) for i in range(10)])
+            out = list(load(["KRW-ETH", "KRW-BTC"], 1, d, bar_min=5))
+            ts = [t.ts for t in out]
+            self.assertEqual(ts, sorted(ts), "리샘플 후에도 전역 시간순")
+
+    def test_no_bar_min_is_passthrough(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "KRW-BTC", 1, [(60000, "100"), (120000, "101"), (180000, "102")])
+            out = list(load(["KRW-BTC"], 1, d, bar_min=None))
+            self.assertEqual([t.ts for t in out], [60.0, 120.0, 180.0])
+
+
 class TestUpbitBackfill(unittest.TestCase):
     def test_ws_ms_converts_candle_time_to_utc_epoch_ms(self):
         expected = int(datetime(2026, 1, 2, 3, 4, 0, tzinfo=timezone.utc).timestamp() * 1000)

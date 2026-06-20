@@ -1,6 +1,6 @@
 """백테스트 엔진 (단일 책임: 봉 replay 구동 + 동기 체결 + 자산곡선 집계).
 
-전략의 Broker 인터페이스를 구현한다(position_qty/avg/cash/open_symbol_count/buy/sell).
+전략의 Broker 인터페이스를 구현한다(position_qty/avg/cash/equity/open_symbol_count/buy/sell).
 매 틱: 최신가 갱신 → strategy.on_tick → 평가자산으로 틱 단위 MDD(정확)와 final_equity 갱신.
 자산곡선은 균등 시간그리드(sample_sec)로 직전가 carry-forward 표본화 → Sharpe 연율화 가정과 정합.
 """
@@ -37,6 +37,9 @@ class BacktestEngine:
 
     def cash(self) -> Decimal:
         return self.account.cash
+
+    def equity(self) -> Decimal:
+        return self.account.equity(self.last_price)
 
     def open_symbol_count(self) -> int:
         return len(self.account.positions)
