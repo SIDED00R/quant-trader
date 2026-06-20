@@ -32,7 +32,8 @@ fi
 cd coin-auto-trader
 git fetch origin main && git reset --hard origin/main   # 부팅 시 최신 main 반영(.env는 gitignore라 보존)
 cp -n .env.example .env || true
-docker compose --profile app up -d --build              # db-init(스키마, candles_1d 포함)은 app 의존성으로 자동 실행
+# 데이터 VM = 수집·저장·대시보드 서브셋만 상시(2-VM 분리). 매매는 온디맨드 매매 VM의 trade_once 담당.
+docker compose --profile data up -d --build             # db-init(스키마, candles_1d 포함)은 의존성으로 자동 실행
 
 # 일봉(candles_1d)은 디스크 볼륨에 영속 → 최초 1회만 백필 필요(부팅마다 X). 미적재 시:
 #   docker compose run --rm commander python -m backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
