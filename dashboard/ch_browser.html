@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>ClickHouse 브라우저 — coin_analytics</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --line:#2b3440; --fg:#d7dde5; --mut:#7d8a99; --accent:#4ea1ff; --accent2:#1f6feb; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header input { background:#0b0f14; border:1px solid var(--line); color:var(--fg); padding:5px 8px; border-radius:6px; }
+  header input.host { width:200px; } header input.small { width:90px; }
+  header .grow { flex:1; }
+  button { background:var(--accent2); color:#fff; border:0; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; }
+  button:hover { background:var(--accent); }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--fg); font-weight:500; }
+  main { flex:1; display:flex; min-height:0; }
+  aside { width:230px; border-right:1px solid var(--line); background:var(--panel); overflow:auto; padding:8px; }
+  aside h3 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:6px 6px 8px; }
+  .tbl { padding:8px 10px; border-radius:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+  .tbl:hover { background:#222b36; } .tbl small { color:var(--mut); }
+  .tbl.active { background:#243447; outline:1px solid var(--accent2); }
+  section { flex:1; display:flex; flex-direction:column; min-width:0; padding:10px; gap:8px; }
+  textarea { width:100%; height:88px; background:#0b0f14; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px; font-family:ui-monospace,Consolas,monospace; resize:vertical; }
+  .bar { display:flex; gap:8px; align-items:center; }
+  .status { color:var(--mut); font-size:12px; } .status.err { color:#ff6b6b; }
+  .results { flex:1; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+  th,td { border-bottom:1px solid var(--line); padding:5px 9px; text-align:right; white-space:nowrap; }
+  th { position:sticky; top:0; background:#222b36; color:var(--accent); text-align:right; z-index:1; }
+  td:first-child, th:first-child { text-align:left; color:var(--mut); }
+  tbody tr:hover { background:#161d26; }
+  .hint { color:var(--mut); font-size:12px; padding:20px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <input id="host" class="host" value="http://localhost:8123" title="ClickHouse HTTP 주소">
+  <input id="user" class="small" value="default" title="유저">
+  <input id="pw" class="small" type="password" placeholder="비밀번호" title="비밀번호(ch_pw)">
+  <input id="db" class="small" value="coin_analytics" title="데이터베이스">
+  <button onclick="loadTables()">테이블 새로고침</button>
+  <span class="grow"></span>
+  <span id="conn" class="status"></span>
+</header>
+<main>
+  <aside>
+    <h3>테이블 (더블클릭 = 최근 100행)</h3>
+    <div id="tables"></div>
+  </aside>
+  <section>
+    <textarea id="sql" spellcheck="false" placeholder="SQL 입력 후 Ctrl+Enter (테이블은 db.table 형식)"></textarea>
+    <div class="bar">
+      <button onclick="runSql()">실행 (Ctrl+Enter)</button>
+      <span id="status" class="status"></span>
+    </div>
+    <div class="results" id="results"><div class="hint">왼쪽에서 테이블을 더블클릭하거나 SQL을 실행하세요.</div></div>
+  </section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const cfg = () => ({ host:$('host').value.replace(/\/$/,''), user:$('user').value, pw:$('pw').value, db:$('db').value });
+
+  // sessionStorage로 비밀번호 등 입력 기억(이 탭 한정 — 파일에 저장 안 함)
+  ['host','user','pw','db'].forEach(k => {
+    const v = sessionStorage.getItem('ch_'+k); if (v!==null) $(k).value = v;
+    $(k).addEventListener('change', () => sessionStorage.setItem('ch_'+k, $(k).value));
+  });
+
+  async function query(sql) {
+    const c = cfg();
+    const url = `${c.host}/?user=${encodeURIComponent(c.user)}&password=${encodeURIComponent(c.pw)}`
+              + `&database=${encodeURIComponent(c.db)}&add_http_cors_header=1&default_format=JSONCompact`;
+    const t0 = performance.now();
+    const r = await fetch(url, { method:'POST', body: sql });
+    const text = await r.text();
+    if (!r.ok) throw new Error(text.slice(0, 400));
+    const ms = (performance.now()-t0).toFixed(0);
+    return { ...JSON.parse(text), ms };
+  }
+
+  async function loadTables() {
+    try {
+      const res = await query('SHOW TABLES');
+      const names = res.data.map(r => r[0]);
+      const el = $('tables'); el.innerHTML = '';
+      for (const name of names) {
+        const cnt = await query(`SELECT count() FROM \`${name}\` FINAL`).then(r=>(+r.data[0][0]).toLocaleString()).catch(()=> '?');
+        const div = document.createElement('div');
+        div.className = 'tbl';
+        div.innerHTML = `<span>${name}</span><small>${cnt}</small>`;
+        div.ondblclick = () => openTable(name, div);
+        el.appendChild(div);
+      }
+      $('conn').textContent = `연결됨 · 테이블 ${names.length}`;
+      $('conn').className = 'status';
+    } catch (e) { $('conn').textContent = '연결 실패: ' + e.message; $('conn').className = 'status err'; }
+  }
+
+  async function openTable(name, div) {
+    document.querySelectorAll('.tbl').forEach(d => d.classList.remove('active'));
+    if (div) div.classList.add('active');
+    let timecol = null;
+    try {  // 시간 컬럼 자동 탐지(첫 Date/DateTime 컬럼) → 최근순 정렬
+      const desc = await query(`DESCRIBE TABLE \`${name}\``);
+      const dt = desc.data.find(r => /Date/.test(r[1]));
+      timecol = dt ? dt[0] : desc.data[0][0];
+    } catch (e) {}
+    const order = timecol ? ` ORDER BY \`${timecol}\` DESC` : '';
+    const sql = `SELECT * FROM ${cfg().db}.${name} FINAL${order} LIMIT 100`;
+    $('sql').value = sql;
+    runSql();
+  }
+
+  async function runSql() {
+    const sql = $('sql').value.trim(); if (!sql) return;
+    $('status').textContent = '실행 중…'; $('status').className = 'status';
+    try {
+      const res = await query(sql);
+      render(res);
+      $('status').textContent = `${res.data.length}행 · ${res.ms}ms` + (res.rows_before_limit_at_least ? ` (총 ≥${(+res.rows_before_limit_at_least).toLocaleString()})` : '');
+    } catch (e) {
+      $('results').innerHTML = '';
+      $('status').textContent = '에러: ' + e.message; $('status').className = 'status err';
+    }
+  }
+
+  function render(res) {
+    if (!res.meta) { $('results').innerHTML = '<div class="hint">결과 없음</div>'; return; }
+    const cols = res.meta.map(m => m.name);
+    let h = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+    for (const row of res.data)
+      h += '<tr>' + row.map(v => `<td>${v===null?'<span style=color:#566>∅</span>':String(v)}</td>`).join('') + '</tr>';
+    h += '</tbody></table>';
+    $('results').innerHTML = res.data.length ? h : '<div class="hint">0행</div>';
+  }
+
+  $('sql').addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key==='Enter') runSql(); });
+  if (cfg().pw) loadTables();   // 비번이 기억돼 있으면 자동 로드
+</script>
+</body>
+</html>

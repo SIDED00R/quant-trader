@@ -43,6 +43,23 @@ def _ann_vol(closes: list[float], lookback: int, bars_per_year: int):
     return math.sqrt(var) * math.sqrt(bars_per_year)
 
 
+def target_weight(ann_vol, vol_target: float, max_weight: Decimal) -> Decimal:
+    """변동성 타게팅 목표 비중 = min(상한, 목표변동성/실현변동성). 무변동/미산출이면 상한."""
+    if not ann_vol or ann_vol <= 0:
+        return max_weight
+    return min(max_weight, Decimal(str(vol_target)) / Decimal(str(ann_vol)))
+
+
+def affordable_qty(budget: Decimal, price: Decimal) -> Decimal:
+    """예산 내 매수 가능 수량 — 수수료 포함 비용 + 양자화 올림 여유분(_FEE_QUANT) 예약 후 내림.
+
+    budget==cash(전액 진입)에서도 체결가 반올림으로 잔고 거부되는 경우를 차단한다. budget·price<=0이면 0.
+    """
+    if budget <= 0 or price <= 0:
+        return Decimal(0)
+    return ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+
+
 class TrendStrategy(Strategy):
     name = "trend"
 
@@ -90,10 +107,7 @@ class TrendStrategy(Strategy):
             self._enter(sym, price, now, ann_vol, broker)
 
     def _target_weight(self, ann_vol) -> Decimal:
-        """변동성 타게팅 목표 비중 = min(상한, 목표변동성/실현변동성). 무변동이면 상한."""
-        if not ann_vol or ann_vol <= 0:
-            return self.max_weight
-        return min(self.max_weight, Decimal(str(self.vol_target)) / Decimal(str(ann_vol)))
+        return target_weight(ann_vol, self.vol_target, self.max_weight)
 
     def _enter(self, sym, price, now, ann_vol, broker):
         if price is None or price <= 0:
@@ -125,6 +139,6 @@ class TrendStrategy(Strategy):
     def _buy(self, sym, price, now, budget, broker):
         if budget < MIN_ORDER_KRW:
             return
-        qty = ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+        qty = affordable_qty(budget, price)
         if qty > 0:
             broker.buy(sym, qty, now)

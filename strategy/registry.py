@@ -5,6 +5,7 @@
 from strategy.base import Strategy
 from strategy.bollinger import BollingerStrategy
 from strategy.breakout import BreakoutStrategy
+from strategy.ensemble import EnsembleStrategy
 from strategy.macd import MACDStrategy
 from strategy.rsi import RSIStrategy
 from strategy.sma import SMAStrategy
@@ -17,6 +18,7 @@ _REGISTRY: dict[str, type[Strategy]] = {
     BollingerStrategy.name: BollingerStrategy,
     BreakoutStrategy.name: BreakoutStrategy,
     TrendStrategy.name: TrendStrategy,
+    EnsembleStrategy.name: EnsembleStrategy,
 }
 
 
