@@ -82,9 +82,6 @@ STRATEGY_MIN_EDGE_PCT = Decimal(os.getenv("STRATEGY_MIN_EDGE_PCT", "0.005"))
 # 데드크로스 청산 사용 여부(1.5단계). baseline에서 데드크로스가 최대 출혈원(−22.5M)이라 기본 비활성(청산은 STOP/TAKE/TRAIL만).
 STRATEGY_DEADCROSS_EXIT = os.getenv("STRATEGY_DEADCROSS_EXIT", "false").strip().lower() in ("1", "true", "yes")
 
-# 활성 전략 목록(레지스트리 이름). 4단계 앙상블에서 부하 선택에 사용. 기본 단일 SMA.
-ACTIVE_STRATEGIES = [s.strip() for s in os.getenv("ACTIVE_STRATEGIES", "sma").split(",") if s.strip()]
-
 # 업비트 최소 주문 금액(이 금액 미만 매수는 스킵). 정본 위치는 여기(config) — sma_trader의 동명 상수는 통합 대기(코드리뷰 D1/D2 deferred).
 MIN_ORDER_KRW = Decimal(os.getenv("MIN_ORDER_KRW", "5000"))
 

@@ -77,7 +77,7 @@ def _enabled_accounts():
 def _positions(acct):
     with pool.connection() as conn:
         rows = conn.execute(
-            "SELECT symbol, quantity, avg_buy_price FROM positions WHERE account_id=%s AND quantity>0",
+            "SELECT symbol, quantity FROM positions WHERE account_id=%s AND quantity>0",
             (acct,)).fetchall()
     return {r[0]: Decimal(str(r[1])) for r in rows}
 
