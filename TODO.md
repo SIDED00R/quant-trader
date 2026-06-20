@@ -93,9 +93,9 @@
 > 목표: 단일 앙상블 → **전략 여럿을 성과로 저울질하는 진짜 Commander**. 단 채택 앙상블은 고정 파라미터라
 > 적응형 가중치는 과적합으로 성과를 *악화*시킬 수 있음(walk-forward에서 그리드<고정 입증) →
 > **적응층 기본 off·DSR 게이트로 격리**해 효과 측정 후 켠다("올바른 순서로 전부 짓되 위험한 한 층만 toggle").
-- [ ] **5.1 부하 분리**: 3 trend 속도(이미 `TrendSignal` 분리) + (선택)후보전략 일봉화 → 각 부하가 `strategy.signals`에 **전략명 태그**로 발행(`live_ensemble` 다부하 확장)
-- [ ] **5.2 가중치 저장소**: Postgres `strategy_weights(strategy, weight, updated_at)` — 잡/DAG write, commander read
-- [ ] **5.3 commander 적응형 합의**: 동일가중 → `strategy_weights` 가중합 (**적응 toggle, 기본 off=동일가중**)
+- [x] **5.1 부하 분리**: 3 trend 속도(`TrendSignal`)가 `strategy.signals`에 **전략명 태그**로 발행(`live_ensemble` 다부하 확장) #68 #69
+- [x] **5.2 가중치 저장소**: Postgres `strategy_weights(strategy, weight, updated_at)` + `load_weights`(미등록/합0 → 동일가중 폴백) #68 #69
+- [x] **5.3 commander 적응형 합의**: 봉별 버퍼링 → `strategy_weights` 가중합(`combined_for_bar`), **적응 toggle `ENSEMBLE_ADAPTIVE` 기본 off=동일가중=부하 평균**(현 동작 보존) #68 #69 — VM 배포·검증 완료(2026-06-20)
 - [ ] **5.4 부하별 성과추적 + 재평가 잡**: 각 부하 롤링 OOS 성과(`walkforward`/`metrics` DSR 재사용) → 새 가중치(역분산/softmax, floor·cap, **demote≠delete**, **EWMA 느린 갱신**, DSR<임계 강등)
 - [ ] **5.5 스케줄러**: 주기 잡(`daily-aggregator` 패턴)으로 검증 → **Airflow** 승격(야간 재백테스트→가중치 갱신 배치 DAG, 재시도·관측성). 라이브 워커는 DAG 밖
 - [ ] **5.6 병렬성 확인**: Kafka 파티션/컨슈머 그룹으로 부하 N개 독립 실행
