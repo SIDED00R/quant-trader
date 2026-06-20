@@ -84,6 +84,20 @@ STRATEGY_DEADCROSS_EXIT = os.getenv("STRATEGY_DEADCROSS_EXIT", "false").strip().
 # 활성 전략 목록(레지스트리 이름). 4단계 앙상블에서 부하 선택에 사용. 기본 단일 SMA.
 ACTIVE_STRATEGIES = [s.strip() for s in os.getenv("ACTIVE_STRATEGIES", "sma").split(",") if s.strip()]
 
+# 업비트 최소 주문 금액(이 금액 미만 매수는 스킵). 정본 위치는 여기(config) — sma_trader의 동명 상수는 통합 대기(코드리뷰 D1/D2 deferred).
+MIN_ORDER_KRW = Decimal(os.getenv("MIN_ORDER_KRW", "5000"))
+
+# ── 저회전 추세추종 전략 (3단계, strategy/trend.py) ──
+# 일봉(상위 타임프레임) 기준 long-or-cash. 가드는 초(秒)가 아닌 **봉 수**로 둔다(일봉=1봉/일).
+TREND_SHORT = int(os.getenv("TREND_SHORT", "10"))            # 단기 SMA(봉)
+TREND_LONG = int(os.getenv("TREND_LONG", "40"))             # 장기 SMA(봉). 단기>장기=상승추세→보유
+TREND_ENTRY_BAND = Decimal(os.getenv("TREND_ENTRY_BAND", "0.0"))  # 히스테리시스 마진(이격 비율). 진입은 +band 초과, 청산은 -band 미만 — whipsaw·churn 차단
+TREND_VOL_TARGET = Decimal(os.getenv("TREND_VOL_TARGET", "0.5"))  # 목표 연율 변동성. 진입 비중 = min(MAX, VOL_TARGET/실현변동성)
+TREND_VOL_LOOKBACK = int(os.getenv("TREND_VOL_LOOKBACK", "20"))   # 실현변동성 산출 봉 수(일별 수익률 표준편차)
+TREND_MAX_WEIGHT = Decimal(os.getenv("TREND_MAX_WEIGHT", "1.0"))  # 1회 비중 상한(현물=1.0, 레버리지 불가)
+TREND_REGIME_MAX_VOL = Decimal(os.getenv("TREND_REGIME_MAX_VOL", "2.0"))  # 연율 실현변동성이 이 값 초과면 추세 무관 강제 현금(극단 레짐 필터)
+TREND_BARS_PER_YEAR = int(os.getenv("TREND_BARS_PER_YEAR", "365"))  # 변동성 연율화 계수(일봉 24/7=365). 변경 시 타임프레임과 일치시킬 것
+
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))

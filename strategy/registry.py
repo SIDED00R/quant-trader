@@ -8,6 +8,7 @@ from strategy.breakout import BreakoutStrategy
 from strategy.macd import MACDStrategy
 from strategy.rsi import RSIStrategy
 from strategy.sma import SMAStrategy
+from strategy.trend import TrendStrategy
 
 _REGISTRY: dict[str, type[Strategy]] = {
     SMAStrategy.name: SMAStrategy,
@@ -15,6 +16,7 @@ _REGISTRY: dict[str, type[Strategy]] = {
     MACDStrategy.name: MACDStrategy,
     BollingerStrategy.name: BollingerStrategy,
     BreakoutStrategy.name: BreakoutStrategy,
+    TrendStrategy.name: TrendStrategy,
 }
 
 
