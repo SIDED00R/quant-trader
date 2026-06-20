@@ -185,6 +185,21 @@ def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
     return {"folds": fold_results, "aggregate": agg, "strategy": "trend"}
 
 
+def oos_returns(bars, factory, prime_bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec):
+    """고정 전략(factory)의 walk-forward 결합 OOS 봉별 수익률 시퀀스(IS 파라미터 선택 없음).
+
+    각 fold의 OOS 구간만 새 계좌로 평가(직전 prime 구간으로 지표 priming, 무거래)하고 봉별 수익률을 이어붙인다.
+    단일 (short,long) 부하의 최근 OOS 위험조정성과 입력 — 5.4 재평가 잡의 부하별 스코어링에 사용.
+    """
+    if not bars:
+        return []
+    folds = _folds(bars[0].ts, bars[-1].ts, prime_bars * sample_sec, is_sec, oos_sec, step_sec)
+    rets: list[float] = []
+    for (_isp, _iss, oos_prime, oos_start, oos_end) in folds:
+        rets.extend(_evaluate(bars, factory, oos_prime, oos_start, oos_end, initial, fills, sample_sec)["rets"])
+    return rets
+
+
 def _print(result):
     if result.get("error"):
         print(f"[wf] {result['error']}", file=sys.stderr)
