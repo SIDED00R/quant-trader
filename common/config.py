@@ -97,6 +97,8 @@ TREND_VOL_LOOKBACK = int(os.getenv("TREND_VOL_LOOKBACK", "20"))   # 실현변동
 TREND_MAX_WEIGHT = Decimal(os.getenv("TREND_MAX_WEIGHT", "1.0"))  # 1회 비중 상한(현물=1.0, 레버리지 불가)
 TREND_REGIME_MAX_VOL = Decimal(os.getenv("TREND_REGIME_MAX_VOL", "2.0"))  # 연율 실현변동성이 이 값 초과면 추세 무관 강제 현금(극단 레짐 필터)
 TREND_BARS_PER_YEAR = int(os.getenv("TREND_BARS_PER_YEAR", "365"))  # 변동성 연율화 계수(일봉 24/7=365). 변경 시 타임프레임과 일치시킬 것
+# 보유 중 변동성 타게팅 리밸런싱 밴드(상대): |현재비중-목표비중|/목표 > 밴드일 때만 재조정. 0=비활성(진입시 사이징만, 저회전 유지).
+TREND_REBALANCE_BAND = Decimal(os.getenv("TREND_REBALANCE_BAND", "0.0"))
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")

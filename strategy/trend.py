@@ -19,6 +19,7 @@ from common.config import (
     TREND_LONG,
     TREND_MAX_WEIGHT,
     TREND_REGIME_MAX_VOL,
+    TREND_REBALANCE_BAND,
     TREND_SHORT,
     TREND_VOL_LOOKBACK,
     TREND_VOL_TARGET,
@@ -46,7 +47,8 @@ class TrendStrategy(Strategy):
     name = "trend"
 
     def __init__(self, short=None, long=None, entry_band=None, vol_target=None,
-                 vol_lookback=None, max_weight=None, regime_max_vol=None, bars_per_year=None):
+                 vol_lookback=None, max_weight=None, regime_max_vol=None, bars_per_year=None,
+                 rebalance_band=None):
         # 파라미터는 config 기본값. walk-forward 그리드탐색은 인자로 오버라이드해 인스턴스화한다.
         self.short = short or TREND_SHORT
         self.long = long or TREND_LONG
@@ -58,6 +60,8 @@ class TrendStrategy(Strategy):
         self.max_weight = Decimal(str(TREND_MAX_WEIGHT if max_weight is None else max_weight))
         self.regime_max_vol = float(TREND_REGIME_MAX_VOL if regime_max_vol is None else regime_max_vol)
         self.bars_per_year = bars_per_year or TREND_BARS_PER_YEAR
+        # 보유 중 변동성 타게팅 재조정 밴드(상대). 0=비활성(진입시 사이징만 = 저회전 기본).
+        self.rebalance_band = float(TREND_REBALANCE_BAND if rebalance_band is None else rebalance_band)
         # 지표 충족 최소 봉 수(=walk-forward priming 길이). short도 포함해 _sma 슬라이스가 항상 충분하도록.
         self.warmup_bars = max(self.short, self.long, self.vol_lookback + 1)
         self.prices: dict[str, deque] = {}
@@ -79,22 +83,48 @@ class TrendStrategy(Strategy):
         if broker.position_qty(sym) > 0:
             if extreme or trend_down:       # 청산: 추세 반전 또는 극단 레짐 → 전량 현금
                 broker.sell(sym, broker.position_qty(sym), "SIGNAL", now)
-            return                           # 추세 유지 중엔 보유(저회전 — 매 봉 리밸런스 안 함)
+            elif self.rebalance_band > 0:   # 보유 유지 중 변동성 타게팅 재조정(밴드 초과 시만 = 저회전)
+                self._rebalance(sym, price, now, ann_vol, broker)
+            return
         if trend_up and not extreme:        # 진입: 변동성 타게팅 비중 1회 산정
             self._enter(sym, price, now, ann_vol, broker)
+
+    def _target_weight(self, ann_vol) -> Decimal:
+        """변동성 타게팅 목표 비중 = min(상한, 목표변동성/실현변동성). 무변동이면 상한."""
+        if not ann_vol or ann_vol <= 0:
+            return self.max_weight
+        return min(self.max_weight, Decimal(str(self.vol_target)) / Decimal(str(ann_vol)))
 
     def _enter(self, sym, price, now, ann_vol, broker):
         if price is None or price <= 0:
             return
-        if not ann_vol or ann_vol <= 0:     # 무변동 → 상한 비중
-            weight = self.max_weight
-        else:
-            weight = min(self.max_weight, Decimal(str(self.vol_target)) / Decimal(str(ann_vol)))
+        weight = self._target_weight(ann_vol)
         budget = min(broker.equity() * weight, broker.cash())  # 총자산 기준 목표금액, 단 현금 한도 내
+        # 거부 시(슬리피지 등 잔고 부족) 다음 봉에 재시도 — 추세 유지 중 미보유면 재진입
+        self._buy(sym, price, now, budget, broker)
+
+    def _rebalance(self, sym, price, now, ann_vol, broker):
+        """보유 비중을 목표 변동성 비중으로 재조정(밴드 초과 시만). 고변동→축소(현금화)로 MDD 완화."""
+        if price is None or price <= 0:
+            return
+        equity = broker.equity()
+        if equity <= 0:
+            return
+        target_w = self._target_weight(ann_vol)
+        cur_val = broker.position_qty(sym) * price
+        target_val = equity * target_w
+        if abs(cur_val - target_val) / equity < Decimal(str(self.rebalance_band)) * target_w:
+            return                           # 밴드 이내 드리프트는 무시(저회전)
+        if target_val > cur_val:             # 비중 확대 → 차액 매수(현금 한도 내)
+            self._buy(sym, price, now, min(target_val - cur_val, broker.cash()), broker)
+        else:                                # 비중 축소 → 차액만큼 매도
+            sell_qty = ((cur_val - target_val) / price).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+            if sell_qty > 0:
+                broker.sell(sym, min(sell_qty, broker.position_qty(sym)), "REBAL", now)
+
+    def _buy(self, sym, price, now, budget, broker):
         if budget < MIN_ORDER_KRW:
             return
-        # 수수료 포함 총비용이 예산을 넘지 않게 (1+수수료)로 나누고 내림. 추가로 수수료 양자화(HALF_EVEN 올림,
-        # 최대 _FEE_QUANT/2)분을 예약해 budget==cash(전액 진입) 시 체결가 반올림으로 잔고 거부되는 경우를 차단.
         qty = ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
         if qty > 0:
-            broker.buy(sym, qty, now)   # 거부 시(슬리피지 등 잔고 부족) 다음 봉에 재시도 — 추세 유지 중 미보유면 재진입
+            broker.buy(sym, qty, now)

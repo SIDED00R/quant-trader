@@ -91,6 +91,27 @@ class TestVolTargeting(unittest.TestCase):
         self.assertGreaterEqual(invested(wild), invested(calm))
 
 
+class TestRebalance(unittest.TestCase):
+    def test_band_zero_holds_without_intermediate_trades(self):
+        # 기본(band=0): 추세 유지 중 매매 없음 → 청산 전까지 closed_trade 0
+        eng = _engine()
+        prices = [100] * 5 + [100 + 3 * i for i in range(1, 30)]  # 지속 상승
+        eng.run(_ticks(prices), TrendStrategy(short=3, long=5, vol_lookback=5,
+                                              vol_target=99, regime_max_vol=999, rebalance_band=0.0))
+        self.assertEqual(len(eng.closed_trades), 0)
+
+    def test_band_on_rebalances_when_vol_shifts(self):
+        # band on: 저변동(전액)→고변동 구간에서 목표비중 하락 → REBAL 부분매도 발생
+        eng = _engine()
+        calm = [100 + i for i in range(1, 25)]                    # 완만 상승(저변동→큰 비중)
+        wild = [124 + (8 if i % 2 else -6) + i for i in range(1, 20)]  # 상승 유지 + 큰 변동
+        prices = [100] * 5 + calm + wild
+        eng.run(_ticks(prices), TrendStrategy(short=3, long=5, vol_lookback=5, vol_target=0.5,
+                                              max_weight=1, regime_max_vol=999, rebalance_band=0.3))
+        reasons = [t.reason for t in eng.closed_trades]
+        self.assertIn("REBAL", reasons)   # 변동성 상승 → 비중 축소 재조정
+
+
 class TestRegimeFilter(unittest.TestCase):
     def test_extreme_vol_blocks_entry(self):
         eng = _engine()
