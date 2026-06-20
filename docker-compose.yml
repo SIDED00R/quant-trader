@@ -253,17 +253,19 @@ services:
     command: python -m backtest.reeval_weights
 
   # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
-  # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB는 매매 VM .env의
-  # POSTGRES_HOST/CLICKHOUSE_HOST(=데이터 VM 사설 IP)로 원격 접속. depends_on 없음(원격 DB라 로컬 인프라 미기동).
+  # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=SSH 터널:
+  # 매매 VM 호스트가 데이터 VM으로 -L 5432/8123 터널을 열고, network_mode:host로 컨테이너가 127.0.0.1(터널)에 접속.
+  # (사설IP 직접노출 대신 터널 — DB는 데이터 VM에서 loopback 유지). depends_on 없음(원격 DB).
   trade-once:
     image: coin-auto-trader-app
     build: .
     profiles: ["trade"]
     restart: "no"
+    network_mode: host
     environment:
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
-      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
       INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
     command: python -m strategy.trade_once
