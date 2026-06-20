@@ -79,11 +79,12 @@
 - [x] 채택안 = **5/40·10/60·20/100 + band 0.5**(BTC/ETH 6.6년: OOS Sharpe 1.45·양수 65%, 종목별 교차검증 강건)
 - [x] 단일 SMA baseline(−62%) 대비 대폭 개선 + 단일 trend 대비 일관성↑(양수 fold 50%→65%)
 
-### 라이브 배선 (5단계 성격, 후속)
-- [ ] 신호 스키마/토픽: 신규 토픽 `strategy.signals` (`common/schemas.py`에 Signal 추가)
-- [ ] 각 부하를 독립 워커로 — `market.ticks` 소비 → `strategy.signals` 발행 (전략명/신호/confidence)
-- [ ] `strategy/commander.py`(라이브): `strategy.signals` 소비 → 가중 합의 → `place_order` 경로로 주문
-- [ ] docker-compose 서비스화 + 모의매매로 라이브 검증
+### 라이브 배선 (#61, 진행 중)
+- [x] 신호 스키마/토픽: `strategy.signals` + `common/schemas.Signal`(목표비중) + config TOPIC_SIGNALS/ENSEMBLE_SYMBOLS
+- [x] 앙상블 신호 워커: `strategy/live_ensemble.py` — candles_1d 워밍업 → market.ticks → 일봉 마감마다 신호 발행(주문 없음)
+- [ ] **(다음, consequential)** `strategy/commander.py`(라이브): `strategy.signals` 소비 → place_order 경로로 모의주문
+- [ ] docker-compose 서비스화(ensemble-signals/commander) + 모의매매 라이브 검증
+> ※ 순서: 신호워커(완료) → **프론트 수정** → commander·주문경로(신중) → VM 모의매매
 
 ## 5단계 — 병렬화 & 오케스트레이션
 - [ ] 각 부하 워커 + commander를 `docker-compose.yml`에 서비스로 추가 (컨슈머 그룹 분리)
