@@ -41,6 +41,19 @@ class Order:
 
 
 @dataclass
+class Signal:
+    """전략 부하 → commander 신호(strategy.signals). target_weight=목표 비중(0~max, 0=현금)."""
+    symbol: str
+    strategy: str           # 전략명(예: 'ensemble')
+    target_weight: Decimal  # 합성 목표 비중(0=현금)
+    bar_ts: str             # 신호 산출 봉(일봉) 시각 ISO8601(UTC)
+    ts: str                 # 발행 시각 ISO8601(UTC)
+
+    def to_json(self) -> bytes:
+        return _dumps(self)
+
+
+@dataclass
 class Execution:
     execution_id: str
     order_id: str

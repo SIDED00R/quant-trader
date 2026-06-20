@@ -92,6 +92,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic market.ticks --partitions 6 --replication-factor 1 --config retention.ms=86400000
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic orders --partitions 6 --replication-factor 1 --config retention.ms=604800000
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic executions --partitions 6 --replication-factor 1 --config retention.ms=604800000
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic strategy.signals --partitions 6 --replication-factor 1 --config retention.ms=604800000
         echo "===== topics ====="
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
     restart: "no"
@@ -201,10 +202,16 @@ services:
     container_name: portfolio
     command: python -m portfolio.updater
 
-  strategy:
+  # 라이브 앙상블 파이프라인 (sma_trader 대체 — 이중 매매 방지로 단일 자동매매 경로 유지)
+  ensemble-signals:
     <<: *app
-    container_name: strategy
-    command: python -m strategy.sma_trader
+    container_name: ensemble-signals
+    command: python -m strategy.live_ensemble    # candles_1d 워밍업 → 일봉 마감마다 strategy.signals 발행
+
+  commander:
+    <<: *app
+    container_name: commander
+    command: python -m strategy.commander        # strategy.signals 소비 → 목표비중 모의주문(place_order)
 
   relay:
     <<: *app

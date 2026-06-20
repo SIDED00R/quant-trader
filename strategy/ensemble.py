@@ -28,12 +28,18 @@ class EnsembleStrategy(Strategy):
         # 합성 목표비중 재조정 밴드(상대). 기본 0.5(교차검증 채택). 0이면 매 봉 목표 추종(거래 급증).
         self.rebalance_band = float(ENSEMBLE_REBALANCE_BAND if rebalance_band is None else rebalance_band)
 
-    def on_tick(self, tick: MarketTick, broker: Broker) -> None:
-        sym, price, now = tick.symbol, tick.price, tick.ts
-        targets = [sig.update(sym, price) for sig in self.signals]   # 각 부하의 목표비중(0=현금)
-        combined = sum((Decimal(str(w)) * t for w, t in zip(self.weights, targets)), Decimal(0)) \
+    def combined_target(self, symbol: str, price) -> Decimal:
+        """각 부하 신호를 갱신하고 가중평균 합성 목표비중(0=현금)을 반환. on_tick(주문)과 라이브 신호 발행이 공유.
+
+        부작용: 각 TrendSignal의 내부 상태(가격버퍼·long 래치)를 갱신한다(매 봉 1회 호출 가정).
+        """
+        targets = [sig.update(symbol, price) for sig in self.signals]   # 각 부하의 목표비중(0=현금)
+        return sum((Decimal(str(w)) * t for w, t in zip(self.weights, targets)), Decimal(0)) \
             / Decimal(str(self._wsum))
-        self._order_to_target(sym, price, combined, now, broker)
+
+    def on_tick(self, tick: MarketTick, broker: Broker) -> None:
+        combined = self.combined_target(tick.symbol, tick.price)
+        self._order_to_target(tick.symbol, tick.price, combined, tick.ts, broker)
 
     def _order_to_target(self, sym, price, target_w: Decimal, now, broker):
         """보유 비중을 합성 목표비중으로 조정. 목표 0이면 전량 청산, 밴드 이내 드리프트는 무시(저회전)."""

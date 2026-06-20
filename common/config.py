@@ -28,6 +28,7 @@ CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
 # ── Kafka 토픽 ──
 TOPIC_ORDERS = "orders"
 TOPIC_EXECUTIONS = "executions"
+TOPIC_SIGNALS = "strategy.signals"   # 전략 부하 → commander 신호 버스(4단계 라이브 배선)
 
 # ── 거래 ──
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
@@ -101,6 +102,8 @@ TREND_BARS_PER_YEAR = int(os.getenv("TREND_BARS_PER_YEAR", "365"))  # 변동성 
 TREND_REBALANCE_BAND = Decimal(os.getenv("TREND_REBALANCE_BAND", "0.0"))
 # 앙상블(다중 추세속도) 합성 목표비중 재조정 밴드. 채택값 0.5(BTC/ETH 6.6년 교차검증: Sharpe·일관성·저회전 최적).
 ENSEMBLE_REBALANCE_BAND = Decimal(os.getenv("ENSEMBLE_REBALANCE_BAND", "0.5"))
+# 라이브 앙상블 운용 유니버스(채택안 = BTC/ETH). 라이브 신호 워커가 이 종목만 일봉 신호 산출.
+ENSEMBLE_SYMBOLS = [s.strip() for s in os.getenv("ENSEMBLE_SYMBOLS", "KRW-BTC,KRW-ETH").split(",") if s.strip()]
 
 # ── PostgreSQL ──
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
