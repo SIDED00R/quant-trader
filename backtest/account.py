@@ -71,9 +71,13 @@ class BacktestAccount:
         cost_basis = qty * p.avg
         pnl = proceeds - cost_basis
         return_pct = (pnl / cost_basis) if cost_basis > 0 else Decimal(0)
+        # 진입 수수료를 매도 수량 비례로 배분(부분매도 시 ClosedTrade별 buy_fee 중복 방지).
+        # 마지막 매도(qty==p.qty)는 잔여 entry_fee 전액 → Σbuy_fee == 실제 지불 진입수수료.
+        buy_fee_portion = _q(p.entry_fee * qty / p.qty)
+        p.entry_fee -= buy_fee_portion
         trade = ClosedTrade(
             symbol=symbol, qty=qty, entry_price=p.entry_price, exit_price=price,
-            buy_fee=p.entry_fee, sell_fee=fee, pnl=pnl, return_pct=return_pct,
+            buy_fee=buy_fee_portion, sell_fee=fee, pnl=pnl, return_pct=return_pct,
             reason="", entry_ts=p.entry_ts, exit_ts=ts,
         )
         p.qty -= qty

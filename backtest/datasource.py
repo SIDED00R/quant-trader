@@ -1,11 +1,10 @@
-"""틱 데이터 소스 (단일 책임: ClickHouse 틱 replay).
+"""ClickHouse 캔들 데이터 소스 (단일 책임: candles_1m/1d replay).
 
-ticks를 시간순으로 스트리밍해 BTick을 yield한다. 정렬은 ORDER BY trade_ts, symbol, seq:
-- 종목 내부: trade_ts→seq 순(거래소 sequential_id 단조와 정합) → SMA 윈도우가 라이브와 동일.
-- 종목 간: 같은 ms(trade_ts는 ms 해상도)면 symbol 사전순으로 결정적 고정 → run마다 재현 가능.
-  단 seq는 종목별 카운터라 종목 간 실제 도착순(라이브 Kafka)과는 다를 수 있다(단일 계좌 경합의 한계).
-ReplacingMergeTree 중복은 FINAL로 정리(오프라인이므로 정확성 우선; --no-final로 생략 가능).
-price는 ClickHouse Float64라 라이브의 정확한 Decimal 문자열가와 미세한 정밀도 차가 있을 수 있다.
+candles 테이블(symbol, window_start, ..., close)을 전역 시간순(window_start, symbol)으로 스트리밍해
+BTick(종가)을 yield한다. 봉 종가를 가격 시계열로 쓴다(라이브 aggregator가 적재하는 1분봉과 동일 소스).
+table=candles_1d면 장기 일봉(backfill_daily 적재본) — 저회전 추세 전략의 장기 백테스트용.
+업비트 REST 직접 수집/캐시는 backtest.upbit_candles 가 담당한다(소스는 run.py --source로 선택).
+ReplacingMergeTree 중복은 FINAL로 정리.
 """
 from decimal import Decimal
 
@@ -31,28 +30,33 @@ def _client():
     )
 
 
-def load_ticks(symbols=None, start=None, end=None, use_final=True):
-    """ticks를 전역 시간순으로 스트리밍 yield한다.
+_TABLES = {"candles_1m", "candles_1d"}  # 허용 테이블(SQL 식별자는 파라미터화 불가 → 화이트리스트로 주입 차단)
+
+
+def load_clickhouse_candles(symbols=None, start=None, end=None, table="candles_1m"):
+    """candles 테이블을 전역 시간순으로 스트리밍 yield(종가 기준).
 
     symbols: 종목 리스트(None이면 전체). start/end: 'YYYY-MM-DD HH:MM:SS' 등 문자열(UTC, None이면 무제한).
+    table: 'candles_1m'(기본) 또는 'candles_1d'(장기 일봉). ReplacingMergeTree 중복 정리를 위해 항상 FINAL.
     """
+    if table not in _TABLES:
+        raise ValueError(f"unknown table '{table}'. allowed: {sorted(_TABLES)}")
     client = _client()
-    final = "FINAL" if use_final else ""
     conds = ["1=1"]
     params: dict = {}
     if symbols:
         conds.append("symbol IN {symbols:Array(String)}")
         params["symbols"] = list(symbols)
     if start:
-        conds.append("trade_ts >= parseDateTimeBestEffort({start:String}, 'UTC')")
+        conds.append("window_start >= parseDateTimeBestEffort({start:String}, 'UTC')")
         params["start"] = start
     if end:
-        conds.append("trade_ts < parseDateTimeBestEffort({end:String}, 'UTC')")
+        conds.append("window_start < parseDateTimeBestEffort({end:String}, 'UTC')")
         params["end"] = end
     where = " AND ".join(conds)
     query = (
-        "SELECT symbol, price, toUnixTimestamp64Milli(trade_ts) AS ts_ms, seq "
-        f"FROM ticks {final} WHERE {where} ORDER BY trade_ts, symbol, seq"
+        "SELECT symbol, close, toUnixTimestamp64Milli(toDateTime64(window_start, 3)) AS ts_ms "
+        f"FROM {table} FINAL WHERE {where} ORDER BY window_start, symbol"
     )
     with client.query_row_block_stream(query, parameters=params) as stream:
         for block in stream:

@@ -50,7 +50,7 @@
 │ Market 수집기 │──▶ [market.ticks]  (key=symbol)
 └──────────────┘        │
                         ├──▶ [틱 Sink]    ──▶ ClickHouse (raw 틱)
-                        ├──▶ [캔들 집계기] ──▶ ClickHouse (1m/5m 봉)
+                        ├──▶ [캔들 집계기] ──▶ ClickHouse (1분봉 candles_1m)
                         │
 사용자 ─▶ FastAPI ─▶ [orders] (key=symbol)
                         │
@@ -198,16 +198,18 @@ ticks(
   volume      Float64,
   side        LowCardinality(String),
   trade_ts    DateTime64(3),
+  seq         UInt64,
   ingest_ts   DateTime64(3)
-) ENGINE = MergeTree ORDER BY (symbol, trade_ts)
+) ENGINE = ReplacingMergeTree(ingest_ts) ORDER BY (symbol, seq)
 
 -- 1분봉 (집계기가 적재, 또는 Materialized View)
 candles_1m(
   symbol        LowCardinality(String),
   window_start  DateTime,
   open Float64, high Float64, low Float64, close Float64,
-  volume Float64
-) ENGINE = ReplacingMergeTree ORDER BY (symbol, window_start)
+  volume Float64,
+  updated_at    DateTime64(3) DEFAULT now64(3)
+) ENGINE = ReplacingMergeTree(updated_at) ORDER BY (symbol, window_start)
 ```
 
 ---

@@ -40,6 +40,22 @@ class TestAccount(unittest.TestCase):
         self.assertIsNone(res)
         self.assertEqual(acct.cash, Decimal("1000"))
 
+    def test_partial_sells_prorate_entry_fee(self):
+        # 부분매도 시 진입수수료가 수량 비례로 배분 → Σbuy_fee == 실제 지불 진입수수료(중복계상 방지)
+        acct = BacktestAccount(Decimal("100000"))
+        acct.apply_buy("X", Decimal("1000"), Decimal("10"), Decimal("5"), ts=0.0)  # entry_fee=5, qty=10
+        t1 = acct.apply_sell("X", Decimal("1000"), Decimal("3"), Decimal("1.5"), ts=1.0)
+        t2 = acct.apply_sell("X", Decimal("1000"), Decimal("3"), Decimal("1.5"), ts=2.0)
+        t3 = acct.apply_sell("X", Decimal("1000"), Decimal("4"), Decimal("2.0"), ts=3.0)  # 전량 청산
+        self.assertEqual(t1.buy_fee + t2.buy_fee + t3.buy_fee, Decimal("5"))  # 진입수수료 합 == 5(중복 없음)
+        self.assertEqual(t3.buy_fee, Decimal("2.0000"))  # 마지막 매도는 잔여 entry_fee 전액
+
+    def test_full_sell_keeps_full_entry_fee(self):
+        acct = BacktestAccount(Decimal("100000"))
+        acct.apply_buy("X", Decimal("1000"), Decimal("10"), Decimal("5"), ts=0.0)
+        t = acct.apply_sell("X", Decimal("1000"), Decimal("10"), Decimal("5"), ts=1.0)
+        self.assertEqual(t.buy_fee, Decimal("5"))  # 전량 1회 청산 → 진입수수료 전액(회귀 보존)
+
 
 if __name__ == "__main__":
     unittest.main()
