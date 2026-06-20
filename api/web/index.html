@@ -129,6 +129,10 @@
   .pill.FILLED{background:var(--algo-glow);color:var(--algo);}
   .pill.PENDING{background:var(--algo-glow);color:var(--algo);}
   .pill.REJECTED{background:var(--raise);color:var(--muted);}
+  .perf{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .perf .cell{background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .perf .cell .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .perf .cell .val{font-size:16px;font-weight:700;font-family:var(--mono);margin-top:3px;}
 </style>
 </head>
 <body>
@@ -167,6 +171,10 @@
           <th class="num">평가금액</th><th class="num">손익</th></tr></thead>
         <tbody id="positions"><tr><td colspan="6" class="muted">없음</td></tr></tbody>
       </table>
+    </div>
+    <div class="panel">
+      <h2>성과 요약 <span class="tag">모의 · FIFO 실현</span></h2>
+      <div class="perf" id="perf"><div class="cell"><span class="k muted">로딩…</span></div></div>
     </div>
   </div>
 
@@ -305,6 +313,18 @@ async function loadAccount(){
   pe.className = "v big num " + (netPnl>0?"up":netPnl<0?"down":"");
   document.getElementById("fees").textContent = won(a.total_fees ?? 0);
 }
+async function loadPerformance(){
+  try {
+    const p = await api("/performance");
+    const wr = p.win_rate == null ? "-" : (p.win_rate*100).toFixed(1) + "%";
+    const rc = p.realized_pnl > 0 ? "up" : p.realized_pnl < 0 ? "down" : "";
+    document.getElementById("perf").innerHTML =
+      `<div class="cell"><div class="k">실현손익</div><div class="val ${rc}">${p.realized_pnl>=0?"+":""}${won(p.realized_pnl)}</div></div>
+       <div class="cell"><div class="k">승률 (청산 ${p.closed_trades})</div><div class="val">${wr}</div></div>
+       <div class="cell"><div class="k">거래수</div><div class="val">${p.num_trades}<span class="muted" style="font-size:11px;font-weight:400"> 매수 ${p.num_buys}·매도 ${p.num_sells}</span></div></div>
+       <div class="cell"><div class="k">누적 수수료</div><div class="val">${won(p.total_fees)}</div></div>`;
+  } catch(e){ document.getElementById("perf").innerHTML = `<div class="cell"><span class="k muted">성과 데이터 없음</span></div>`; }
+}
 async function loadExecs(){
   const rows = await api("/history/executions?limit=20");
   const tb = document.getElementById("execs");
@@ -377,7 +397,7 @@ async function refresh(){
   try {
     prevPrices = prices; prices = await api("/market/prices");
     renderTickers();
-    await Promise.all([loadAccount(), loadExecs()]);
+    await Promise.all([loadAccount(), loadExecs(), loadPerformance()]);
     document.getElementById("updated").textContent =
       "갱신 " + new Date().toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false});
     setStatus("ok","실시간");
