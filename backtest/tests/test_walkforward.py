@@ -63,6 +63,21 @@ class TestEndToEnd(unittest.TestCase):
                                  180 * _DAY, 90 * _DAY, 90 * _DAY, log=lambda *a: None)
         self.assertIn("error", result)
 
+    def test_ensemble_strategy_path(self):
+        # --strategy ensemble 경로: 고정 구성이라 IS 선택 없이 OOS 평가, n_trials=1(PSR)
+        bars = [
+            BTick("KRW-BTC", Decimal(str(100 + i * 0.1 + 5 * math.sin(i / 15))), float(i) * _DAY)
+            for i in range(700)
+        ]
+        result = run_walkforward(bars, Decimal("1000000"), FillModel(), _DAY,
+                                 180 * _DAY, 90 * _DAY, 90 * _DAY, strategy="ensemble", log=lambda *a: None)
+        self.assertNotIn("error", result)
+        self.assertEqual(result["strategy"], "ensemble")
+        self.assertEqual(result["aggregate"]["n_trials"], 1)
+        self.assertGreaterEqual(result["aggregate"]["oos_folds"], 2)
+        for fr in result["folds"]:
+            self.assertIsNone(fr["params"])   # 앙상블은 IS 그리드 선택 없음
+
 
 class TestPrimeNoLeak(unittest.TestCase):
     def test_prime_region_produces_no_trades_and_oos_base_is_initial(self):

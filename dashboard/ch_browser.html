@@ -67,12 +67,16 @@
     $(k).addEventListener('change', () => sessionStorage.setItem('ch_'+k, $(k).value));
   });
 
+  const esc = s => String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
   async function query(sql) {
     const c = cfg();
-    const url = `${c.host}/?user=${encodeURIComponent(c.user)}&password=${encodeURIComponent(c.pw)}`
-              + `&database=${encodeURIComponent(c.db)}&add_http_cors_header=1&default_format=JSONCompact`;
+    // 자격증명은 URL 쿼리(서버 query_log에 평문 기록됨)가 아니라 헤더로 전송. ClickHouse CORS가 해당 헤더 허용.
+    const url = `${c.host}/?database=${encodeURIComponent(c.db)}&add_http_cors_header=1&default_format=JSONCompact`;
     const t0 = performance.now();
-    const r = await fetch(url, { method:'POST', body: sql });
+    const r = await fetch(url, { method: 'POST', body: sql,
+      headers: { 'X-ClickHouse-User': c.user, 'X-ClickHouse-Key': c.pw } });
     const text = await r.text();
     if (!r.ok) throw new Error(text.slice(0, 400));
     const ms = (performance.now()-t0).toFixed(0);
@@ -88,7 +92,7 @@
         const cnt = await query(`SELECT count() FROM \`${name}\` FINAL`).then(r=>(+r.data[0][0]).toLocaleString()).catch(()=> '?');
         const div = document.createElement('div');
         div.className = 'tbl';
-        div.innerHTML = `<span>${name}</span><small>${cnt}</small>`;
+        div.innerHTML = `<span>${esc(name)}</span><small>${esc(cnt)}</small>`;
         div.ondblclick = () => openTable(name, div);
         el.appendChild(div);
       }
@@ -128,9 +132,9 @@
   function render(res) {
     if (!res.meta) { $('results').innerHTML = '<div class="hint">결과 없음</div>'; return; }
     const cols = res.meta.map(m => m.name);
-    let h = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+    let h = '<table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
     for (const row of res.data)
-      h += '<tr>' + row.map(v => `<td>${v===null?'<span style=color:#566>∅</span>':String(v)}</td>`).join('') + '</tr>';
+      h += '<tr>' + row.map(v => `<td>${v===null?'<span style=color:#566>∅</span>':esc(v)}</td>`).join('') + '</tr>';
     h += '</tbody></table>';
     $('results').innerHTML = res.data.length ? h : '<div class="hint">0행</div>';
   }

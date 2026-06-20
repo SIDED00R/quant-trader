@@ -22,6 +22,7 @@ from backtest.engine import BacktestEngine
 from backtest.fills import FillModel
 from backtest.metrics import SECONDS_PER_YEAR, deflated_sharpe
 from backtest.upbit_candles import load as load_candle_cache
+from strategy.ensemble import EnsembleStrategy
 from strategy.trend import TrendStrategy
 
 _GRID_SHORT = [5, 10, 20]
@@ -96,14 +97,56 @@ def _folds(t0, t1, prime_sec, is_sec, oos_sec, step_sec):
     return folds
 
 
-def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log=print):
-    """그리드 walk-forward 실행 → fold별 OOS 성과 + 집계(합성수익·Deflated Sharpe) 반환."""
+def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var):
+    """fold별 OOS 결과 → 집계 dict(합성수익·양수fold·OOS Sharpe·Deflated/Probabilistic Sharpe)."""
+    ppy = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
+    compound = 1.0
+    for fr in fold_results:
+        compound *= (1.0 + fr["return"])
+    return {
+        "oos_folds": len(fold_results),
+        "positive_oos_folds": sum(1 for fr in fold_results if fr["return"] > 0),
+        "oos_compound_return": compound - 1.0,
+        "oos_mean_return": statistics.mean([fr["return"] for fr in fold_results]) if fold_results else 0.0,
+        "oos_total_trades": sum(fr["num_trades"] for fr in fold_results),
+        "oos_total_fees": sum((fr["fees"] for fr in fold_results), Decimal(0)),
+        "combined_oos_sharpe": _sharpe_from_rets(combined_oos_rets, ppy),
+        "n_trials": n_trials,
+        "sr_variance": sr_var,
+        "deflated_sharpe": deflated_sharpe(combined_oos_rets, sr_var, n_trials),
+    }
+
+
+def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log):
+    """앙상블(고정 구성) walk-forward — IS 파라미터 선택 없이 각 OOS만 평가(n_trials=1 → PSR)."""
+    prime_bars = max(s.warmup_bars for s in EnsembleStrategy().signals)
+    folds = _folds(bars[0].ts, bars[-1].ts, prime_bars * sample_sec, is_sec, oos_sec, step_sec)
+    if not folds:
+        return {"folds": [], "error": "기간이 짧아 fold 없음(IS+OOS+prime > 데이터)"}
+    fold_results, combined_oos_rets = [], []
+    for i, (_isp, _iss, oos_prime, oos_start, oos_end) in enumerate(folds, 1):
+        oosr = _evaluate(bars, lambda: EnsembleStrategy(), oos_prime, oos_start, oos_end,
+                         initial, fills, sample_sec)
+        if not oosr["rets"]:
+            log(f"[wf] fold {i}: OOS 표본 부족(스킵)")
+            continue
+        combined_oos_rets.extend(oosr["rets"])
+        fold_results.append({"fold": i, "params": None, "is_return": None, **oosr})
+        log(f"[wf] fold {i}: 앙상블 OOS {oosr['return']*100:+.1f}% ({oosr['num_trades']}거래)")
+    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, 1, 0.0)  # 고정구성 → N=1(PSR)
+    return {"folds": fold_results, "aggregate": agg, "strategy": "ensemble"}
+
+
+def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, strategy="trend", log=print):
+    """walk-forward 실행 → fold별 OOS 성과 + 집계. strategy='trend'(그리드 선택) / 'ensemble'(고정 구성)."""
+    if not bars:
+        return {"folds": [], "error": "no bars"}
+    if strategy == "ensemble":
+        return _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log)
     combos = _combos()
     # prime 길이 = 그리드 전 조합 중 최장 워밍업(전략의 실제 warmup_bars를 직접 읽음 — 공식 발산 방지)
     prime_bars = max(TrendStrategy(short=s, long=l).warmup_bars for s, l in combos)
     prime_sec = prime_bars * sample_sec
-    if not bars:
-        return {"folds": [], "error": "no bars"}
     t0, t1 = bars[0].ts, bars[-1].ts
     folds = _folds(t0, t1, prime_sec, is_sec, oos_sec, step_sec)
     if not folds:
@@ -138,25 +181,8 @@ def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
         for s, l in combos
     ]
     sr_var = statistics.pvariance(full_sharpes) if len(full_sharpes) >= 2 else 0.0
-
-    ppy = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
-    compound = 1.0
-    for fr in fold_results:
-        compound *= (1.0 + fr["return"])
-    positive = sum(1 for fr in fold_results if fr["return"] > 0)
-    agg = {
-        "oos_folds": len(fold_results),
-        "positive_oos_folds": positive,
-        "oos_compound_return": compound - 1.0,
-        "oos_mean_return": statistics.mean([fr["return"] for fr in fold_results]) if fold_results else 0.0,
-        "oos_total_trades": sum(fr["num_trades"] for fr in fold_results),
-        "oos_total_fees": sum((fr["fees"] for fr in fold_results), Decimal(0)),
-        "combined_oos_sharpe": _sharpe_from_rets(combined_oos_rets, ppy),
-        "n_trials": len(combos),
-        "sr_variance": sr_var,
-        "deflated_sharpe": deflated_sharpe(combined_oos_rets, sr_var, len(combos)),
-    }
-    return {"folds": fold_results, "aggregate": agg}
+    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, len(combos), sr_var)
+    return {"folds": fold_results, "aggregate": agg, "strategy": "trend"}
 
 
 def _print(result):
@@ -164,8 +190,9 @@ def _print(result):
         print(f"[wf] {result['error']}", file=sys.stderr)
         return
     a = result["aggregate"]
+    name = "앙상블(다중 추세속도)" if result.get("strategy") == "ensemble" else "저회전 추세 전략"
     print("=" * 60)
-    print("  Walk-forward (저회전 추세 전략, 롤링 IS/OOS)")
+    print(f"  Walk-forward ({name}, 롤링 IS/OOS)")
     print("=" * 60)
     print(f"  OOS fold 수      : {a['oos_folds']}  (양수 {a['positive_oos_folds']})")
     print(f"  OOS 합성수익률   : {a['oos_compound_return']*100:+.2f}%")
@@ -177,13 +204,15 @@ def _print(result):
           else f"  Deflated Sharpe  : N/A (시도 N={a['n_trials']})")
     print("-" * 60)
     for fr in result["folds"]:
-        print(f"  fold {fr['fold']:>2}: SMA{fr['params'][0]}/{fr['params'][1]:<2} "
-              f"OOS {fr['return']*100:+7.2f}%  {fr['num_trades']:>3}거래")
+        label = f"SMA{fr['params'][0]}/{fr['params'][1]:<3}" if fr.get("params") else "앙상블   "
+        print(f"  fold {fr['fold']:>2}: {label} OOS {fr['return']*100:+7.2f}%  {fr['num_trades']:>3}거래")
     print("=" * 60)
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(description="저회전 추세 전략 walk-forward (롤링 IS/OOS + Deflated Sharpe)")
+    p = argparse.ArgumentParser(description="walk-forward (롤링 IS/OOS + Deflated/Probabilistic Sharpe)")
+    p.add_argument("--strategy", default="trend", choices=["trend", "ensemble"],
+                   help="trend=단일추세 그리드선택 / ensemble=다중속도 고정구성(채택안)")
     p.add_argument("--symbols", default="", help="쉼표 구분(미지정 시 config SYMBOLS)")
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=CSV 캐시(리샘플) / clickhouse=candles_1d 장기 일봉")
@@ -233,7 +262,8 @@ def main(argv=None) -> int:
         print(f"[wf] 0봉 — 먼저 백필: {hint}", file=sys.stderr)
         return 1
     result = run_walkforward(bars, initial, fills, sample_sec,
-                             args.is_days * _DAY, args.oos_days * _DAY, args.step_days * _DAY)
+                             args.is_days * _DAY, args.oos_days * _DAY, args.step_days * _DAY,
+                             strategy=args.strategy)
     _print(result)
     return 0
 

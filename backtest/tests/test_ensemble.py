@@ -84,6 +84,16 @@ class TestEnsemble(unittest.TestCase):
         eng.run(_ticks(prices), EnsembleStrategy(specs=[(5, 20)], rebalance_band=0.0))
         self.assertGreater(eng.position_qty("KRW-BTC"), 0)
 
+    def test_no_sub_min_order_micro_sells(self):
+        # band=0(매 봉 추종)이라도 최소주문 미달 미세매도(REBAL)는 발생하지 않아야(churn 차단)
+        eng = _engine()
+        prices = [100] * 25 + [100 + (0.3 if i % 2 else -0.2) + i * 0.05 for i in range(1, 60)]
+        eng.run(_ticks(prices), EnsembleStrategy(specs=[(3, 8), (5, 20)], rebalance_band=0.0))
+        from common.config import MIN_ORDER_KRW
+        rebals = [t for t in eng.closed_trades if t.reason == "REBAL"]
+        for t in rebals:                       # 모든 REBAL 매도는 최소주문액 이상
+            self.assertGreaterEqual(t.exit_price * t.qty, MIN_ORDER_KRW)
+
 
 if __name__ == "__main__":
     unittest.main()

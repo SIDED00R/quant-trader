@@ -3,7 +3,7 @@
 이후 모든 알고리즘/앙상블 성과를 비교하는 **기준 수치**. (TODO 0단계 산출물)
 
 ## 측정 조건
-- 데이터: 업비트 **1분봉**, 최근 **2년**(2024-06-17 ~ 2026-06-17)
+- 데이터: 업비트 **1분봉**, 최근 **2년**(실측 2024-06-20 ~ 2026-06-17)
 - 종목: KRW-BTC, KRW-ETH, KRW-XRP, KRW-SOL, KRW-DOGE (~522만 봉)
 - 초기자금 10,000,000원 / 수수료 0.05% / 슬리피지 0 / 지연=0 이상화
 - 전략: 현 `SMAStrategy`(SMA 7/25틱, 진입밴드 0.15%, 손절 1.2%/익절 2.0%/트레일링, 데드크로스) — **파라미터 무변경**
@@ -140,16 +140,18 @@ OOS가 −31.5%로 잘못 나왔으나, 적대적 코드리뷰로 발견·수정
 서로 다른 (단기,장기) 추세 부하의 목표비중을 가중평균해 종목별 합성 목표비중을 만들고, 합성 목표로 (밴드 초과 시) 재조정한다.
 원칙적 후보 소수만 비교(대규모 그리드 탐색 회피)하고 **종목별 교차검증**으로 강건성을 확인했다.
 
-재현: `python -m backtest.walkforward --source clickhouse --ch-table candles_1d --symbols KRW-BTC,KRW-ETH`(specs/band는 config)
+재현(앙상블): `python -m backtest.walkforward --strategy ensemble --source clickhouse --ch-table candles_1d --symbols KRW-BTC,KRW-ETH`
+(specs는 `ensemble._DEFAULT_SPECS`, band는 `ENSEMBLE_REBALANCE_BAND`=0.5. 단일 비교는 `--strategy trend`)
 
 | BTC/ETH 6.6년 OOS | 단일 5/40 | **앙상블 채택(5/40·10/60·20/100, band 0.5)** |
 |---|---|---|
-| OOS 합성수익 | +2075% | +1509% |
+| OOS 합성수익 | +2075% | +1594% |
 | 양수 fold | 12/24 (50%) | **15/23 (65%)** |
-| OOS Sharpe | 1.51 | 1.45 |
+| OOS Sharpe | 1.51 | 1.47 |
 | PSR | 1.000 | 1.000 |
-| 거래 | 57 | 81 |
+| 거래 | 57 | 77 |
 
 **채택 근거(일관성 우선)**: 앙상블은 단일 대비 Sharpe·수익은 소폭 낮으나 **양수 fold 비율이 높아(65% vs 50%) 손실 구간이 적다**.
-밴드 0.5가 후보 중 Sharpe·일관성·저회전 모두 최적이었다. 교차검증: BTC단독 Sharpe 1.45(52%)·ETH단독 1.26(60%)로
-풀링뿐 아니라 개별 종목에서도 강건(PSR ~1.0). **최종 운용안 = BTC/ETH 일봉, 3속도 추세 앙상블 + 변동성 타게팅, band 0.5.**
+밴드 0.5가 후보 중 Sharpe·일관성·저회전 모두 최적이었다. 종목별 교차검증에서도 BTC·ETH 개별로 PSR ~1.0로 강건(풀링 우연 아님).
+**최종 운용안 = BTC/ETH 일봉, 3속도 추세 앙상블 + 변동성 타게팅, band 0.5.**
+(고정 구성이라 IS 파라미터 선택이 없어 다중시도 보정 불필요 → Deflated Sharpe는 N=1의 PSR로 보고.)

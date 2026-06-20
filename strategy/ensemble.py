@@ -4,7 +4,7 @@
 합성 목표비중을 만들고, 보유 비중을 그 목표로 (밴드 초과 시) 재조정한다. 단일 속도의 파라미터 리스크·
 whipsaw를 분산한다(부하 다수가 동의할수록 비중↑). config/base/trend/trend_signal에만 의존(Kafka/DB 비의존).
 """
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from common.config import ENSEMBLE_REBALANCE_BAND, MIN_ORDER_KRW
 from strategy.base import Broker, MarketTick, Strategy
@@ -58,7 +58,7 @@ class EnsembleStrategy(Strategy):
                 add = affordable_qty(budget, price)
                 if add > 0:
                     broker.buy(sym, add, now)
-        else:                                   # 축소 → 차액만큼 매도
-            sell_qty = ((cur_val - target_val) / price).quantize(Decimal("0.00000001"))
+        elif cur_val - target_val >= MIN_ORDER_KRW:   # 축소 → 차액만큼 매도(최소주문 미달 미세매도 churn 차단)
+            sell_qty = ((cur_val - target_val) / price).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
             if sell_qty > 0:
                 broker.sell(sym, min(sell_qty, qty), "REBAL", now)

@@ -39,17 +39,25 @@ def main(argv=None) -> int:
         return 2
     # 진행 중(미마감) 당일 일봉 제외 경계 = 오늘 00:00 UTC
     complete_until = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    try:
+    try:   # CH 연결 실패는 전체 치명 → fail-fast
         client = create_client()
-        total = 0
-        for market in markets:
+    except Exception as e:
+        print(f"[daily] ClickHouse 연결 실패: {e} (기동·init_db 확인)", file=sys.stderr)
+        return 2
+    total, failed = 0, []
+    for market in markets:   # 종목별 격리 — 일시적 429/오류 1종목이 나머지(수백) 종목을 막지 않게
+        try:
             rows = fetch_daily(market, a.days, complete_until)
             total += upsert_clickhouse(client, rows, a.table)
             print(f"[daily] {market}: {len(rows)}봉 적재")
-    except Exception as e:   # 네트워크/CH 연결 실패 → fail-fast
-        print(f"[daily] 실패: {e} (ClickHouse 기동·init_db 확인)", file=sys.stderr)
-        return 2
-    print(f"[daily] 완료: {markets} → {a.table} ({total}행)")
+        except Exception as e:
+            failed.append(market)
+            print(f"[daily] {market} 실패(건너뜀): {e}", file=sys.stderr)
+    ok = len(markets) - len(failed)
+    print(f"[daily] 완료: {ok}/{len(markets)}종목 → {a.table} ({total}행)")
+    if failed:
+        print(f"[daily] 실패 {len(failed)}종목: {failed} (재실행으로 보충 가능)", file=sys.stderr)
+        return 1
     return 0
 
 
