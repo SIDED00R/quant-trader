@@ -3,10 +3,10 @@
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
-> **📌 현재 운영/배포 상태 (2026-06-20)**: **앙상블 라이브 배포 완료(모의)**.
-> - GCE VM 가동 + 최신 main 배포. 공개 대시보드 `https://jh-coinlab.duckdns.org`(Basic Auth). ≈$24/월.
-> - 파이프라인: ensemble-signals → commander(모의주문) + daily-aggregator(candles_1d 최신화). 모델 출처 = `docs/model.md`.
-> - 계정 초기화 완료(본인 2계정 → ₩10M). 현재 앙상블 CASH(추세 미진입). 상세 = `DEPLOY.md` 상단.
+> **📌 현재 운영/배포 상태 (2026-06-20)**: **앙상블 라이브 배포 완료(모의) — 2-VM 온디맨드**.
+> - **아키텍처**: 데이터 VM(상시, e2-medium 4GB, `--profile data` 수집·저장·대시보드) + **매매 VM(온디맨드, Cloud Scheduler 매일 01:00 UTC 기동→`trade_once` 동기 배치→자가종료)**. 라이브 매매 = trade_once(스트리밍 commander 아님). Kafka는 데이터 팬아웃만. **상시 비용 ~$66→~$25/월**.
+> - 공개 대시보드 `https://jh-coinlab.duckdns.org`(Basic Auth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
+> - 계정 초기화 완료(본인 2계정 → ₩10M). 현재 앙상블 CASH(추세 미진입).
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
 - [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
@@ -96,12 +96,12 @@
 - [x] **5.1 부하 분리**: 3 trend 속도(`TrendSignal`)가 `strategy.signals`에 **전략명 태그**로 발행(`live_ensemble` 다부하 확장) #68 #69
 - [x] **5.2 가중치 저장소**: Postgres `strategy_weights(strategy, weight, updated_at)` + `load_weights`(미등록/합0 → 동일가중 폴백) #68 #69
 - [x] **5.3 commander 적응형 합의**: 봉별 버퍼링 → `strategy_weights` 가중합(`combined_for_bar`), **적응 toggle `ENSEMBLE_ADAPTIVE` 기본 off=동일가중=부하 평균**(현 동작 보존) #68 #69 — VM 배포·검증 완료(2026-06-20)
-- [ ] **5.4 부하별 성과추적 + 재평가 잡**: 각 부하 롤링 OOS 성과(`walkforward`/`metrics` DSR 재사용) → 새 가중치(역분산/softmax, floor·cap, **demote≠delete**, **EWMA 느린 갱신**, DSR<임계 강등)
-- [ ] **5.5 스케줄러**: 주기 잡(`daily-aggregator` 패턴)으로 검증 → **Airflow** 승격(야간 재백테스트→가중치 갱신 배치 DAG, 재시도·관측성). 라이브 워커는 DAG 밖
-- [ ] **5.6 병렬성 확인**: Kafka 파티션/컨슈머 그룹으로 부하 N개 독립 실행
+- [x] **5.4 부하별 성과추적 + 재평가 잡**: `reeval_weights`가 각 부하 OOS 성과(`walkforward.oos_returns`/DSR) → `weight_policy.compute_weights`(floor·cap·EWMA·**demote≠delete**·DSR게이트) → `strategy_weights` UPSERT. 별도 배치 이미지(`Dockerfile.batch`). #71 #72 #73 #74
+- [x] **5.5 스케줄러 + 온디맨드 인프라**: 단일 16GB → **2-VM 분리**(상시 데이터 `--profile data` + 온디맨드 매매) + **Cloud Scheduler**(매일 01:00 UTC 매매 VM 기동 → `trade_once` 동기 배치 → 자가종료). **Airflow는 보류**(무거운 정기 잡 없음 → DL 도입 시 도입). 비용 ~$66→~$25/월. #75~#87
+- [~] **5.6 병렬성**: Kafka 다소비자 팬아웃(ingester→sink+candle)으로 데이터 경로는 이미 충족. 부하 합성은 `trade_once`가 동기 처리(온디맨드 배치라 N개 독립 컨슈머 불요 — 설계 변경으로 대체)
 > ⚠️ **가드(절대)**: 적응층 기본 off · DSR 게이트 · EWMA/일변동 캡 · demote≠delete · 가중식 자체 OOS 검증.
 > "재학습으로 향상"이 아니라 "**열화 부하 자동 강등**" 안전장치로 보수적 사용.
-> 검증: 적응 on/off A/B(동일 OOS) · 잡/DAG 수동 트리거 성공 + `strategy_weights` 갱신 + commander 반영 확인.
+> 검증: 적응 on/off A/B(동일 OOS) · Cloud Scheduler 잡 수동 트리거 성공 + `strategy_weights` 갱신 + `trade_once` 반영 확인.
 
 ## 6단계 — 코인 마무리 & 성과 검증
 - [ ] 라이브 모의매매로 앙상블 vs 단일 SMA 성과 비교 (일정 기간 — **실제 시장 경과 필요**, 현재 CASH)
