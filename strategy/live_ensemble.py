@@ -12,10 +12,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from common.config import ENSEMBLE_SYMBOLS, TOPIC_SIGNALS, TOPIC_TICKS
-from common.kafka_client import create_consumer, create_producer
 from common.schemas import Signal
 from strategy.ensemble import default_loads
 from strategy.trend_signal import TrendSignal
+
+# common.kafka_client(confluent-kafka)는 run()에서만 지연 import — LiveEnsemble 순수 상태기는
+# Kafka 비의존이라 단위 테스트 시 무거운 의존성을 끌어오지 않는다.
 
 GROUP_ID = "ensemble-signals"
 
@@ -43,6 +45,27 @@ class LiveEnsemble:
     def _targets(self, symbol, close):
         """각 부하의 (load_name, 목표비중). 부작용: 각 TrendSignal 내부 상태(가격버퍼·래치) 갱신(봉당 1회 호출)."""
         return [(name, sig.update(symbol, close)) for name, sig in self.loads]
+
+    def signals_for(self, symbol) -> list:
+        """부하별 마지막 진단(목표비중·단기/장기 SMA·연율변동성·LONG/CASH) — 결정 근거 기록용.
+
+        prime/on_tick으로 각 부하가 최소 1회 갱신된 뒤 호출한다(미갱신 부하는 제외).
+        반환 [{"load","target","sma_s","sma_l","ann_vol","state"}] — JSON 직렬화 가능(JSONB 저장용).
+        """
+        out = []
+        for name, sig in self.loads:
+            d = sig.last.get(symbol)
+            if d is None:
+                continue
+            out.append({
+                "load": name,
+                "target": float(d["target"]),
+                "sma_s": d["sma_s"],
+                "sma_l": d["sma_l"],
+                "ann_vol": d["ann_vol"],
+                "state": "LONG" if d["long"] else "CASH",
+            })
+        return out
 
     def prime(self, history: dict) -> list:
         """history={symbol:[(day, close)...]}(시간오름차순)로 각 부하 워밍업. 마지막 완료봉 부하별 목표를 초기 신호로 반환."""
@@ -102,6 +125,7 @@ def _publish_all(producer, symbol, per_load, bar_day) -> None:
 
 
 def run() -> None:
+    from common.kafka_client import create_consumer, create_producer   # 지연 import(테스트 시 confluent-kafka 불요)
     state = LiveEnsemble(ENSEMBLE_SYMBOLS)
     hist = _load_history(ENSEMBLE_SYMBOLS)
     producer = create_producer()

@@ -34,12 +34,15 @@ class TrendSignal:
         self.warmup_bars = max(self.short, self.long, self.vol_lookback + 1)
         self.prices: dict[str, deque] = {}
         self.long_state: dict[str, bool] = {}   # 직전 long(보유의향)/cash 래치(히스테리시스)
+        self.last: dict[str, dict] = {}         # 종목별 마지막 진단값(결정 근거 기록용 — 반환값과 무관)
 
     def update(self, symbol: str, price) -> Decimal:
         """가격버퍼·래치 갱신 후 목표비중 반환(0=현금/워밍업). 포지션 보유는 호출자(앙상블)가 관리."""
         dq = self.prices.setdefault(symbol, deque(maxlen=self.warmup_bars + 1))
         dq.append(float(price))
         if len(dq) < self.warmup_bars:
+            self.last[symbol] = {"sma_s": None, "sma_l": None, "ann_vol": None,
+                                 "long": False, "target": Decimal(0)}
             return Decimal(0)
         closes = list(dq)
         sma_s = _sma(closes, self.short)
@@ -54,4 +57,7 @@ class TrendSignal:
         elif (not long) and trend_up and not extreme:  # 현금 → 진입(상승추세)
             long = True
         self.long_state[symbol] = long
-        return target_weight(ann_vol, self.vol_target, self.max_weight) if long else Decimal(0)
+        tw = target_weight(ann_vol, self.vol_target, self.max_weight) if long else Decimal(0)
+        self.last[symbol] = {"sma_s": sma_s, "sma_l": sma_l, "ann_vol": ann_vol,
+                             "long": long, "target": tw}
+        return tw
