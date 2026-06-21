@@ -75,5 +75,23 @@ class TestOnTick(unittest.TestCase):
         self.assertIsNone(le.on_tick("KRW-BTC", Decimal("9"), "2026-06-19T10:00:00+00:00"))
 
 
+class TestSignalsFor(unittest.TestCase):
+    def test_empty_before_prime(self):
+        # 갱신 전엔 근거 없음
+        self.assertEqual(LiveEnsemble(["KRW-BTC"]).signals_for("KRW-BTC"), [])
+
+    def test_signals_after_prime(self):
+        le = LiveEnsemble(["KRW-BTC"])
+        le.prime({"KRW-BTC": _hist([100 + i for i in range(130)])})   # 상승추세
+        sigs = le.signals_for("KRW-BTC")
+        self.assertEqual(len(sigs), 3)                                # 부하 3개
+        for s in sigs:
+            self.assertEqual(set(s), {"load", "target", "sma_s", "sma_l", "ann_vol", "state"})
+            self.assertIn(s["state"], ("LONG", "CASH"))
+            self.assertIsInstance(s["sma_s"], float)
+            self.assertGreaterEqual(s["target"], 0.0)
+        self.assertTrue(all(s["state"] == "LONG" and s["target"] > 0 for s in sigs))  # 상승추세 → 보유
+
+
 if __name__ == "__main__":
     unittest.main()

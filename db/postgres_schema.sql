@@ -59,6 +59,26 @@ CREATE TABLE IF NOT EXISTS order_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON order_outbox (id) WHERE NOT published;
 
+-- 매매 결정 기록: trade_once가 매 실행마다 종목별로 1행(매매·유지 전부) 남긴다. 대시보드 '매매 결정 기록' 탭이 읽음.
+CREATE TABLE IF NOT EXISTS trade_decisions (
+    decision_id   UUID PRIMARY KEY,
+    run_ts        TIMESTAMPTZ NOT NULL DEFAULT now(),   -- trade_once 실행 시각(한 실행=동일값)
+    bar_date      DATE,                                 -- 분석 기준 일봉 날짜(candles_1d 최신 완료봉)
+    account_id    TEXT NOT NULL REFERENCES accounts(account_id),
+    symbol        TEXT NOT NULL,
+    price         NUMERIC(20,4),                        -- 분석 시점 시세
+    target_weight NUMERIC(10,6),                        -- 합성 목표비중(0~1, NULL=신호 불완전)
+    action        TEXT NOT NULL,                        -- 'BUY' | 'SELL' | 'HOLD'
+    quantity      NUMERIC(28,12),                       -- 매매 시 수량(HOLD면 NULL)
+    amount_krw    NUMERIC(20,4),                        -- 예상/체결 금액 = quantity*price
+    equity        NUMERIC(20,4),                        -- 결정 시점 평가자산
+    reason        TEXT NOT NULL,                        -- 사람이 읽는 사유(한국어)
+    signals       JSONB,                                -- 부하별 근거 [{load,target,sma_s,sma_l,ann_vol,state}]
+    executed      BOOLEAN NOT NULL DEFAULT FALSE        -- 실제 체결 여부(rejected=false)
+);
+
+CREATE INDEX IF NOT EXISTS idx_decisions_run ON trade_decisions (account_id, run_ts DESC);
+
 INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;

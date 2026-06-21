@@ -133,6 +133,37 @@
   .perf .cell{background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
   .perf .cell .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
   .perf .cell .val{font-size:16px;font-weight:700;font-family:var(--mono);margin-top:3px;}
+
+  /* ── 탭 네비 ── */
+  .tabs{display:flex;gap:4px;padding:0 22px;background:var(--panel);border-bottom:1px solid var(--line);}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);
+    padding:11px 16px;cursor:pointer;font-size:13px;font-family:var(--sans);font-weight:600;letter-spacing:.02em;}
+  .tab:hover{color:var(--text);}
+  .tab.on{color:var(--algo);border-bottom-color:var(--algo);}
+  #view-decisions{padding:18px 22px 26px;}
+
+  /* ── 매매 결정 기록 ── */
+  .pill.HOLD{background:var(--raise);color:var(--muted);}
+  .drow{cursor:pointer;}
+  .drow:hover td{background:var(--raise);}
+  .drow .sub{display:block;font-size:10px;color:var(--faint);margin-top:2px;}
+  .caret{display:inline-block;width:11px;color:var(--faint);transition:transform .15s;}
+  .drow.open .caret{transform:rotate(90deg);}
+  .detail>td{background:var(--field);padding:0;}
+  .detail .inner{padding:12px 14px;}
+  .sigtab{width:100%;font-size:12px;}
+  .sigtab th{font-size:9px;}
+  .sigrow .st{font-weight:700;letter-spacing:.08em;font-size:10px;padding:2px 7px;border-radius:4px;}
+  .sigrow .st.LONG{color:var(--ink);background:var(--algo);}
+  .sigrow .st.CASH{color:var(--cash);background:var(--raise);border:1px solid var(--line2);}
+
+  /* ── 호버 툴팁(용어 설명) ── */
+  .help{border-bottom:1px dotted var(--faint);cursor:help;}
+  .help sup{color:var(--algo);font-size:9px;margin-left:1px;font-weight:700;}
+  #tip{position:fixed;z-index:50;max-width:280px;background:var(--raise);color:var(--text);
+    border:1px solid var(--line2);border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.5;
+    box-shadow:0 8px 28px rgba(0,0,0,.4);pointer-events:none;opacity:0;transition:opacity .12s;}
+  #tip.show{opacity:1;}
 </style>
 </head>
 <body>
@@ -150,6 +181,12 @@
   <a id="logout" href="/logout" style="display:none">로그아웃</a>
 </header>
 
+<nav class="tabs">
+  <button class="tab on" data-view="dashboard">대시보드</button>
+  <button class="tab" data-view="decisions">매매 결정 기록</button>
+</nav>
+
+<div id="view-dashboard">
 <section class="stance">
   <div class="stance-head"><span class="lbl">앙상블 스탠스</span>
     <span class="sub num" id="stanceSub">모델 2026-06-20(데이터 2019-11~2026-06) · 일봉 3속도 · band 0.5</span></div>
@@ -206,6 +243,21 @@
     </table>
   </div>
 </main>
+</div><!-- /view-dashboard -->
+
+<div id="view-decisions" hidden>
+  <div class="panel full">
+    <h2>매매 결정 기록 <span class="tag">일 1회 · 최신순</span></h2>
+    <table>
+      <thead><tr><th>시각 KST</th><th>종목</th><th>결정</th><th class="num">수량</th>
+        <th class="num">금액</th><th class="num">목표비중</th><th>사유</th></tr></thead>
+      <tbody id="decisions"><tr><td colspan="7" class="muted">로딩…</td></tr></tbody>
+    </table>
+    <p class="muted" style="font-size:11px;margin-top:12px">행을 클릭하면 부하별 분석 근거가 펼쳐집니다 · 밑줄 친 용어에 마우스를 올리면 설명이 나옵니다.</p>
+  </div>
+</div>
+
+<div id="tip"></div>
 
 <script>
 let prices = {}, prevPrices = {}, side = "BUY", otype = "MARKET", chartSym = null, candleData = [];
@@ -404,6 +456,73 @@ async function refresh(){
   } catch(e){ setStatus("err","연결 끊김"); }
 }
 
+// ── 탭 전환 ──
+function showView(name){
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.view === name));
+  document.getElementById("view-dashboard").hidden = name !== "dashboard";
+  document.getElementById("view-decisions").hidden = name !== "decisions";
+  if(name === "decisions") loadDecisions();
+}
+
+// ── 용어 설명(호버 툴팁) ──
+const TIP = {
+  target: "목표비중 — 이 종목에 자산의 몇 %를 둘지. 0%면 전량 현금으로 둔다는 뜻.",
+  sma: "이동평균(SMA) — 최근 N일 종가의 평균. 단기선이 장기선 위로 올라오면 상승추세 신호.",
+  vol: "연율 변동성 — 가격 출렁임을 1년 기준으로 환산한 값. 높을수록 비중을 줄이고, 극단적이면 진입을 막는다.",
+  state: "LONG = 추세가 있어 보유 / CASH = 추세가 없어 현금. 부하(속도)별로 따로 판단한다.",
+  load: "부하(속도) — 단기/장기 이동평균 조합. 5/40·10/60·20/100 세 속도의 신호를 가중평균해 합성한다.",
+  equity: "평가자산 — 현금 + 보유 코인 평가액의 합. 목표 금액 계산의 기준.",
+};
+const help = (label, key) => `<span class="help" data-tip="${TIP[key]}">${label}<sup>ⓘ</sup></span>`;
+const loadLabel = s => s.replace("trend-", "").replace("-", "/");   // trend-5-40 → 5/40
+
+// ── 매매 결정 기록 ──
+async function loadDecisions(){
+  const tb = document.getElementById("decisions");
+  try {
+    const rows = await api("/decisions?limit=100");
+    if(!rows.length){
+      tb.innerHTML = `<tr><td colspan="7" class="muted">아직 기록 없음 — 다음 매매 실행(매일 01:00 UTC)부터 표시됩니다.</td></tr>`;
+      return;
+    }
+    tb.innerHTML = rows.map((d, i) => {
+      const act = d.action === "BUY" ? "매수" : d.action === "SELL" ? "매도" : "매매안함";
+      const tw = d.target_weight == null ? "-" : (d.target_weight*100).toFixed(1) + "%";
+      const qty = d.quantity == null ? "-" : px(d.quantity);
+      const amt = d.amount_krw == null ? "-" : won(d.amount_krw);
+      const bar = d.bar_date ? `<span class="sub">기준봉 ${d.bar_date}${d.executed ? " · 체결" : ""}</span>` : "";
+      const hasDetail = d.signals && d.signals.length;
+      const detail = hasDetail ? `
+        <tr class="detail" data-i="${i}" hidden><td colspan="7"><div class="inner">
+          <table class="sigtab"><thead><tr>
+            <th>${help("부하","load")}</th><th>${help("상태","state")}</th>
+            <th class="num">${help("단기 SMA","sma")}</th><th class="num">${help("장기 SMA","sma")}</th>
+            <th class="num">${help("연율 변동성","vol")}</th><th class="num">${help("부하 목표","target")}</th>
+          </tr></thead><tbody>
+          ${d.signals.map(s => `<tr class="sigrow">
+            <td>${loadLabel(s.load)}</td>
+            <td><span class="st ${s.state}">${s.state}</span></td>
+            <td class="num">${s.sma_s == null ? "-" : px(s.sma_s)}</td>
+            <td class="num">${s.sma_l == null ? "-" : px(s.sma_l)}</td>
+            <td class="num">${s.ann_vol == null ? "-" : (s.ann_vol*100).toFixed(1)+"%"}</td>
+            <td class="num">${(s.target*100).toFixed(1)}%</td></tr>`).join("")}
+          </tbody></table>
+          <div class="muted" style="margin-top:8px;font-size:11px">${help("평가자산","equity")} ${d.equity == null ? "-" : won(d.equity)}</div>
+        </div></td></tr>` : "";
+      return `<tr class="drow" data-i="${i}">
+        <td class="num">${hasDetail ? '<span class="caret">▸</span> ' : ''}${fmtTime(d.run_ts)}${bar}</td>
+        <td>${d.symbol}</td>
+        <td><span class="pill ${d.action}">${act}</span></td>
+        <td class="num">${qty}</td><td class="num">${amt}</td><td class="num">${tw}</td>
+        <td>${d.reason}</td></tr>${detail}`;
+    }).join("");
+    tb.querySelectorAll(".drow").forEach(r => r.onclick = () => {
+      const det = tb.querySelector(`.detail[data-i="${r.dataset.i}"]`);
+      if(det){ det.hidden = !det.hidden; r.classList.toggle("open", !det.hidden); }
+    });
+  } catch(e){ tb.innerHTML = `<tr><td colspan="7" class="muted">결정 기록을 불러오지 못했습니다</td></tr>`; }
+}
+
 async function boot(){
   applyTheme(localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
   initForm(); await loadMe(); await loadAuto();
@@ -416,6 +535,20 @@ async function boot(){
   setInterval(loadStrategy, 60000);   // 일봉 신호 — 저빈도 폴링
   setInterval(loadAuto, 5000);
   addEventListener("resize", drawChart);
+
+  // 탭 전환
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => showView(t.dataset.view));
+  // 호버 툴팁(테이블 overflow에도 안 잘리게 fixed 위치)
+  const tip = document.getElementById("tip");
+  document.addEventListener("mouseover", e => {
+    const el = e.target.closest(".help"); if(!el) return;
+    tip.textContent = el.dataset.tip; tip.classList.add("show");
+    const r = el.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(r.left, innerWidth - tip.offsetWidth - 8)) + "px";
+    tip.style.top = (r.bottom + 8) + "px";
+  });
+  document.addEventListener("mouseout", e => { if(e.target.closest(".help")) tip.classList.remove("show"); });
+  setInterval(() => { if(!document.getElementById("view-decisions").hidden) loadDecisions(); }, 60000);
 }
 boot();
 </script>
