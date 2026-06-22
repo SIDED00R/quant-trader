@@ -164,6 +164,15 @@ infra/terraform/
 - 예산 알림: 결제계정에 30,000 (50/90/100%) 설정됨
 - 포트는 VM 루프백에만 바인딩 → 외부 비노출, 접속은 SSH 터널
 
+### ⚠️ 배포 함정 — 코드가 실제로 적용됐는지 반드시 확인
+
+- **매매 VM은 코드를 이미지에 굽는다**(`trade-once`는 `build: .`, 소스 볼륨 마운트 없음). `trade-vm-startup.sh`는 부팅 때 `git reset` 후 **`docker compose run --build`** 로 매번 재빌드한다. **`--build`를 빼면** 소스만 최신이고 낡은 이미지가 계속 실행돼 새 코드가 조용히 안 돈다(에러 없이). 실제로 #94 결정 기록이 이 이유로 미동작 → #99에서 `--build` 복구. **이 플래그 제거 금지.**
+- **startup-script는 VM 메타데이터에 사본으로 저장**된다. repo의 `infra/*-startup.sh`만 고치면 적용 안 됨 — 메타데이터를 갱신해야 한다:
+  `gcloud compute instances add-metadata coin-trade-vm --zone us-central1-a --metadata-from-file startup-script=infra/trade-vm-startup.sh`
+- **배포 검증(필수)**: 매매 VM start 후 시리얼 콘솔로 실제 실행된 코드를 확인한다(데이터 VM은 재배포 후 대시보드 탭·신규 테이블 확인).
+  `gcloud compute instances get-serial-port-output coin-trade-vm --zone us-central1-a | grep trade_once`
+  → `[trade_once] done — decisions=N recorded` 가 보여야 최신 코드(구버전은 `[trade_once] done` 만 찍음). 매매 안 한 날도 `decisions=N`(HOLD 포함) 기록된다.
+
 ### 접속 (SSH 터널)
 ```bash
 gcloud compute ssh coin-trader-vm --zone=us-central1-a -- -L 3000:localhost:3000 -L 8000:localhost:8000
