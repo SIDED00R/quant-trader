@@ -37,6 +37,31 @@ def orders(account_id: str = Depends(current_account_id), limit: int = 20):
     ]
 
 
+@router.get("/decisions")
+def decisions(account_id: str = Depends(current_account_id), limit: int = 30):
+    """매매결정 기록(매매 안 한 HOLD/SKIP 포함). trade_once 가 실행마다 종목별로 남긴다."""
+    with pool.connection() as conn:
+        rows = conn.execute(
+            "SELECT decided_at, symbol, decision, target_w, current_w, gap, price, quantity, reason "
+            "FROM trade_decisions WHERE account_id=%s ORDER BY decided_at DESC, symbol LIMIT %s",
+            (account_id, _limit(limit)),
+        ).fetchall()
+    return [
+        {
+            "ts": r[0].isoformat(),
+            "symbol": r[1],
+            "decision": r[2],
+            "target_w": float(r[3]) if r[3] is not None else None,
+            "current_w": float(r[4]) if r[4] is not None else None,
+            "gap": float(r[5]) if r[5] is not None else None,
+            "price": float(r[6]) if r[6] is not None else None,
+            "quantity": float(r[7]),
+            "reason": r[8],
+        }
+        for r in rows
+    ]
+
+
 @router.get("/executions")
 def executions(account_id: str = Depends(current_account_id), limit: int = 20):
     with pool.connection() as conn:

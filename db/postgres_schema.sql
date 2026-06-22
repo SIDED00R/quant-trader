@@ -59,6 +59,25 @@ CREATE TABLE IF NOT EXISTS order_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON order_outbox (id) WHERE NOT published;
 
+-- 매매결정 기록: trade_once 가 매 실행마다 (계정,종목)별 결정을 1행씩 남긴다(매매 안 한 HOLD/SKIP 포함).
+-- 실제 체결과 무관하게 "왜 그렇게 결정했는지"를 사유·수치와 함께 보존 → 대시보드 표시·전략 디버깅.
+CREATE TABLE IF NOT EXISTS trade_decisions (
+    id          BIGSERIAL PRIMARY KEY,
+    decided_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    account_id  TEXT NOT NULL,
+    symbol      TEXT NOT NULL,
+    decision    TEXT NOT NULL,            -- BUY | SELL | HOLD | SKIP
+    target_w    NUMERIC(10,6),
+    current_w   NUMERIC(10,6),
+    gap         NUMERIC(10,6),
+    band        NUMERIC(10,6),
+    price       NUMERIC(20,4),
+    quantity    NUMERIC(28,12) NOT NULL DEFAULT 0,
+    reason      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_decisions_acct_recent ON trade_decisions (account_id, decided_at DESC);
+
 INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;

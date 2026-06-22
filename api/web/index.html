@@ -129,6 +129,8 @@
   .pill.FILLED{background:var(--algo-glow);color:var(--algo);}
   .pill.PENDING{background:var(--algo-glow);color:var(--algo);}
   .pill.REJECTED{background:var(--raise);color:var(--muted);}
+  .pill.HOLD{background:var(--raise);color:var(--cash);border:1px solid var(--line2);}
+  .pill.SKIP{background:var(--raise);color:var(--faint);}
   .perf{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .perf .cell{background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
   .perf .cell .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
@@ -203,6 +205,14 @@
     <table>
       <thead><tr><th>시각 KST</th><th>종목</th><th>구분</th><th class="num">체결가</th><th class="num">수량</th><th class="num">수수료</th></tr></thead>
       <tbody id="execs"><tr><td colspan="6" class="muted">없음</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel full">
+    <h2>매매결정 기록 <span class="tag">매매 안 한 날도 사유 기록</span></h2>
+    <table>
+      <thead><tr><th>시각 KST</th><th>종목</th><th>결정</th><th class="num">목표%</th><th class="num">현재%</th><th class="num">격차%p</th><th style="text-align:left">사유</th></tr></thead>
+      <tbody id="decisions"><tr><td colspan="7" class="muted">없음</td></tr></tbody>
     </table>
   </div>
 </main>
@@ -335,6 +345,20 @@ async function loadExecs(){
   ).join("") : `<tr><td colspan="6" class="muted">없음</td></tr>`;
 }
 
+const decLabel = { BUY:"매수", SELL:"매도", HOLD:"유지", SKIP:"스킵" };
+const pct = n => n == null ? "-" : (n*100).toFixed(1);
+const pctp = n => n == null ? "-" : (n*100>=0?"+":"") + (n*100).toFixed(1);
+async function loadDecisions(){
+  const rows = await api("/history/decisions?limit=30");
+  const tb = document.getElementById("decisions");
+  tb.innerHTML = rows.length ? rows.map(d =>
+    `<tr><td class="num">${fmtTime(d.ts)}</td><td>${d.symbol}</td>
+     <td><span class="pill ${d.decision}">${decLabel[d.decision]||d.decision}</span></td>
+     <td class="num">${pct(d.target_w)}</td><td class="num">${pct(d.current_w)}</td><td class="num">${pctp(d.gap)}</td>
+     <td style="text-align:left" class="muted">${d.reason}</td></tr>`
+  ).join("") : `<tr><td colspan="7" class="muted">아직 기록 없음 (다음 매매 실행 후 표시)</td></tr>`;
+}
+
 // ── 차트(테마 인지) ──
 async function loadChart(){ if(!chartSym) return; candleData = await api(`/market/candles/${chartSym}`); drawChart(); }
 function drawChart(){
@@ -397,7 +421,7 @@ async function refresh(){
   try {
     prevPrices = prices; prices = await api("/market/prices");
     renderTickers();
-    await Promise.all([loadAccount(), loadExecs(), loadPerformance()]);
+    await Promise.all([loadAccount(), loadExecs(), loadDecisions(), loadPerformance()]);
     document.getElementById("updated").textContent =
       "갱신 " + new Date().toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false});
     setStatus("ok","실시간");
