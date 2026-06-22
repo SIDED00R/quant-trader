@@ -15,22 +15,22 @@ _QTY_QUANT = Decimal("0.00000001")
 
 
 class Decision(NamedTuple):
-    decision: str            # BUY | SELL | HOLD | SKIP
-    quantity: Decimal        # BUY/SELL 수량, 그 외 0
-    target_w: float          # 목표비중
-    current_w: float         # 현재비중(미산출 시 0.0)
-    gap: float               # 목표 − 현재 (%p 의미)
-    reason: str              # 사람이 읽는 사유(수치 포함)
+    decision: str                  # BUY | SELL | HOLD | SKIP
+    quantity: Decimal              # BUY/SELL 수량, 그 외 0
+    target_w: float                # 목표비중
+    current_w: Optional[float]     # 현재비중(가격 미확보 SKIP 시 None=미산출)
+    gap: Optional[float]           # 목표 − 현재 (%p 의미; 미산출 시 None)
+    reason: str                    # 사람이 읽는 사유(수치 포함)
 
 
 def classify(qty: Decimal, price: Optional[Decimal], cash: Decimal, equity: Decimal,
              target_w: float, band: float) -> Decision:
     """보유 수량을 목표비중으로 재조정하는 결정 + 사유. decide()와 동일한 임계(밴드·최소주문·현금한도)."""
-    if not price:                                       # 최신가 미확보 → 체결 불가
-        return Decision("SKIP", Decimal(0), target_w, 0.0, target_w,
+    if not price:                                       # 최신가 미확보 → 체결·평가 불가(현재비중 미산출)
+        return Decision("SKIP", Decimal(0), target_w, None, None,
                         "최신가 미확보(최근 1시간 틱 없음) → 스킵")
     if price <= 0 or equity <= 0:
-        return Decision("SKIP", Decimal(0), target_w, 0.0, target_w,
+        return Decision("SKIP", Decimal(0), target_w, None, None,
                         "가격/평가액 0 이하 → 스킵")
 
     cur_val = qty * price
@@ -66,5 +66,5 @@ def classify(qty: Decimal, price: Optional[Decimal], cash: Decimal, equity: Deci
     qsell = min((sell_val / price).quantize(_QTY_QUANT, rounding=ROUND_DOWN), qty)
     if qsell > 0:
         return Decision("SELL", qsell, target_w, current_w, gap,
-                        f"격차 {gap:+.1%} < 밴드 {band_w:.1%} 초과(축소) → {qsell} 매도")
+                        f"격차 {gap:+.1%} (|격차| > 밴드 {band_w:.1%}) → {qsell} 매도")
     return Decision("HOLD", Decimal(0), target_w, current_w, gap, "매도 수량 0 → 유지")

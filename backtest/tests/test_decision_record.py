@@ -14,6 +14,8 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(d.decision, "SKIP")
         self.assertIn("최신가", d.reason)
         self.assertEqual(d.quantity, Decimal(0))
+        self.assertIsNone(d.current_w)   # 가격 없어 현재비중 미산출 → NULL
+        self.assertIsNone(d.gap)
 
     def test_invalid_price_is_skip(self):
         self.assertEqual(classify(Decimal("1"), Decimal("0"), _EQ, _EQ, 0.5, 0.5).decision, "SKIP")

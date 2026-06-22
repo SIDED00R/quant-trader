@@ -349,14 +349,16 @@ const decLabel = { BUY:"매수", SELL:"매도", HOLD:"유지", SKIP:"스킵" };
 const pct = n => n == null ? "-" : (n*100).toFixed(1);
 const pctp = n => n == null ? "-" : (n*100>=0?"+":"") + (n*100).toFixed(1);
 async function loadDecisions(){
-  const rows = await api("/history/decisions?limit=30");
   const tb = document.getElementById("decisions");
-  tb.innerHTML = rows.length ? rows.map(d =>
-    `<tr><td class="num">${fmtTime(d.ts)}</td><td>${d.symbol}</td>
-     <td><span class="pill ${d.decision}">${decLabel[d.decision]||d.decision}</span></td>
-     <td class="num">${pct(d.target_w)}</td><td class="num">${pct(d.current_w)}</td><td class="num">${pctp(d.gap)}</td>
-     <td style="text-align:left" class="muted">${d.reason}</td></tr>`
-  ).join("") : `<tr><td colspan="7" class="muted">아직 기록 없음 (다음 매매 실행 후 표시)</td></tr>`;
+  try {
+    const rows = await api("/history/decisions?limit=30");
+    tb.innerHTML = rows.length ? rows.map(d =>
+      `<tr><td class="num">${fmtTime(d.ts)}</td><td>${d.symbol}</td>
+       <td><span class="pill ${d.decision}">${decLabel[d.decision]||d.decision}</span></td>
+       <td class="num">${pct(d.target_w)}</td><td class="num">${pct(d.current_w)}</td><td class="num">${pctp(d.gap)}</td>
+       <td style="text-align:left" class="muted">${d.reason}</td></tr>`
+    ).join("") : `<tr><td colspan="7" class="muted">아직 기록 없음 (다음 매매 실행 후 표시)</td></tr>`;
+  } catch(e){ tb.innerHTML = `<tr><td colspan="7" class="muted">결정 기록 불러오기 실패</td></tr>`; }
 }
 
 // ── 차트(테마 인지) ──
@@ -421,7 +423,7 @@ async function refresh(){
   try {
     prevPrices = prices; prices = await api("/market/prices");
     renderTickers();
-    await Promise.all([loadAccount(), loadExecs(), loadDecisions(), loadPerformance()]);
+    await Promise.all([loadAccount(), loadExecs(), loadPerformance()]);
     document.getElementById("updated").textContent =
       "갱신 " + new Date().toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false});
     setStatus("ok","실시간");
@@ -434,10 +436,11 @@ async function boot(){
   const syms = await api("/market/symbols");
   document.getElementById("oSymbol").innerHTML = syms.map(s => `<option>${s}</option>`).join("");
   chartSym = syms[0]; document.getElementById("chartSym").textContent = chartSym;
-  await refresh(); await loadChart(); await loadStrategy();
+  await refresh(); await loadChart(); await loadStrategy(); await loadDecisions();
   setInterval(refresh, 2000);
   setInterval(loadChart, 15000);
   setInterval(loadStrategy, 60000);   // 일봉 신호 — 저빈도 폴링
+  setInterval(loadDecisions, 60000);  // 매매결정 기록 — 일봉 저빈도
   setInterval(loadAuto, 5000);
   addEventListener("resize", drawChart);
 }

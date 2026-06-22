@@ -4,8 +4,8 @@
 candles_1d·포지션을 읽어 부하 합성 목표비중을 산출하고 주문→체결을 **동기**로 처리(Kafka 불요) 후 끝낸다.
 일봉 저빈도 매매라 배치가 자연스럽다. 원격 DB는 env(CLICKHOUSE_HOST/POSTGRES_HOST)로 데이터 VM을 가리킨다.
 
-순수 결정부 plan_orders는 테스트 가능. 체결·상태 갱신은 검증된 portfolio.apply_execution을 재사용한다.
-재사용: commander.decide·combined_for_bar, live_ensemble.prime, ensemble.default_loads, load_weights, apply_execution.
+순수 결정부 plan_decisions(매매 안 한 HOLD/SKIP 포함 전 종목 결정)는 테스트 가능. 체결·상태 갱신은 검증된 portfolio.apply_execution을 재사용한다.
+재사용: decision_record.classify·combined_for_bar, live_ensemble.prime, ensemble.default_loads, load_weights, apply_execution.
 계정/시세 읽기 헬퍼는 commander와 일시 중복(스트리밍 commander 은퇴 시 정리).
 """
 import uuid
@@ -106,11 +106,15 @@ def plan_decisions(targets: dict, snapshots: dict, band: float) -> list:
     return out
 
 
-def plan_orders(targets: dict, snapshots: dict, band: float) -> list:
-    """실행할 주문만 추출(plan_decisions 의 BUY/SELL) [(acct, symbol, side, qty)]. 기존 호출부·테스트 호환."""
+def _orders_in(decisions: list) -> list:
+    """결정 기록에서 실행할 주문(BUY/SELL)만 추출 [(acct, symbol, side, qty)] — 필터 단일 출처."""
     return [(acct, sym, d.decision, d.quantity)
-            for acct, sym, px, d in plan_decisions(targets, snapshots, band)
-            if d.decision in ("BUY", "SELL")]
+            for acct, sym, _, d in decisions if d.decision in ("BUY", "SELL")]
+
+
+def plan_orders(targets: dict, snapshots: dict, band: float) -> list:
+    """실행할 주문만 추출(plan_decisions 의 BUY/SELL) [(acct, symbol, side, qty)]. 테스트 호환용 얇은 래퍼."""
+    return _orders_in(plan_decisions(targets, snapshots, band))
 
 
 def _execute(conn, acct, symbol, side, qty: Decimal, price: Decimal) -> str:
@@ -139,13 +143,13 @@ def run(dry_run: bool = False) -> int:
         accts = enabled_accounts()
         snapshots = {a: {"cash": cash(a), "positions": positions(a), "prices": prices} for a in accts}
         decisions = plan_decisions(targets, snapshots, band)
-        orders = [(a, s, d.decision, d.quantity) for a, s, px, d in decisions if d.decision in ("BUY", "SELL")]
+        orders = _orders_in(decisions)
         shown = {k: round(v, 4) for k, v in targets.items()}
         counts = dict(Counter(d.decision for _, _, _, d in decisions))
         tag = " [DRY-RUN]" if dry_run else ""
         print(f"[trade_once]{tag} targets={shown} accounts={len(accts)} decisions={len(decisions)}{counts} orders={len(orders)}")
         if dry_run:
-            for acct, sym, px, d in decisions:
+            for acct, sym, _, d in decisions:
                 print(f"[trade_once] (dry-run) {acct} {sym}: {d.decision} — {d.reason}")
             print("[trade_once] dry-run done")
             return 0
