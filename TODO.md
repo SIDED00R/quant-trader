@@ -109,7 +109,7 @@
 - [x] 코인 단계 회고/문서화 (`BACKLOG.md` 회고 + `docs/model.md` 모델카드) #61
 
 ## 7단계 — 주식(키움) 토대
-- [ ] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md`
+- [x] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md` (#102 — 인증·도메인·WS·엔드포인트·모의흐름·시장메커니즘·재사용매핑·유니버스, 1차 출처 교차검증)
 - [ ] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용)
 - [ ] 종목 유니버스 선정 논의/결정 (전 종목 X — 어떤 종목 대상으로 할지) → `docs/kiwoom.md`
 - [ ] 주식 체결/계좌 모델: 정수 주문단위·장 시간·수수료/세금 반영 (engine/portfolio 확장 또는 분기)
