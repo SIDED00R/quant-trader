@@ -109,11 +109,12 @@
 - [x] 코인 단계 회고/문서화 (`BACKLOG.md` 회고 + `docs/model.md` 모델카드) #61
 
 ## 7단계 — 주식(키움) 토대
+> **다음 세션 우선순위**: ① #4 체결/계좌 모델(자격증명 불요 — 지금 바로) → ② 정규장(09:00~15:30 KST)에 #2 라이브 틱 검증 + FID 보정 → ③ #5 단건 주문 왕복. (#3 유니버스는 8단계 백테스트 후 결정·보류). PR #103/#105 리뷰·머지 대기.
 - [ ] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md`
 - [~] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. **토큰·WS·LOGIN·REG 실서버(모의) 검증 완료** — 정규장 0B 틱 수신·FID(10/15/20) 보정만 대기)
-- [ ] 종목 유니버스 선정 논의/결정 (전 종목 X — 어떤 종목 대상으로 할지) → `docs/kiwoom.md`
-- [ ] 주식 체결/계좌 모델: 정수 주문단위·장 시간·수수료/세금 반영 (engine/portfolio 확장 또는 분기)
-- [ ] 키움 모의계정으로 단건 주문 왕복 검증 (API → 모의체결 → 내 대시보드 반영)
+- [ ] 종목 유니버스 선정 논의/결정 (전 종목 X — 어떤 종목 대상으로 할지) → `docs/kiwoom.md` (잠정 005930+000660, 확정은 8단계 백테스트 성과로)
+- [ ] 주식 체결/계좌 모델: 정수 주문단위·장 시간·수수료/세금 반영 (engine/portfolio 확장 또는 분기) — **다음 우선·자격증명 불요**: ①정수단위(ROUND_DOWN+<1주 skip 로그)를 place_order·backtest/engine 입구에 ②신규 `common/market_hours.py is_market_open()`(코인=항상 True, 주식=KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 2026 KOSPI/KOSDAQ 0.20%, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로는 자산군 조건부로 무영향. 백테스트 단위테스트로 검증
+- [ ] 키움 모의계정으로 단건 주문 왕복 검증 (API → 모의체결 → 내 대시보드 반영) — **정규장+모의계좌 필요**: 코인 Kafka 매칭엔진 **우회**. `api/routes/stock_orders.py`(kt10000 매수 1주) + `kiwoom_client` 주문 호출 + `executions`에 `asset_class`/`broker_order_id` 컬럼(ADD COLUMN IF NOT EXISTS) + 대시보드 주식 패널(`loadStockExecs`). 체결멱등 `uuid5(ord_no)`
 
 ## 8단계 — 주식 앙상블 (구조 재사용)
 - [ ] 코인 `Strategy`/`Commander`/신호버스 구조를 주식에 재사용 (`stock.signals` 토픽)
