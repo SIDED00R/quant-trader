@@ -29,6 +29,26 @@ CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
 TOPIC_ORDERS = "orders"
 TOPIC_EXECUTIONS = "executions"
 TOPIC_SIGNALS = "strategy.signals"   # 전략 부하 → commander 신호 버스(4단계 라이브 배선)
+TOPIC_STOCK_TICKS = "stock.ticks"    # 키움 실시간 주식체결(7단계 주식 확장)
+
+# ── 키움증권 주식 (7단계: 주식 확장) ──
+# 운용 유니버스는 8단계 백테스트 후 확정 — 아래는 잠정 데이터 수집 대상(6자리 종목코드).
+STOCK_SYMBOLS = [
+    s.strip()
+    for s in os.getenv("STOCK_SYMBOLS", "005930,000660").split(",")
+    if s.strip()
+]
+# 모의(mock) vs 실전(real) 도메인 선택. 모의계좌 검증 단계 → 기본 모의.
+KIWOOM_MOCK = os.getenv("KIWOOM_MOCK", "true").strip().lower() in ("1", "true", "yes")
+KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "")       # 키움 Open API appkey
+KIWOOM_APP_SECRET = os.getenv("KIWOOM_APP_SECRET", "")  # 키움 Open API secretkey
+KIWOOM_ACCOUNT_NO = os.getenv("KIWOOM_ACCOUNT_NO", "")  # 모의 계좌번호(단건주문용, 7단계 #5)
+KIWOOM_REST_BASE = "https://mockapi.kiwoom.com" if KIWOOM_MOCK else "https://api.kiwoom.com"
+KIWOOM_WS_URL = (
+    "wss://mockapi.kiwoom.com:10000/api/dostk/websocket"
+    if KIWOOM_MOCK
+    else "wss://api.kiwoom.com:10000/api/dostk/websocket"
+)
 
 # ── 거래 ──
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%

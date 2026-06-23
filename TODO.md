@@ -110,7 +110,7 @@
 
 ## 7단계 — 주식(키움) 토대
 - [ ] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md`
-- [ ] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용)
+- [~] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. 코드 완료, 정규장 라이브 검증 대기)
 - [ ] 종목 유니버스 선정 논의/결정 (전 종목 X — 어떤 종목 대상으로 할지) → `docs/kiwoom.md`
 - [ ] 주식 체결/계좌 모델: 정수 주문단위·장 시간·수수료/세금 반영 (engine/portfolio 확장 또는 분기)
 - [ ] 키움 모의계정으로 단건 주문 왕복 검증 (API → 모의체결 → 내 대시보드 반영)
