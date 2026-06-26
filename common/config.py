@@ -53,6 +53,12 @@ KIWOOM_WS_URL = (
 # ── 거래 ──
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 
+# ── 토스증권 Open API (데이터/조회 전용 — 매매는 키움 모의 유지) ──
+# 주식 일봉 백필 데이터 소스(백테스트 입력). client_credentials OAuth2, 클라이언트당 토큰 1개.
+TOSS_CLIENT_ID = os.getenv("TOSS_CLIENT_ID", "")
+TOSS_CLIENT_SECRET = os.getenv("TOSS_CLIENT_SECRET", "")
+TOSS_REST_BASE = "https://openapi.tossinvest.com"
+
 # ── 웹 대시보드 인증 (Basic Auth) ──
 # WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.
 WEB_USER = os.getenv("WEB_USER", "admin")
