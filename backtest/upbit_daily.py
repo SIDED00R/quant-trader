@@ -10,11 +10,12 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from common.constants import COLUMNS_CANDLES, HTTP_PAGE
 from backtest.upbit_candles import _MAX_RETRIES, _backoff, _parse_dt
 
 _URL = "https://api.upbit.com/v1/candles/days"
-_PAGE = 200
-_COLUMNS = ["symbol", "window_start", "open", "high", "low", "close", "volume"]
+_PAGE = HTTP_PAGE
+_COLUMNS = COLUMNS_CANDLES
 
 
 def _get(client: httpx.Client, params: dict, req_sleep: float) -> list:

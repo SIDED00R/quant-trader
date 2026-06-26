@@ -13,13 +13,13 @@ import httpx
 
 from backtest.upbit_candles import _MAX_RETRIES, _backoff
 from common.config import TOSS_REST_BASE
+from common.constants import COLUMNS_STOCK_CANDLES_1D, HTTP_PAGE
 from common.toss_client import get_access_token
 
 _URL = f"{TOSS_REST_BASE}/api/v1/candles"
-_PAGE = 200
+_PAGE = HTTP_PAGE
 _KST = timezone(timedelta(hours=9))
-_COLUMNS = ["symbol", "window_start", "open", "high", "low", "close", "volume",
-            "currency", "market"]
+_COLUMNS = COLUMNS_STOCK_CANDLES_1D
 
 
 def _get(client: httpx.Client, params: dict, headers: dict, req_sleep: float) -> dict:

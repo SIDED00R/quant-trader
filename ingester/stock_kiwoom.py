@@ -21,11 +21,12 @@ from common.config import (
     STOCK_SYMBOLS,
     TOPIC_STOCK_TICKS,
 )
+from common.constants import HTTP_MAX_BACKOFF
 from common.kafka_client import create_producer
 from common.kiwoom_client import get_access_token
 from common.schemas import Tick
 
-MAX_BACKOFF = 30
+MAX_BACKOFF = HTTP_MAX_BACKOFF
 REAL_TYPE_TRADE = "0B"  # 주식체결
 _KST = timezone(timedelta(hours=9))
 

@@ -5,12 +5,13 @@ from datetime import datetime
 
 from common.clickhouse_client import create_client
 from common.config import TOPIC_TICKS
+from common.constants import COLUMNS_TICKS
 from common.kafka_client import create_consumer
 
 GROUP_ID = "tick-clickhouse-sink"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
-COLUMNS = ["symbol", "price", "volume", "side", "trade_ts", "seq"]
+COLUMNS = COLUMNS_TICKS
 
 
 def parse_row(value: bytes) -> list:

@@ -12,9 +12,10 @@ from datetime import datetime, timezone
 
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
+from common.constants import COLUMNS_CANDLES
 from backtest.upbit_candles import cache_path
 
-_COLUMNS = ["symbol", "window_start", "open", "high", "low", "close", "volume"]
+_COLUMNS = COLUMNS_CANDLES
 _BATCH = 100_000
 
 

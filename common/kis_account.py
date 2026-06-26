@@ -14,6 +14,12 @@ from common.config import (
     KIS_MOCK,
     KIS_REST_BASE,
 )
+from common.constants import (
+    KIS_DEFAULT_CURRENCY,
+    KIS_DEFAULT_EXCHANGE,
+    KIS_TR_DOMESTIC_BALANCE,
+    KIS_TR_OVERSEAS_BALANCE,
+)
 from common.kis_client import get_access_token
 
 
@@ -64,7 +70,7 @@ def fetch_domestic_balance() -> tuple[list, dict]:
     cano, prdt = split_account()
     body = _get(
         "/uapi/domestic-stock/v1/trading/inquire-balance",
-        _tr("TTTC8434R"),
+        _tr(KIS_TR_DOMESTIC_BALANCE),
         {
             "CANO": cano, "ACNT_PRDT_CD": prdt,
             "AFHR_FLPR_YN": "N", "OFL_YN": "", "INQR_DVSN": "02",
@@ -76,7 +82,7 @@ def fetch_domestic_balance() -> tuple[list, dict]:
     return body.get("output1", []), _summary(body)
 
 
-def fetch_overseas_balance(exchange: str = "NASD", currency: str = "USD") -> tuple[list, dict]:
+def fetch_overseas_balance(exchange: str = KIS_DEFAULT_EXCHANGE, currency: str = KIS_DEFAULT_CURRENCY) -> tuple[list, dict]:
     """해외 잔고(거래소·통화별). (보유종목 output1, 계좌요약 output2) 반환(원본 dict 그대로).
 
     OVRS_EXCG_CD: NASD(나스닥)/NYSE/AMEX. 미국 전체 보유는 거래소별로 각각 조회 필요.
@@ -84,7 +90,7 @@ def fetch_overseas_balance(exchange: str = "NASD", currency: str = "USD") -> tup
     cano, prdt = split_account()
     body = _get(
         "/uapi/overseas-stock/v1/trading/inquire-balance",
-        _tr("TTTS3012R"),
+        _tr(KIS_TR_OVERSEAS_BALANCE),
         {
             "CANO": cano, "ACNT_PRDT_CD": prdt,
             "OVRS_EXCG_CD": exchange, "TR_CRCY_CD": currency,

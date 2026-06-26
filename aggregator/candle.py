@@ -11,12 +11,13 @@ from datetime import datetime, timedelta
 
 from common.clickhouse_client import create_client
 from common.config import TOPIC_TICKS
+from common.constants import COLUMNS_CANDLES
 from common.kafka_client import create_consumer
 
 GROUP_ID = "candle-aggregator"
 FLUSH_SEC = 2.0
 WATERMARK = timedelta(minutes=2)
-COLUMNS = ["symbol", "window_start", "open", "high", "low", "close", "volume"]
+COLUMNS = COLUMNS_CANDLES
 
 
 def floor_minute(ts_iso: str) -> datetime:
