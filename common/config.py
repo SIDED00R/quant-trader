@@ -59,6 +59,18 @@ TOSS_CLIENT_ID = os.getenv("TOSS_CLIENT_ID", "")
 TOSS_CLIENT_SECRET = os.getenv("TOSS_CLIENT_SECRET", "")
 TOSS_REST_BASE = "https://openapi.tossinvest.com"
 
+# ── 한국투자증권 KIS (모의 체결 브로커 — KR+US 통합) ──
+# 계좌 1개로 국내/해외 모의 체결. OAuth2 access_token(약 24h). 토큰 재발급 횟수 제한 있어 캐시 필수.
+KIS_MOCK = os.getenv("KIS_MOCK", "true").strip().lower() in ("1", "true", "yes")
+KIS_APPKEY = os.getenv("KIS_APPKEY", "")          # KIS Developers appkey
+KIS_APPSECRET = os.getenv("KIS_APPSECRET", "")    # KIS Developers appsecret
+KIS_ACCOUNT_NO = os.getenv("KIS_ACCOUNT_NO", "")  # 계좌번호 'CANO-PRDT'(앞 8자리-상품코드 2자리)
+KIS_REST_BASE = (
+    "https://openapivts.koreainvestment.com:29443"  # 모의
+    if KIS_MOCK
+    else "https://openapi.koreainvestment.com:9443"  # 실전
+)
+
 # ── 웹 대시보드 인증 (Basic Auth) ──
 # WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.
 WEB_USER = os.getenv("WEB_USER", "admin")
