@@ -8,13 +8,14 @@ from datetime import datetime
 
 from common.clickhouse_client import create_client
 from common.config import TOPIC_STOCK_TICKS
+from common.constants import COLUMNS_TICKS
 from common.kafka_client import create_consumer
 
 GROUP_ID = "stock-tick-clickhouse-sink"
 TABLE = "stock_ticks"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
-COLUMNS = ["symbol", "price", "volume", "side", "trade_ts", "seq"]
+COLUMNS = COLUMNS_TICKS
 
 
 def parse_row(value: bytes) -> list:

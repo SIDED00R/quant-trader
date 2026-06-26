@@ -19,13 +19,14 @@ from decimal import Decimal
 
 import httpx
 
+from common.constants import HTTP_MAX_BACKOFF, HTTP_MAX_RETRIES, HTTP_PAGE
 from backtest.models import BTick
 
 _URL = "https://api.upbit.com/v1/candles/minutes/{unit}"
 _HEADER = ["ts_ms", "open", "high", "low", "close", "volume", "dt_utc"]
-_PAGE = 200
-_MAX_RETRIES = 6
-_MAX_BACKOFF = 30.0
+_PAGE = HTTP_PAGE
+_MAX_RETRIES = HTTP_MAX_RETRIES
+_MAX_BACKOFF = HTTP_MAX_BACKOFF
 
 
 def _backoff(attempt: int) -> float:
