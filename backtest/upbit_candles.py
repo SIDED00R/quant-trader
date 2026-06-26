@@ -13,13 +13,13 @@ epoch ms다(업비트 candle_date_time_utc 기준) — ClickHouse 소스의 wind
 import csv
 import heapq
 import os
-import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
 
 from common.constants import HTTP_MAX_BACKOFF, HTTP_MAX_RETRIES, HTTP_PAGE
+from common.http_client import get_json
 from backtest.models import BTick
 
 _URL = "https://api.upbit.com/v1/candles/minutes/{unit}"
@@ -27,11 +27,6 @@ _HEADER = ["ts_ms", "open", "high", "low", "close", "volume", "dt_utc"]
 _PAGE = HTTP_PAGE
 _MAX_RETRIES = HTTP_MAX_RETRIES
 _MAX_BACKOFF = HTTP_MAX_BACKOFF
-
-
-def _backoff(attempt: int) -> float:
-    """지수 백오프 초(상한 _MAX_BACKOFF) — 라이브 ingester(upbit_ws.py)와 동일 house 패턴."""
-    return min(1.0 * (2 ** attempt), _MAX_BACKOFF)
 
 
 def cache_path(cache_dir: str, market: str, unit: int) -> str:
@@ -48,20 +43,9 @@ def _ws_ms(candle: dict) -> int:
 
 
 def _get(client: httpx.Client, unit: int, params: dict, req_sleep: float) -> list:
-    url = _URL.format(unit=unit)
-    for attempt in range(_MAX_RETRIES):
-        try:
-            r = client.get(url, params=params)
-        except httpx.TransportError:               # 타임아웃/연결오류 → 지수 백오프 재시도
-            time.sleep(_backoff(attempt))
-            continue
-        if r.status_code == 429 or r.status_code >= 500:  # 레이트리밋/일시적 서버오류 → 지수 백오프 재시도
-            time.sleep(_backoff(attempt))
-            continue
-        r.raise_for_status()
-        time.sleep(req_sleep)
-        return r.json()
-    raise RuntimeError(f"upbit fetch failed after retries: {params}")
+    """분봉 1페이지 — 공용 재시도 GET에 위임(시그니처 보존)."""
+    return get_json(_URL.format(unit=unit), params, client=client,
+                    max_retries=_MAX_RETRIES, max_backoff=_MAX_BACKOFF, req_sleep=req_sleep)
 
 
 def _scan_dt(path: str):

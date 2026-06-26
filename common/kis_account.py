@@ -5,8 +5,6 @@
 인증 헤더(appkey/appsecret/tr_id/Bearer)는 공통 구성, 토큰은 kis_client 캐시 사용.
 출처: KIS Developers — 국내 inquire-balance(TTTC8434R), 해외 inquire-balance(TTTS3012R).
 """
-import httpx
-
 from common.config import (
     KIS_ACCOUNT_NO,
     KIS_APPKEY,
@@ -15,11 +13,13 @@ from common.config import (
     KIS_REST_BASE,
 )
 from common.constants import (
+    BROKER_TIMEOUT,
     KIS_DEFAULT_CURRENCY,
     KIS_DEFAULT_EXCHANGE,
     KIS_TR_DOMESTIC_BALANCE,
     KIS_TR_OVERSEAS_BALANCE,
 )
+from common.http_client import get_json
 from common.kis_client import get_access_token
 
 
@@ -49,9 +49,7 @@ def _headers(tr_id: str) -> dict:
 
 
 def _get(path: str, tr_id: str, params: dict) -> dict:
-    r = httpx.get(f"{KIS_REST_BASE}{path}", headers=_headers(tr_id), params=params, timeout=15.0)
-    r.raise_for_status()
-    body = r.json()
+    body = get_json(f"{KIS_REST_BASE}{path}", params, headers=_headers(tr_id), timeout=BROKER_TIMEOUT)
     if str(body.get("rt_cd")) != "0":
         raise RuntimeError(f"KIS 조회 실패({tr_id}): {body.get('msg_cd')} {body.get('msg1')}")
     return body

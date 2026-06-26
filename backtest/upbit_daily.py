@@ -5,13 +5,13 @@
 candles_1d는 ReplacingMergeTree(updated_at)라 (symbol, window_start) 재기록이 멱등 병합된다(재실행 안전).
 재시도/백오프는 분봉 수집(upbit_candles)과 동일 house 패턴을 재사용한다.
 """
-import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
 from common.constants import COLUMNS_CANDLES, HTTP_PAGE
-from backtest.upbit_candles import _MAX_RETRIES, _backoff, _parse_dt
+from common.http_client import get_json
+from backtest.upbit_candles import _parse_dt
 
 _URL = "https://api.upbit.com/v1/candles/days"
 _PAGE = HTTP_PAGE
@@ -19,19 +19,8 @@ _COLUMNS = COLUMNS_CANDLES
 
 
 def _get(client: httpx.Client, params: dict, req_sleep: float) -> list:
-    for attempt in range(_MAX_RETRIES):
-        try:
-            r = client.get(_URL, params=params)
-        except httpx.TransportError:                       # 타임아웃/연결오류 → 지수 백오프
-            time.sleep(_backoff(attempt))
-            continue
-        if r.status_code == 429 or r.status_code >= 500:   # 레이트리밋/일시적 서버오류 → 지수 백오프
-            time.sleep(_backoff(attempt))
-            continue
-        r.raise_for_status()
-        time.sleep(req_sleep)
-        return r.json()
-    raise RuntimeError(f"upbit daily fetch failed after retries: {params}")
+    """일봉 1페이지 — 공용 재시도 GET에 위임."""
+    return get_json(_URL, params, client=client, req_sleep=req_sleep)
 
 
 def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: float = 0.12, log=print) -> list:

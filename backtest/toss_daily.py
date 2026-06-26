@@ -6,14 +6,13 @@
 stock_candles_1d는 ReplacingMergeTree(updated_at)라 (symbol, window_start) 재기록이 멱등(재실행 안전).
 재시도/백오프는 업비트 수집(upbit_candles)과 동일 house 패턴을 재사용한다.
 """
-import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from backtest.upbit_candles import _MAX_RETRIES, _backoff
 from common.config import TOSS_REST_BASE
 from common.constants import COLUMNS_STOCK_CANDLES_1D, HTTP_PAGE
+from common.http_client import get_json
 from common.toss_client import get_access_token
 
 _URL = f"{TOSS_REST_BASE}/api/v1/candles"
@@ -23,21 +22,9 @@ _COLUMNS = COLUMNS_STOCK_CANDLES_1D
 
 
 def _get(client: httpx.Client, params: dict, headers: dict, req_sleep: float) -> dict:
-    """캔들 1페이지 result를 반환. 429/5xx·전송오류는 지수 백오프로 재시도."""
-    for attempt in range(_MAX_RETRIES):
-        try:
-            r = client.get(_URL, params=params, headers=headers)
-        except httpx.TransportError:                       # 타임아웃/연결오류 → 지수 백오프
-            time.sleep(_backoff(attempt))
-            continue
-        if r.status_code == 429 or r.status_code >= 500:   # 레이트리밋/일시적 서버오류 → 지수 백오프
-            time.sleep(_backoff(attempt))
-            continue
-        r.raise_for_status()
-        time.sleep(req_sleep)
-        body = r.json()
-        return body.get("result", body)
-    raise RuntimeError(f"toss daily fetch failed after retries: {params}")
+    """캔들 1페이지 result를 반환 — 공용 재시도 GET에 위임."""
+    body = get_json(_URL, params, headers=headers, client=client, req_sleep=req_sleep)
+    return body.get("result", body)
 
 
 def fetch_daily(symbol: str, days: int, req_sleep: float = 0.25, log=print) -> list:

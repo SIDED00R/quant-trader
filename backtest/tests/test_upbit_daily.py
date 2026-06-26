@@ -3,6 +3,7 @@ import unittest
 from datetime import datetime, timezone
 from unittest import mock
 
+from common import http_client as _hc
 from backtest import upbit_daily as ud
 
 
@@ -48,7 +49,7 @@ def _run(pages, days=4000, complete_until="2026-06-20"):
     cu = datetime.fromisoformat(f"{complete_until}T00:00:00").replace(tzinfo=timezone.utc)
     client = _Client(pages)
     with mock.patch.object(ud.httpx, "Client", return_value=client), \
-         mock.patch.object(ud.time, "sleep"):
+         mock.patch.object(_hc.time, "sleep"):
         rows = ud.fetch_daily("KRW-BTC", days, cu, req_sleep=0, log=lambda *a: None)
     return rows, client
 

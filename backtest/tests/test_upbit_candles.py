@@ -14,6 +14,7 @@ from unittest import mock
 
 import httpx
 
+from common import http_client as _hc
 from backtest import upbit_candles as uc
 from backtest.upbit_candles import _HEADER, cache_path, load
 
@@ -207,7 +208,7 @@ class TestUpbitBackfill(unittest.TestCase):
 
     def test_get_retries_on_429_then_succeeds(self):
         client = _Client([_Resp(429), _Resp(429), _Resp(200, [{"x": 1}])])
-        with mock.patch.object(uc.time, "sleep") as sl:
+        with mock.patch.object(_hc.time, "sleep") as sl:
             out = uc._get(client, 1, {"market": "KRW-BTC", "count": 200}, req_sleep=0)
         self.assertEqual(out, [{"x": 1}])
         self.assertEqual(len(client.calls), 3)
@@ -216,14 +217,14 @@ class TestUpbitBackfill(unittest.TestCase):
     def test_get_retries_on_5xx_then_succeeds(self):
         # 일시적 5xx도 429처럼 재시도해야 한다(전체 백필이 한 번의 서버 오류로 죽지 않게)
         client = _Client([_Resp(503), _Resp(500), _Resp(200, [{"ok": True}])])
-        with mock.patch.object(uc.time, "sleep"):
+        with mock.patch.object(_hc.time, "sleep"):
             out = uc._get(client, 1, {"market": "KRW-BTC"}, req_sleep=0)
         self.assertEqual(out, [{"ok": True}])
         self.assertEqual(len(client.calls), 3)
 
     def test_get_raises_after_exhausting_retries(self):
         client = _Client([_Resp(429)] * uc._MAX_RETRIES)
-        with mock.patch.object(uc.time, "sleep"):
+        with mock.patch.object(_hc.time, "sleep"):
             with self.assertRaises(RuntimeError):
                 uc._get(client, 1, {"market": "KRW-BTC"}, req_sleep=0)
         self.assertEqual(len(client.calls), uc._MAX_RETRIES)
@@ -237,7 +238,7 @@ class TestUpbitBackfill(unittest.TestCase):
             p = os.path.join(d, "out.csv")
             with open(p, "w", newline="", encoding="utf-8") as fh:
                 w = csv.writer(fh)
-                with mock.patch.object(uc, "_PAGE", 2), mock.patch.object(uc.time, "sleep"):
+                with mock.patch.object(uc, "_PAGE", 2), mock.patch.object(_hc.time, "sleep"):
                     n = uc._fetch_backward(client, w, fh, "KRW-BTC", 1, None, None, far_future,
                                            req_sleep=0, log=lambda *a: None)
             with open(p, newline="", encoding="utf-8") as f:
@@ -256,7 +257,7 @@ class TestUpbitBackfill(unittest.TestCase):
             p = os.path.join(d, "out.csv")
             with open(p, "w", newline="", encoding="utf-8") as fh:
                 w = csv.writer(fh)
-                with mock.patch.object(uc, "_PAGE", 2), mock.patch.object(uc.time, "sleep"):
+                with mock.patch.object(uc, "_PAGE", 2), mock.patch.object(_hc.time, "sleep"):
                     uc._fetch_backward(client, w, fh, "KRW-BTC", 1, None, lower, 10 ** 15,
                                        req_sleep=0, log=lambda *a: None)
         self.assertEqual(len(client.calls), 1)  # oldest(02:00)<=lower → 1페이지 후 종료
@@ -272,7 +273,7 @@ class TestUpbitBackfill(unittest.TestCase):
             p = os.path.join(d, "out.csv")
             with open(p, "w", newline="", encoding="utf-8") as fh:
                 w = csv.writer(fh)
-                with mock.patch.object(uc.time, "sleep"):
+                with mock.patch.object(_hc.time, "sleep"):
                     uc._fetch_backward(client, w, fh, "KRW-BTC", 1, None, None, cu,
                                        req_sleep=0, log=lambda *a: None)
             with open(p, newline="", encoding="utf-8") as f:
