@@ -59,9 +59,14 @@ from common import rate_limit
 rate_limit.acquire("toss", "MARKET_DATA_CHART")
 r = httpx.get(...)
 
-# KIS 실전이면 rate로 덮어쓰기(모의 기본 5)
-rate_limit.acquire("kis", "rest", rate=20 if not KIS_MOCK else None)
+# KIS: 모의/실전 한도가 다름(5 vs 20). rate는 버킷 최초 생성 시에만 반영(first-wins)되므로,
+# 모드별로 group을 분리한다.
+rate_limit.acquire("kis", "rest-real" if not KIS_MOCK else "rest-mock",
+                   rate=20 if not KIS_MOCK else 5)
 ```
+
+- **균등 페이싱(기본)**: `capacity` 기본값 1 → 버스트 없이 `rate`개/초로 고르게. 토큰버킷 `capacity=rate`면 고정 1초 윈도우 경계에서 최대 ~2×rate가 통과할 수 있어, 엄격 한도에선 순간 초과 위험 → 기본은 버스트 없음. 버스트가 필요하면 `TokenBucket(rate, capacity=...)`로 명시.
+- **first-wins**: `(provider, group)` 버킷은 최초 생성 시 rate로 고정. 모드별 한도가 다르면 group을 나눈다(위 예).
 
 배선 대상(각 클라이언트 머지 후): `backtest/toss_daily.py`(toss:MARKET_DATA_CHART), `common/toss_client.py`(toss:AUTH), `common/kis_client.py`·`common/kis_account.py`(kis:rest), `backtest/upbit_daily.py`·`backtest/upbit_candles.py`(upbit:quotation), `ingester/stock_kiwoom.py` 등.
 

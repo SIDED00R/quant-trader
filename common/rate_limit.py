@@ -34,7 +34,10 @@ class TokenBucket:
 
     def __init__(self, rate: float, capacity: float | None = None):
         self.rate = float(rate)                       # 초당 충전 토큰 수
-        self.capacity = float(capacity if capacity is not None else rate)  # 버스트 상한
+        # capacity 기본 1 = 버스트 없는 균등 페이싱. 토큰버킷 cap=rate면 고정 1초 윈도우
+        # 경계에서 최대 ~2×rate까지 통과할 수 있어, 엄격 한도(예: KIS 실전 20)에선 순간 초과 위험.
+        # 버스트가 필요하면 capacity를 명시한다.
+        self.capacity = float(capacity if capacity is not None else 1.0)  # 버스트 상한
         self._tokens = self.capacity
         self._last = time.monotonic()
         self._lock = threading.Lock()
@@ -71,5 +74,10 @@ def limiter(provider: str, group: str, rate: float | None = None) -> TokenBucket
 
 
 def acquire(provider: str, group: str, n: int = 1, rate: float | None = None) -> None:
-    """요청 직전 호출 — 한도 내 토큰이 확보될 때까지 블록한다."""
+    """요청 직전 호출 — 한도 내 토큰이 확보될 때까지 블록한다.
+
+    rate는 해당 (provider, group) 버킷 **최초 생성 시에만** 반영된다(first-wins). 이후 다른
+    rate로 호출해도 무시되므로, 모드(모의/실전)별 한도가 다르면 group을 분리한다
+    (예: 'rest-mock' / 'rest-real').
+    """
     limiter(provider, group, rate).acquire(n)
