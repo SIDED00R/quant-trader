@@ -4,7 +4,7 @@
 응답 timestamp는 KR/US 모두 KST(+09:00) 표기 → 현지 날짜만 취해 00:00 UTC window_start로 정규화한다
 (하루 1행). 수정주가(adjusted=true) 기준으로 받는다(백테스트엔 수정주가가 적합).
 stock_candles_1d는 ReplacingMergeTree(updated_at)라 (symbol, window_start) 재기록이 멱등(재실행 안전).
-재시도/백오프는 업비트 수집(upbit_candles)과 동일 house 패턴을 재사용한다.
+재시도/백오프는 공용 common/http_client.get_json 에 위임한다.
 """
 from datetime import datetime, timedelta, timezone
 

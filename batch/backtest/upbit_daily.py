@@ -3,7 +3,7 @@
 일봉은 1행/일이라 수년치도 적은 호출로 받는다(분봉 대비 저비용 — 5년 ≈ 종목당 ~10요청).
 'to' 역방향 페이지네이션(200/요청). window_start=일 시작(UTC). 진행 중(미마감) 당일 봉은 종가 미확정이라 제외.
 candles_1d는 ReplacingMergeTree(updated_at)라 (symbol, window_start) 재기록이 멱등 병합된다(재실행 안전).
-재시도/백오프는 분봉 수집(upbit_candles)과 동일 house 패턴을 재사용한다.
+재시도/백오프는 공용 common/http_client.get_json 에 위임한다.
 """
 from datetime import datetime, timedelta, timezone
 
