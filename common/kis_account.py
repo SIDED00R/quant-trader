@@ -51,6 +51,14 @@ def _get(path: str, tr_id: str, params: dict) -> dict:
     return body
 
 
+def _summary(body: dict) -> dict:
+    """output2를 단일 계좌요약 dict로 정규화(국내=list, 해외=dict 모두 대응). 없으면 {}."""
+    out2 = body.get("output2")
+    if isinstance(out2, list):
+        return out2[0] if out2 else {}
+    return out2 if isinstance(out2, dict) else {}
+
+
 def fetch_domestic_balance() -> tuple[list, dict]:
     """국내 잔고. (보유종목 output1, 계좌요약 output2) 반환(원본 dict 그대로)."""
     cano, prdt = split_account()
@@ -65,8 +73,7 @@ def fetch_domestic_balance() -> tuple[list, dict]:
             "CTX_AREA_FK100": "", "CTX_AREA_NK100": "",
         },
     )
-    out2 = body.get("output2") or []
-    return body.get("output1", []), (out2[0] if isinstance(out2, list) and out2 else (out2 if isinstance(out2, dict) else {}))
+    return body.get("output1", []), _summary(body)
 
 
 def fetch_overseas_balance(exchange: str = "NASD", currency: str = "USD") -> tuple[list, dict]:
@@ -84,5 +91,4 @@ def fetch_overseas_balance(exchange: str = "NASD", currency: str = "USD") -> tup
             "CTX_AREA_FK200": "", "CTX_AREA_NK200": "",
         },
     )
-    out2 = body.get("output2") or {}
-    return body.get("output1", []), (out2[0] if isinstance(out2, list) and out2 else (out2 if isinstance(out2, dict) else {}))
+    return body.get("output1", []), _summary(body)
