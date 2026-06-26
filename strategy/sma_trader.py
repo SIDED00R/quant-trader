@@ -25,6 +25,7 @@ from collections import deque
 from decimal import Decimal
 
 from common.config import (
+    MIN_ORDER_KRW,
     SMA_LONG,
     SMA_SHORT,
     STRATEGY_CONFIRM_TICKS,
@@ -50,7 +51,6 @@ GROUP_ID = "strategy"
 SETTLE_SEC = 5.0       # 주문 후 체결 반영 전 중복 주문 방지 빠른 윈도우(이후엔 PENDING 조회로 확인)
 ACCOUNTS_TTL = 3.0     # auto_trade 계정 목록 캐시 TTL(초)
 POSITIONS_TTL = 1.5    # 보유 포지션 캐시 bulk 갱신 주기(초) — 매 틱 DB조회 제거(전체 종목 스케일링)
-MIN_ORDER_KRW = Decimal("5000")  # 업비트 최소 주문 금액(이하 매수 스킵)
 
 # 퍼센트 → 비율(Decimal)
 _STOP = STRATEGY_STOP_LOSS_PCT / Decimal(100)
