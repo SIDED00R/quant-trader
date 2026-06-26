@@ -189,67 +189,67 @@ services:
     <<: *app
     container_name: ingester
     profiles: ["app", "data"]
-    command: python -m ingester.upbit_ws
+    command: python -m streaming.ingester.upbit_ws
 
   sink:
     <<: *app
     container_name: sink
     profiles: ["app", "data"]
-    command: python -m sink.tick_clickhouse
+    command: python -m streaming.sink.tick_clickhouse
 
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
     <<: *app
     container_name: stock-ingester
     profiles: ["app", "data"]
-    command: python -m ingester.stock_kiwoom
+    command: python -m streaming.ingester.stock_kiwoom
 
   stock-sink:
     <<: *app
     container_name: stock-sink
     profiles: ["app", "data"]
-    command: python -m sink.stock_tick_clickhouse
+    command: python -m streaming.sink.stock_tick_clickhouse
 
   candle:
     <<: *app
     container_name: candle
     profiles: ["app", "data"]
-    command: python -m aggregator.candle
+    command: python -m streaming.aggregator.candle
 
   daily-aggregator:
     <<: *app
     container_name: daily-aggregator
     profiles: ["app", "data"]
-    command: python -m aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
+    command: python -m streaming.aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
 
   engine:
     <<: *app
     container_name: engine
-    command: python -m engine.matching
+    command: python -m trading.engine.matching
 
   portfolio:
     <<: *app
     container_name: portfolio
-    command: python -m portfolio.updater
+    command: python -m trading.portfolio.updater
 
   # 라이브 앙상블 파이프라인 (sma_trader 대체 — 이중 매매 방지로 단일 자동매매 경로 유지)
   ensemble-signals:
     <<: *app
     container_name: ensemble-signals
-    command: python -m strategy.live_ensemble    # candles_1d 워밍업 → 일봉 마감마다 strategy.signals 발행
+    command: python -m trading.strategy.live_ensemble    # candles_1d 워밍업 → 일봉 마감마다 strategy.signals 발행
 
   commander:
     <<: *app
     container_name: commander
-    command: python -m strategy.commander        # strategy.signals 소비 → 목표비중 모의주문(place_order)
+    command: python -m trading.strategy.commander        # strategy.signals 소비 → 목표비중 모의주문(place_order)
 
   relay:
     <<: *app
     container_name: relay
-    command: python -m relay.order_relay
+    command: python -m trading.relay.order_relay
 
   # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
-  # 라이브와 분리: `docker compose run --rm reeval python -m backtest.reeval_weights [--dry-run]`.
+  # 라이브와 분리: `docker compose run --rm reeval python -m batch.backtest.reeval_weights [--dry-run]`.
   # 5.5 Airflow DAG가 이 서비스를(또는 온디맨드 VM에서) 주기 실행한다. kafka 불요(postgres+clickhouse만).
   reeval:
     build:
@@ -269,7 +269,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-    command: python -m backtest.reeval_weights
+    command: python -m batch.backtest.reeval_weights
 
   # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
   # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=SSH 터널:
@@ -287,7 +287,7 @@ services:
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
       INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
-    command: python -m strategy.trade_once
+    command: python -m trading.strategy.trade_once
 
   api:
     <<: *app

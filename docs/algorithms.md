@@ -56,7 +56,7 @@ RSI·볼린저가 평균회귀 계열의 대표 구현이다. 추가 변형(z-sc
 | 볼린저 | `strategy/bollinger.py` | `BollingerStrategy` | `bollinger` | 평균회귀 |
 | 돌파 | `strategy/breakout.py` | `BreakoutStrategy` | `breakout` | 추세추종 |
 
-레지스트리(`strategy/registry.py`)에 등록되어 `python -m backtest.run --strategy <이름>`으로 선택한다.
+레지스트리(`strategy/registry.py`)에 등록되어 `python -m batch.backtest.run --strategy <이름>`으로 선택한다.
 
 ## 동작 확인 (sanity, KRW-BTC 90일 1분봉)
 

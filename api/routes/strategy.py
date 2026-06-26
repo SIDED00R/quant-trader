@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from common.config import ENSEMBLE_SYMBOLS
-from strategy.ensemble import EnsembleStrategy
+from trading.strategy.ensemble import EnsembleStrategy
 
 router = APIRouter(prefix="/strategy")
 

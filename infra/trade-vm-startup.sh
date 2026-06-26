@@ -40,7 +40,7 @@ sleep 5
 # ── 1회 매매(network_mode:host로 127.0.0.1 터널 접속) ──
 # --build: trade-once는 코드를 이미지에 굽는다(소스 볼륨 없음). 위 git reset 한 최신 소스로 매번 재빌드해야
 #          낡은 이미지의 옛 코드가 실행되는 것을 막는다(없으면 #94 결정 기록 코드가 영영 안 돌았음).
-docker compose --profile trade run --build --rm trade-once python -m strategy.trade_once 2>&1 | tee /var/log/trade-once.log
+docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
 
 # ── 정리 + self-stop ──
 pkill -f "ssh.*tunnel@" 2>/dev/null || true
