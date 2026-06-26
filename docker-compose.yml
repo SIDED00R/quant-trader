@@ -36,6 +36,11 @@ x-app: &app
     STRATEGY_CONFIRM_TICKS: ${STRATEGY_CONFIRM_TICKS:-2}
     STRATEGY_MIN_HOLD_SEC: ${STRATEGY_MIN_HOLD_SEC:-20}
     STRATEGY_WARMUP_SEC: ${STRATEGY_WARMUP_SEC:-30}
+    STOCK_SYMBOLS: ${STOCK_SYMBOLS:-005930,000660}
+    KIWOOM_MOCK: ${KIWOOM_MOCK:-true}
+    KIWOOM_APP_KEY: ${KIWOOM_APP_KEY:-}
+    KIWOOM_APP_SECRET: ${KIWOOM_APP_SECRET:-}
+    KIWOOM_ACCOUNT_NO: ${KIWOOM_ACCOUNT_NO:-}
   depends_on:
     kafka:
       condition: service_healthy
@@ -90,6 +95,7 @@ services:
       - |
         set -euo pipefail
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic market.ticks --partitions 6 --replication-factor 1 --config retention.ms=86400000
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic stock.ticks --partitions 6 --replication-factor 1 --config retention.ms=86400000
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic orders --partitions 6 --replication-factor 1 --config retention.ms=604800000
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic executions --partitions 6 --replication-factor 1 --config retention.ms=604800000
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic strategy.signals --partitions 6 --replication-factor 1 --config retention.ms=604800000
@@ -190,6 +196,19 @@ services:
     container_name: sink
     profiles: ["app", "data"]
     command: python -m sink.tick_clickhouse
+
+  # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
+  stock-ingester:
+    <<: *app
+    container_name: stock-ingester
+    profiles: ["app", "data"]
+    command: python -m ingester.stock_kiwoom
+
+  stock-sink:
+    <<: *app
+    container_name: stock-sink
+    profiles: ["app", "data"]
+    command: python -m sink.stock_tick_clickhouse
 
   candle:
     <<: *app

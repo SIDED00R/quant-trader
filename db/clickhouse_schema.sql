@@ -10,6 +10,18 @@ CREATE TABLE IF NOT EXISTS ticks (
 ENGINE = ReplacingMergeTree(ingest_ts)
 ORDER BY (symbol, seq);
 
+CREATE TABLE IF NOT EXISTS stock_ticks (
+    symbol     LowCardinality(String),
+    price      Float64,
+    volume     Float64,
+    side       LowCardinality(String),
+    trade_ts   DateTime64(3, 'UTC'),
+    seq        UInt64,
+    ingest_ts  DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingest_ts)
+ORDER BY (symbol, seq);
+
 CREATE TABLE IF NOT EXISTS candles_1m (
     symbol        LowCardinality(String),
     window_start  DateTime('UTC'),
