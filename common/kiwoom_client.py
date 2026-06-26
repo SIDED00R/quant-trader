@@ -4,20 +4,16 @@
 출처: docs/kiwoom.md §2 — POST {base}/oauth2/token, api-id au10001,
 바디 grant_type=client_credentials + appkey + secretkey, 응답 필드는 token(=access_token 아님).
 """
-import threading
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
 from common.config import KIWOOM_APP_KEY, KIWOOM_APP_SECRET, KIWOOM_REST_BASE
+from common.oauth_token import TokenCache
 
 _TOKEN_PATH = "/oauth2/token"
 _EXPIRY_MARGIN = timedelta(minutes=10)  # 만료 10분 전 선제 재발급
 _KST = timezone(timedelta(hours=9))
-
-_lock = threading.Lock()
-_token: str | None = None
-_expires_at = datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _parse_expiry(expires_dt: str | None) -> datetime:
@@ -54,12 +50,9 @@ def _request_token() -> tuple[str, datetime]:
     return body["token"], _parse_expiry(body.get("expires_dt"))
 
 
+_cache = TokenCache(_request_token, _EXPIRY_MARGIN, "kiwoom")
+
+
 def get_access_token(force: bool = False) -> str:
     """유효한 접근토큰 반환(만료 임박 또는 force=True면 재발급)."""
-    global _token, _expires_at
-    with _lock:
-        now = datetime.now(timezone.utc)
-        if force or _token is None or now >= _expires_at - _EXPIRY_MARGIN:
-            _token, _expires_at = _request_token()
-            print(f"[kiwoom] 접근토큰 발급 (만료 {_expires_at.isoformat()})")
-        return _token
+    return _cache.get(force)
