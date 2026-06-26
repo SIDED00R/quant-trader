@@ -39,5 +39,5 @@ docker compose --profile app --profile data --profile batch --profile trade down
 docker compose --profile data up -d --build             # db-init(스키마, candles_1d 포함)은 의존성으로 자동 실행
 
 # 일봉(candles_1d)은 디스크 볼륨에 영속 → 최초 1회만 백필 필요(부팅마다 X). 미적재 시:
-#   docker compose run --rm commander python -m backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
+#   docker compose run --rm commander python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
 echo "STARTUP_DONE"

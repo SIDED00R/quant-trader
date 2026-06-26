@@ -6,13 +6,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY common ./common
-COPY ingester ./ingester
-COPY sink ./sink
-COPY aggregator ./aggregator
-COPY engine ./engine
-COPY portfolio ./portfolio
-COPY strategy ./strategy
-COPY relay ./relay
+COPY streaming ./streaming
+COPY trading ./trading
 COPY api ./api
 COPY scripts ./scripts
 COPY db ./db

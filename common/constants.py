@@ -17,6 +17,8 @@ COLUMNS_STOCK_CANDLES_1D = [
 HTTP_PAGE = 200            # 캔들/시세 페이지당 최대 레코드
 HTTP_MAX_RETRIES = 6       # 429/5xx/전송오류 재시도 횟수
 HTTP_MAX_BACKOFF = 30.0    # 지수 백오프 상한(초) — REST 재시도·WS 재연결 공통
+HTTP_TIMEOUT = 20.0        # 캔들/시세 수집 REST 타임아웃(초)
+BROKER_TIMEOUT = 15.0      # 브로커 인증/조회 REST 타임아웃(초)
 
 # ── KIS 잔고 TR·기본 코드 (불투명 식별자 → 의미 부여) ──
 KIS_TR_DOMESTIC_BALANCE = "TTTC8434R"   # 국내 잔고(모의는 V접두로 토글)

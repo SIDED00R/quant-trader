@@ -216,48 +216,51 @@ candles_1m(
 
 ## 7. 컴포넌트 (파일 단일 책임 원칙)
 
+> 폴더는 **실행 단계**를 드러낸다: `streaming/`(수집→집계) → `trading/`(신호→체결). `batch/`·`api/`·`common/`은 직교(파이프라인 단계 아님).
+
 ```
 kafka_project/
 ├── docker-compose.yml          # Kafka(KRaft) + Postgres + ClickHouse + Grafana
-├── DESIGN.md
-├── README.md
-├── .env.example
-├── pyproject.toml / requirements.txt
+├── Dockerfile / Dockerfile.batch
+├── DESIGN.md / README.md / .env.example / requirements.txt
 │
-├── common/
-│   ├── config.py               # 환경변수/설정 로딩
-│   ├── kafka_client.py         # producer/consumer 팩토리
-│   └── schemas.py              # tick/order/execution dataclass
+├── common/                     # 공용 라이브러리 (파이프라인 단계 아님)
+│   ├── config.py · constants.py            # 설정 / 고정 상수(컬럼리스트·HTTP·KIS TR)
+│   ├── kafka_client.py · clickhouse_client.py · postgres_client.py
+│   ├── http_client.py · oauth_token.py     # 공용 HTTP 재시도 / 토큰 캐시
+│   ├── schemas.py · candles.py · rate_limit.py
+│   └── kiwoom_client · toss_client · kis_client · kis_account
 │
-├── ingester/
-│   └── upbit_ws.py             # 업비트 WS → market.ticks  (기능 1)
+├── streaming/                  # 연속 데이터: 수집 → 적재 → 집계
+│   ├── ingester/   upbit_ws · stock_kiwoom          # 시세 → Kafka market/stock.ticks
+│   ├── sink/       tick_clickhouse · stock_tick_clickhouse   # ticks → ClickHouse
+│   └── aggregator/ candle(1m) · daily(1d)
 │
-├── sink/
-│   └── tick_clickhouse.py      # market.ticks → ClickHouse  (기능 2)
+├── trading/                    # 신호 → 체결
+│   ├── strategy/   ensemble · trend · live_ensemble · commander · trade_once …
+│   ├── engine/     matching                          # orders+ticks → executions
+│   ├── portfolio/  updater                           # executions → Postgres 잔고/포지션
+│   └── relay/      order_relay                        # outbox → orders 토픽
 │
-├── api/
-│   ├── main.py                 # FastAPI 앱
-│   └── routes/
-│       ├── account.py          # 계좌/잔고 조회
-│       ├── orders.py           # 주문 생성 → orders 토픽  (기능 3)
-│       └── portfolio.py        # 포트폴리오/손익 조회
+├── batch/                      # 오프라인/배치 (프로덕션 이미지 제외)
+│   └── backtest/   run · walkforward · metrics · upbit_daily · toss_daily …
 │
-├── engine/
-│   └── matching.py             # orders+ticks → executions  (기능 4)
-│
-├── portfolio/
-│   └── updater.py              # executions → Postgres 잔고/포지션  (기능 5)
-│
-├── aggregator/
-│   └── candle.py               # ticks → 1m 캔들 → ClickHouse  (기능 6)
-│
-├── db/
-│   ├── postgres_schema.sql
-│   └── clickhouse_schema.sql
-│
-└── dashboard/
-    └── grafana/                # 대시보드 정의(프로비저닝)
+├── api/        # FastAPI 대시보드/REST (서빙 — 직교)
+├── scripts/    # init_db 등 1회성 셋업
+├── db/         # 스키마 DDL (postgres_schema.sql · clickhouse_schema.sql)
+└── dashboard/  # Grafana 정의(프로비저닝)
 ```
+
+### 실행 순서 · 의존 맵 (A 완료 → B 가능)
+
+- `scripts.init_db` → 모든 서비스 (스키마 생성 선행)
+- `streaming.ingester` → `streaming.sink` · `streaming.aggregator` (market.ticks 흐름)
+- `streaming.aggregator.candle` → `.daily` (candles_1m → candles_1d)
+- `streaming.aggregator.daily` → `trading.strategy.live_ensemble` (candles_1d 워밍업)
+- `trading.strategy.live_ensemble` → `.commander` (strategy.signals)
+- `.commander` → `trading.relay` → `trading.engine` → `trading.portfolio` (orders → executions → 잔고)
+- candles_1d 완성 → `trading.strategy.trade_once` (일 1회 온디맨드 배치)
+- candles_1d(전기간) → `batch.backtest.reeval_weights` (가중치 재평가)
 
 ---
 
