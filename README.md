@@ -1,114 +1,207 @@
 # coin-auto-trader
 
-실시간 코인 모의거래 시스템 — Kafka 기반 실시간 이벤트 파이프라인 학습 프로젝트.
+Kafka 기반 실시간 이벤트 파이프라인 학습 프로젝트 — 업비트 코인 시세를 상시 수집·저장하고, **일봉 추세추종 앙상블 전략**으로 가상 자금을 자동 매매하며, 체결·포트폴리오·손익을 대시보드로 보여준다. 주식(키움·토스·KIS)으로 확장 중.
 
-업비트 실시간 시세를 수집·저장하고, **일봉 추세추종 앙상블 전략**으로 가상 자금을 자동 매매하며, 체결·포트폴리오·손익을 대시보드로 보여준다. 데이터 수집은 상시, 매매는 일봉 1회(온디맨드)로 분리한 구조다.
+> **이 문서 하나로 전체 파악**을 목표로 한다: 무엇이 / 어디에 / 어떻게 구현돼 있고 / 어떻게 돌아가는지.
+> 설계 배경·의사결정은 [DESIGN.md](DESIGN.md)·[project_flow.md](project_flow.md), 로드맵은 [TODO.md](TODO.md), 배포는 [DEPLOY.md](DEPLOY.md).
 
-## 아키텍처 개요
+---
+
+## 1. 한눈에
+
+| 축 | 내용 |
+|----|------|
+| **핵심 흐름** | 수집(상시) → 저장 → 집계(캔들) → 신호(일봉) → 체결 → 잔고/손익 → 대시보드 |
+| **메시지 버스** | Apache Kafka (KRaft) — 틱 1스트림을 여러 소비자에 **팬아웃** |
+| **OLTP** | PostgreSQL — 계좌/주문/포지션/체결/전략가중치 (outbox 패턴) |
+| **OLAP** | ClickHouse — 틱/캔들(1분·일봉)/분석 |
+| **API·대시보드** | FastAPI + Grafana (+ Caddy 자동 HTTPS) |
+| **전략** | 일봉 저회전 추세추종 앙상블(5/40·10/60·20/100), walk-forward·Deflated Sharpe 검증 |
+| **배포** | GCP **2-VM** — 상시 데이터 VM + Cloud Scheduler가 매일 01:00 UTC 켜는 온디맨드 매매 VM |
+| **확장(진행)** | 주식: 키움(틱·인증)·토스(일봉 데이터)·KIS(모의 체결) |
+
+---
+
+## 2. 아키텍처 & 데이터 흐름
 
 ```
-[수집·저장 (상시)]
-업비트 WS → ingester → [Kafka market.ticks] ─┬→ sink → ClickHouse(틱)
-                                             └→ candle → 1분봉 → daily-aggregator → 일봉(candles_1d)
-[자동매매]
-live_ensemble (일봉 마감마다 부하별 목표비중 신호)
-trade_once (일봉 합성 목표비중 → 주문·체결 동기 처리) → PostgreSQL(계좌/주문/포지션)
-[조회] FastAPI 대시보드 · Grafana
+[수집·저장 — 상시]
+업비트 WS ─ streaming/ingester ─▶ (Kafka market.ticks) ─┬─▶ streaming/sink ─────▶ ClickHouse(ticks)
+                                                        └─▶ streaming/aggregator/candle ─▶ candles_1m
+                                                                    └─ aggregator/daily ─▶ candles_1d
+
+[자동매매 — 일봉 1회(프로덕션) / 스트리밍(로컬)]
+trading/strategy/live_ensemble ─(Kafka strategy.signals)─▶ trading/strategy/commander
+   └─▶ order_outbox ─▶ trading/relay ─(Kafka orders)─▶ trading/engine ─(Kafka executions)─▶ trading/portfolio ─▶ PostgreSQL
+trading/strategy/trade_once  ── (프로덕션 라이브 경로: 일봉 합성 목표 → 동기 주문·체결 → PostgreSQL)
+
+[조회] api (FastAPI 대시보드/REST) · Grafana
 ```
 
-- **메시지**: Apache Kafka (KRaft) — 틱 한 스트림을 적재·집계 소비자에게 **팬아웃**
-- **OLTP**: PostgreSQL (잔고/주문/포지션/전략가중치, outbox 패턴)
-- **OLAP**: ClickHouse (틱/캔들/분석)
-- **API/대시보드**: FastAPI + Grafana (+ Caddy 자동 HTTPS)
-- **전략**: 일봉 저회전 추세추종 앙상블(5/40·10/60·20/100), walk-forward·Deflated Sharpe 검증 (`docs/model.md`)
-- **프로덕션 배포**: **2-VM** — 상시 데이터 VM + Cloud Scheduler가 매일 01:00 UTC 켜는 온디맨드 매매 VM([DEPLOY.md](DEPLOY.md) §11)
+- **메시지 흐름**: `market.ticks` → (sink·candle) 팬아웃 → `candles_1m` → `candles_1d` → `strategy.signals` → `orders` → `executions`.
+- **두 매매 경로**: 프로덕션은 `trade_once`(일 1회 동기 배치). 스트리밍 경로(`commander`/`relay`/`engine`/`portfolio`)는 로컬 개발·디버깅용으로 함께 존재.
+- **OLTP/OLAP 분리**: 정확성 필요한 계좌·주문은 Postgres(`Decimal`/`NUMERIC`), 대량 분석은 ClickHouse(`Float64`).
 
-> 참고: 위 자동매매 외에, 수동 주문 API(`POST /orders`)와 실시간 스트리밍 체결 파이프라인(`commander`/`engine`/`portfolio`)도 코드로 존재한다(로컬 개발·디버깅용). 프로덕션 라이브 매매 경로는 `trade_once`(동기 배치)다.
+---
 
-전체 설계/흐름은 [DESIGN.md](DESIGN.md) · [project_flow.md](project_flow.md) 참고.
+## 3. 폴더 구조 — 어디에 뭐가 있나
 
-## 로컬 실행 (인프라)
+폴더가 **실행 단계**를 드러낸다: `streaming/`(수집→집계) → `trading/`(신호→체결). `batch/`·`api/`·`common/`은 직교(파이프라인 단계 아님).
+
+### `common/` — 공용 라이브러리 (파이프라인 단계 아님, 프로덕션·배치 공용)
+| 모듈 | 역할 |
+|------|------|
+| `config.py` | 환경변수/런타임 설정 로딩 |
+| `constants.py` | 중복·동기화 위험 고정 상수 단일 출처(CH 컬럼리스트·HTTP 한도·KIS TR 등) |
+| `schemas.py` | 이벤트 직렬화 모델(Tick/Order/Signal/Execution) |
+| `kafka_client.py` · `clickhouse_client.py` · `postgres_client.py` | 각 인프라 연결 팩토리 |
+| `schema_loader.py` | `.sql` 스키마를 DB에 적용 |
+| `http_client.py` | 429/5xx 지수 백오프 GET (Upbit·Toss·KIS 공용 재시도) |
+| `oauth_token.py` | 스레드 안전 토큰 캐시·선제 재발급(키움/토스/KIS 공용) |
+| `rate_limit.py` | 클라이언트측 레이트리밋(제공자×그룹 토큰버킷) |
+| `candles.py` | candles_1d 종가 스트림(프로덕션 안전 — backtest 비의존) |
+| `strategy_weights.py` | strategy_weights 읽기 + 동일가중 폴백 |
+| `order_writer.py` | orders + order_outbox 원자적 INSERT(outbox) |
+| `symbols.py` · `upbit_markets.py` | 거래 종목 목록 해석 / 업비트 마켓 메타 |
+| `kiwoom_client.py` · `toss_client.py` · `kis_client.py` | 키움/토스/KIS OAuth2 토큰(공용 `oauth_token` 사용) |
+| `kis_account.py` | KIS 국내·해외 잔고 조회 |
+| `kis_order.py` | KIS KR/US 단건 모의 주문 *(PR #117 — 검토 중)* |
+
+### `streaming/` — 연속 데이터: 수집 → 적재 → 집계
+| 모듈 | 역할 |
+|------|------|
+| `ingester/upbit_ws.py` | 업비트 WS 실시간 체결 → `market.ticks` |
+| `ingester/stock_kiwoom.py` | 키움 실시간 주식체결 → `stock.ticks` |
+| `sink/tick_clickhouse.py` · `sink/stock_tick_clickhouse.py` | ticks → ClickHouse 적재 |
+| `aggregator/candle.py` | `market.ticks` → 1분봉 `candles_1m` |
+| `aggregator/daily.py` | `candles_1m` → 일봉 `candles_1d` 리샘플 |
+
+### `trading/` — 신호 → 체결
+| 모듈 | 역할 |
+|------|------|
+| `strategy/base.py` | 전략 인터페이스 + 실행 어댑터 프로토콜 |
+| `strategy/indicators.py` | 기술 지표 순수 함수(SMA/RSI/MACD/BB/ATR…) |
+| `strategy/trend.py` · `trend_signal.py` | 저회전 추세추종 + 변동성 타게팅(히스테리시스 래치) |
+| `strategy/ensemble.py` | 다중 추세속도 앙상블 합성 목표비중 |
+| `strategy/sma.py`·`rsi.py`·`macd.py`·`bollinger.py`·`breakout.py`·`disciplined.py` | 개별 지표 전략(+공통 규율 베이스) |
+| `strategy/registry.py` | 이름 → 전략 클래스 조회 |
+| `strategy/live_ensemble.py` | 일봉 마감마다 부하별 목표비중 신호 발행 → `strategy.signals` |
+| `strategy/commander.py` | `strategy.signals` 소비 → 부하 가중합 목표로 모의주문 |
+| `strategy/trade_once.py` | **프로덕션 라이브 경로** — 일봉 목표로 동기 주문·체결 후 종료 |
+| `strategy/sma_trader.py` | (레거시) 실시간 틱 SMA 봇 |
+| `strategy/weight_policy.py` · `decision_record.py` | 가드된 가중치 산출 / 매매결정 분류 |
+| `engine/matching.py` | 주문 매칭(시장가/지정가) → `executions` |
+| `portfolio/updater.py` | `executions` → Postgres 잔고/포지션 |
+| `relay/order_relay.py` | order_outbox → `orders` 토픽 발행 |
+
+### `batch/` — 오프라인/배치 (프로덕션 이미지 제외, `Dockerfile.batch`)
+| 모듈 | 역할 |
+|------|------|
+| `backtest/run.py` | 백테스트 실행 CLI |
+| `backtest/engine.py`·`account.py`·`fills.py`·`models.py` | 봉 replay 엔진·계좌·체결모델·값타입 |
+| `backtest/datasource.py` | ClickHouse 캔들 replay |
+| `backtest/metrics.py`·`walkforward.py`·`report.py` | 지표·walk-forward(Deflated Sharpe)·리포트 |
+| `backtest/upbit_candles.py`·`upbit_daily.py`·`toss_daily.py` | Upbit 분봉/일봉·Toss 일봉 수집 |
+| `backtest/backfill*.py`·`csv_to_clickhouse.py` | 백필 CLI들(코인·주식 일봉, CSV→CH) |
+| `backtest/reeval_weights.py` | 부하 OOS 성과 → strategy_weights 갱신 |
+| `backtest/tests/` | 단위테스트(161개) |
+
+### 그 외
+| 폴더 | 역할 |
+|------|------|
+| `api/` | FastAPI 대시보드/REST — `main.py`(앱), `security.py`/`auth_google.py`(인증), `routes/`(account·orders·market·history·performance·strategy·decisions·autotrade·web) |
+| `scripts/` | `init_db.py`(스키마 1회 적용)·`reset_account.py`(모의 계정 리셋) |
+| `db/` | `postgres_schema.sql`·`clickhouse_schema.sql` |
+| `infra/` | GCP 기동 스크립트(`gce-startup.sh`·`trade-vm-startup.sh`) |
+| `dashboard/` | Grafana 프로비저닝/대시보드 |
+| `docs/` | 설계·전략·모델·한도 등 심화 문서 |
+
+---
+
+## 4. 어떻게 돌아가나 (실행 순서·의존)
+
+선행관계(A 완료 → B 가능):
+1. `scripts.init_db` → 모든 서비스 (스키마 생성 선행)
+2. `streaming.ingester` → `streaming.sink` · `streaming.aggregator` (market.ticks 흐름)
+3. `aggregator.candle` → `aggregator.daily` (candles_1m → candles_1d)
+4. `aggregator.daily` → `trading.strategy.live_ensemble` (candles_1d 워밍업)
+5. `live_ensemble` → `commander` → `relay` → `engine` → `portfolio` (orders → executions → 잔고)
+6. candles_1d 완성 → `trading.strategy.trade_once` (일 1회 온디맨드 배치)
+7. candles_1d(전기간) → `batch.backtest.reeval_weights` (가중치 재평가)
+
+**docker-compose 프로파일**(서비스 코드는 동일, 실행 묶음만 다름):
+- `app` — 로컬 풀스택(수집+스트리밍 매매+대시보드)
+- `data` — 프로덕션 데이터 VM(수집·저장·대시보드만)
+- `trade` — 온디맨드 1회 매매(`trade_once`)
+- `batch` — 부하 재평가 배치(`reeval_weights`, `Dockerfile.batch`)
+
+---
+
+## 5. 데이터 소스 & 브로커
+
+| 제공자 | 용도 | 상태 |
+|--------|------|------|
+| **업비트** | 코인 실시간 틱 + 분/일봉 백필 | 운영 |
+| **키움** | 주식 실시간 틱(`stock.ticks`) + 인증 | 모의 검증 완료(FID 보정 대기) |
+| **토스** | 주식 **일봉 데이터**(백테스트 입력, KR+US) | 운영(데이터 전용, WS 미지원) |
+| **KIS(한국투자)** | 주식 **모의 체결**(KR+US 통합) | 토큰·잔고 운영, 단건 주문 PR #117(평일 체결검증 대기) |
+
+> 분업: **데이터는 토스/업비트, 체결은 KIS(주식)/시뮬(코인)**. 호출 한도는 `common/rate_limit.py`로 일원화([docs/rate_limits.md](docs/rate_limits.md)).
+
+---
+
+## 6. 전략 & 백테스트
+
+- **채택 전략**: 일봉 저회전 추세추종 **앙상블**(5/40·10/60·20/100 다중 속도) + 변동성 타게팅. 과매매·수수료 출혈을 피하려 1분봉→일봉으로 전환한 결과(`project_flow.md`).
+- **검증**: walk-forward(롤링 IS/OOS) + **Deflated Sharpe**(시도 횟수 페널티). 모델 카드 [docs/model.md](docs/model.md), 베이스라인 [docs/baseline.md](docs/baseline.md).
+- **실행**: `python -m batch.backtest.run --source clickhouse --strategy ensemble ...` / `python -m batch.backtest.walkforward ...` (상세 [batch/backtest/README.md](batch/backtest/README.md)).
+
+---
+
+## 7. 로컬 실행 (퀵스타트)
 
 ```bash
-# 1) 환경변수 준비
-cp .env.example .env
+cp .env.example .env                       # 1) 환경변수 (브로커 키 등은 .env에만, gitignore)
+docker compose up -d                       # 2) 인프라(Kafka+Postgres+ClickHouse) + 토픽 생성
+.venv/Scripts/python -m scripts.init_db    # 2-1) DB 스키마 1회 적용
+docker compose ps                          # 3) 상태 확인
 
-# 2) 인프라 기동 (Kafka + PostgreSQL + ClickHouse + 토픽 자동 생성)
-docker compose up -d
+# 풀스택/데이터/매매/배치 (프로파일)
+docker compose --profile app  up -d --build
+docker compose --profile data up -d --build
+docker compose --profile trade run --rm trade-once python -m trading.strategy.trade_once
+docker compose --profile batch run --rm reeval
 
-# 2-1) DB 스키마 1회 적용 (앱 런타임과 분리)
-.venv/Scripts/python -m scripts.init_db
+# 개별 워커 디버깅(예)
+.venv/Scripts/python -m streaming.ingester.upbit_ws
+.venv/Scripts/python -m trading.portfolio.updater
+.venv/Scripts/python -m uvicorn api.main:app --port 8000
 
-# 3) 검증
-docker compose ps                                   # 컨테이너 상태 확인
-docker compose logs kafka-init                       # 생성된 토픽 목록 확인
-docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
-
-# 4) produce/consume 왕복 테스트
-docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
-  --bootstrap-server localhost:9092 --topic market.ticks   # 입력 후 메시지 타이핑
-docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 --topic market.ticks --from-beginning --max-messages 1
-
-# 종료
-docker compose down            # 컨테이너 제거 (볼륨 유지)
-docker compose down -v         # 볼륨까지 삭제
+# 테스트
+.venv/Scripts/python -m pytest batch/backtest/tests/ -q
 ```
 
-접속 정보: 웹 대시보드 `127.0.0.1:8000` · Kafka `127.0.0.1:9092` · PostgreSQL `127.0.0.1:5432` · ClickHouse HTTP `127.0.0.1:8123` · Grafana `127.0.0.1:3000` (admin/admin)
-(컨테이너 포트는 보안상 `127.0.0.1` 루프백에만 바인딩. Windows에서 `localhost`가 IPv6 `::1`로 풀리는 문제를 피하려 호스트 접속은 `127.0.0.1`을 사용합니다.)
+접속(보안상 `127.0.0.1` 루프백 바인딩): 대시보드 `127.0.0.1:8000` · Kafka `:9092` · PostgreSQL `:5432` · ClickHouse `:8123` · Grafana `:3000`. 대시보드는 2초 폴링, 시각은 KST 표시(UTC 저장).
 
-### 서비스 실행
+---
 
-docker-compose는 프로파일로 묶여 있다(서비스 코드는 동일, 실행 묶음만 다름):
+## 8. 배포
 
-```bash
-docker compose --profile app  up -d --build   # 로컬 풀스택(수집+스트리밍 매매+대시보드)
-docker compose --profile data up -d --build   # 프로덕션 데이터 VM(수집·저장·대시보드만)
-docker compose --profile trade run --rm trade-once python -m trading.strategy.trade_once   # 온디맨드 1회 매매
-docker compose --profile batch run --rm reeval                                     # 부하 재평가 배치
-```
+GCP **2-VM** — 상시 데이터 VM(수집·저장·대시보드) + Cloud Scheduler가 매일 01:00 UTC 켜는 온디맨드 매매 VM(`trade_once` 후 자가 종료, ~$25/월). 절차는 [DEPLOY.md](DEPLOY.md).
 
-개별 워커를 디버깅용으로 직접 돌릴 수도 있다(각각 별도 터미널):
+---
 
-```bash
-.venv/Scripts/python -m streaming.ingester.upbit_ws      # 업비트 WS → market.ticks
-.venv/Scripts/python -m streaming.sink.tick_clickhouse   # market.ticks → ClickHouse
-.venv/Scripts/python -m trading.engine.matching        # 체결 엔진(시장가)
-.venv/Scripts/python -m trading.portfolio.updater      # executions → 잔고/포지션
-.venv/Scripts/python -m trading.relay.order_relay      # 주문 outbox → orders 토픽
-.venv/Scripts/python -m uvicorn api.main:app --port 8000   # 주문 API
+## 9. 기술 스택 & 관련 문서
 
-# 주문 넣고 잔고 확인
-curl -X POST 127.0.0.1:8000/orders -H "Content-Type: application/json" \
-  -d '{"symbol":"KRW-BTC","side":"BUY","type":"MARKET","quantity":0.001}'
-curl 127.0.0.1:8000/accounts/demo
-```
+Python 3.13 · confluent-kafka · FastAPI/uvicorn · psycopg(Postgres) · clickhouse-connect · httpx · websockets · Docker Compose · Grafana · Caddy.
 
-### 웹 대시보드
-
-브라우저에서 `http://127.0.0.1:8000` 접속 → 실시간 시세·잔고·평가손익·주문·체결내역을 한 화면에서 확인(2초 폴링). 모든 시각은 **KST(Asia/Seoul)** 표시(데이터는 UTC 저장).
-
-- 외부 공개(인터넷)는 `.env` 에 `API_BIND=0.0.0.0` + `WEB_PASSWORD=<강한 비번>` 설정 시 Basic Auth로 보호. GCP 배포는 [DEPLOY.md](DEPLOY.md) §11 참고.
+- 설계/스키마: [DESIGN.md](DESIGN.md) · 시스템 근거·교훈: [project_flow.md](project_flow.md)
+- 배포(GCP 2-VM): [DEPLOY.md](DEPLOY.md) · 로드맵: [TODO.md](TODO.md)
+- 전략·모델: [docs/model.md](docs/model.md)·[docs/baseline.md](docs/baseline.md)·[docs/algorithms.md](docs/algorithms.md)
+- 키움: [docs/kiwoom.md](docs/kiwoom.md) · API 호출 한도: [docs/rate_limits.md](docs/rate_limits.md)
+- 백테스트 사용법: [batch/backtest/README.md](batch/backtest/README.md)
 
 ## 알려진 한계 (학습용 MVP)
-
-- **체결 엔진은 단일 인스턴스 전제**: 최신가·pending이 인메모리이고 ticks/orders가 별도 토픽이라, 컨슈머 그룹으로 스케일아웃하면 파티션 분배가 어긋나 동작이 깨진다. 재시작 직후 워밍업 구간에는 약간 과거 가격으로 체결될 수 있다(틱 재생 기반).
-- **정밀도 분리**: 금액·수량은 Postgres `NUMERIC` + Python `Decimal`로 무손실 처리. ClickHouse `ticks`는 분석용이라 `Float64`.
-- **모의 체결**: 사용자 간 호가 매칭 없이 실시간 최신가로 체결한다.
-
-## 진행 상태
-
-- [x] 0. 로컬 인프라 (docker-compose)
-- [x] 1. Market 수집기 (업비트 WS → market.ticks)
-- [x] 2. 틱 Sink → ClickHouse
-- [x] 3. 주문 API + Postgres 스키마
-- [x] 4. 체결 엔진 (시장가)
-- [x] 5. 포트폴리오 서비스
-- [x] 6. 캔들 집계기 → ClickHouse
-- [x] 7. 지정가 주문
-- [x] 8. Grafana 대시보드
-- [x] 9. GCP 배포 — **2-VM**(상시 데이터 + 온디맨드 매매), Cloud Scheduler ([DEPLOY.md](DEPLOY.md) §11)
-- [x] 10. 자동매매 전략 — 일봉 추세추종 앙상블 + walk-forward/Deflated Sharpe 검증 + 라이브(모의) 배포
-
-> 전략·인프라 로드맵 상세는 [TODO.md](TODO.md) · [project_flow.md](project_flow.md) 참고.
+- **체결 엔진 단일 인스턴스 전제**: 최신가·pending 인메모리라 컨슈머 그룹 스케일아웃 시 깨짐.
+- **모의 체결(코인)**: 사용자 간 호가 매칭 없이 실시간 최신가로 체결.
+- **정밀도**: 계좌·주문은 `Decimal`/`NUMERIC` 무손실, ClickHouse 분석용은 `Float64`.
