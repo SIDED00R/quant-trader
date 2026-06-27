@@ -121,6 +121,14 @@
 - [~] 주식용 알고리즘 백테스트·기준치 선별 (주식 데이터 기준) — 하니스 지원 완료(#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계). 기준치 선별·유니버스 확정은 잔여(ClickHouse 주식 일봉 적재 후 실행). *후속: `TREND_BARS_PER_YEAR`/연율화를 주식 거래일 ~252로 분기(현 코인 365 공용).*
 - [ ] 주식 모의매매 라이브 + 성과 검증
 
+### 8.1 인트라데이(분봉) 매매 연구·검증 (신규 트랙 — 플랜 `.claude/plans/rustling-sleeping-lovelace.md`)
+> 일 1회 → 분 단위(1~60분) 고빈도 탐색. 유니버스 KOSPI200+KOSDAQ150+S&P500+NASDAQ(~950, long-or-cash). 연구→검증→조건부배포, ML/DL 포함(GPU는 DL/RL 학습 시에만).
+- [x] **단계1 전수조사 (#126)** → `docs/intraday_research.md`. shortlist: ①변동성 타게팅 ②횡단면 종가직전 리버설(롱) ③횡단면 모멘텀/상대강도(롱) ④필터링 돌파(ORB) ⑤트리 ML(LightGBM). 제외: 단기반전 단독·페어(long-only破)·마이크로구조(호가 필요)·DL/RL 배포(연구트랙). 핵심: 비용(KR 매도세 0.20%)·생존편향·다중검정이 방법보다 중요.
+- [ ] 단계0 분봉 데이터 feasibility(`stock_candles_1m` 스키마·토스/키움/US 분봉 API·subset-first 백필·라이브 집계·point-in-time 유니버스)
+- [ ] 단계2 shortlist 구현(규칙/통계 + 트리 ML, 시장별 KR/US·US 세션)
+- [ ] 단계3 검증(분봉 연율화 보정·purged/embargo CV·DSR·비용/슬리피지 게이트·빈도 스윕) → `docs/intraday_baseline.md`
+- [ ] 단계4 조건부 배포(통과 시 분 스트리밍+KIS 체결, DL/RL시 GPU VM / 미통과 시 기각 문서화)
+
 ## 9단계 — 통합 자산배분
 - [ ] 전체 자산 100 기준 코인+주식 배분 정책 설계 (자산군 비중·리밸런싱)
 - [ ] 통합 대시보드 (코인+주식 합산 평가자산/손익)
