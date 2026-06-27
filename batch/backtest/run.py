@@ -91,8 +91,8 @@ def parse_args(argv=None):
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=REST 백필 캐시 / clickhouse=candles_1m·1d")
     p.add_argument("--ch-table", default="candles_1m",
-                   choices=["candles_1m", "candles_1d", "stock_candles_1d"],
-                   help="clickhouse 소스 테이블(1d=코인 장기 일봉, stock_candles_1d=주식 일봉)")
+                   choices=["candles_1m", "candles_1d", "stock_candles_1d", "stock_candles_1m"],
+                   help="clickhouse 소스 테이블(1d=코인 장기 일봉, stock_candles_1d=주식 일봉, stock_candles_1m=주식 분봉)")
     p.add_argument("--symbols", default="", help="쉼표 구분(upbit는 미지정 시 config SYMBOLS, clickhouse는 전체)")
     p.add_argument("--unit", type=int, default=1, help="분봉 단위(upbit 캐시 unit과 일치)")
     p.add_argument("--bar-min", type=int, default=0,

@@ -236,8 +236,8 @@ def parse_args(argv=None):
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=CSV 캐시(리샘플) / clickhouse=candles_1d 장기 일봉")
     p.add_argument("--ch-table", default="candles_1d",
-                   choices=["candles_1m", "candles_1d", "stock_candles_1d"],
-                   help="clickhouse 소스 테이블(candles_1d=코인 일봉, stock_candles_1d=주식 일봉)")
+                   choices=["candles_1m", "candles_1d", "stock_candles_1d", "stock_candles_1m"],
+                   help="clickhouse 소스 테이블(candles_1d=코인 일봉, stock_candles_1d=주식 일봉, stock_candles_1m=주식 분봉)")
     p.add_argument("--unit", type=int, default=1, help="캐시 분봉 단위(upbit)")
     p.add_argument("--bar-min", type=int, default=1440, help="리샘플 타임프레임 분(upbit, 기본 1440=일봉)")
     p.add_argument("--days", type=int, default=730, help="최근 N일(upbit 캐시 필터)")

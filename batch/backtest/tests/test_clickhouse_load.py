@@ -55,6 +55,11 @@ class TestDatasourceTableWhitelist(unittest.TestCase):
         from batch.backtest.datasource import _TABLES
         self.assertIn("stock_candles_1d", _TABLES)
 
+    def test_stock_minute_table_allowed(self):
+        # 주식 분봉 테이블은 화이트리스트에 포함(인트라데이 연구·검증 입력)
+        from batch.backtest.datasource import _TABLES
+        self.assertIn("stock_candles_1m", _TABLES)
+
 
 if __name__ == "__main__":
     unittest.main()
