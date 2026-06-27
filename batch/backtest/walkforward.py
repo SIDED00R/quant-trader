@@ -126,33 +126,48 @@ def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var, pe
     }
 
 
-def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log, periods_per_year=None):
-    """앙상블(고정 구성) walk-forward — IS 파라미터 선택 없이 각 OOS만 평가(n_trials=1 → PSR)."""
-    prime_bars = max(s.warmup_bars for s in EnsembleStrategy().signals)
+def _run_fixed(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, factory, name, prime_bars,
+               log, periods_per_year=None):
+    """고정 구성(IS 파라미터 선택 없음) walk-forward — 임의 전략 factory의 각 OOS만 평가(n_trials=1 → PSR)."""
     folds = _folds(bars[0].ts, bars[-1].ts, prime_bars * sample_sec, is_sec, oos_sec, step_sec)
     if not folds:
         return {"folds": [], "error": "기간이 짧아 fold 없음(IS+OOS+prime > 데이터)"}
     fold_results, combined_oos_rets = [], []
     for i, (_isp, _iss, oos_prime, oos_start, oos_end) in enumerate(folds, 1):
-        oosr = _evaluate(bars, lambda: EnsembleStrategy(), oos_prime, oos_start, oos_end,
-                         initial, fills, sample_sec)
+        oosr = _evaluate(bars, factory, oos_prime, oos_start, oos_end, initial, fills, sample_sec)
         if not oosr["rets"]:
             log(f"[wf] fold {i}: OOS 표본 부족(스킵)")
             continue
         combined_oos_rets.extend(oosr["rets"])
         fold_results.append({"fold": i, "params": None, "is_return": None, **oosr})
-        log(f"[wf] fold {i}: 앙상블 OOS {oosr['return']*100:+.1f}% ({oosr['num_trades']}거래)")
+        log(f"[wf] fold {i}: {name} OOS {oosr['return']*100:+.1f}% ({oosr['num_trades']}거래)")
     agg = _aggregate(fold_results, combined_oos_rets, sample_sec, 1, 0.0, periods_per_year)  # 고정구성 → N=1(PSR)
-    return {"folds": fold_results, "aggregate": agg, "strategy": "ensemble"}
+    return {"folds": fold_results, "aggregate": agg, "strategy": name}
+
+
+def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log, periods_per_year=None):
+    """앙상블(고정 구성) walk-forward."""
+    prime_bars = max(s.warmup_bars for s in EnsembleStrategy().signals)
+    return _run_fixed(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
+                      lambda: EnsembleStrategy(), "ensemble", prime_bars, log, periods_per_year)
 
 
 def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, strategy="trend", log=print,
-                    periods_per_year=None):
-    """walk-forward 실행 → fold별 OOS 성과 + 집계. strategy='trend'(그리드 선택) / 'ensemble'(고정 구성)."""
+                    periods_per_year=None, factory=None):
+    """walk-forward 실행 → fold별 OOS 성과 + 집계.
+
+    strategy='trend'(그리드 선택) / 'ensemble'(고정) / 그 외=임의 등록 전략(고정 구성, factory 필수).
+    """
     if not bars:
         return {"folds": [], "error": "no bars"}
     if strategy == "ensemble":
         return _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log, periods_per_year)
+    if strategy != "trend":                  # 임의 등록 전략(고정 구성) — factory가 fold별 새 인스턴스 생성
+        if factory is None:
+            return {"folds": [], "error": f"strategy='{strategy}'에는 factory가 필요합니다"}
+        prime_bars = getattr(factory(), "warmup_bars", 1)
+        return _run_fixed(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
+                          factory, strategy, prime_bars, log, periods_per_year)
     combos = _combos()
     # prime 길이 = 그리드 전 조합 중 최장 워밍업(전략의 실제 warmup_bars를 직접 읽음 — 공식 발산 방지)
     prime_bars = max(TrendStrategy(short=s, long=l).warmup_bars for s, l in combos)
@@ -237,8 +252,8 @@ def _print(result):
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="walk-forward (롤링 IS/OOS + Deflated/Probabilistic Sharpe)")
-    p.add_argument("--strategy", default="trend", choices=["trend", "ensemble"],
-                   help="trend=단일추세 그리드선택 / ensemble=다중속도 고정구성(채택안)")
+    p.add_argument("--strategy", default="trend",
+                   help="trend=그리드선택 / ensemble·xs_reversal·xs_momentum·orb·intraday_momentum 등=고정구성(레지스트리 이름)")
     p.add_argument("--symbols", default="", help="쉼표 구분(미지정 시 config SYMBOLS)")
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=CSV 캐시(리샘플) / clickhouse=candles_1d 장기 일봉")
@@ -292,10 +307,29 @@ def main(argv=None) -> int:
                 else "python -m batch.backtest.backfill --days {} --unit {}".format(args.days, args.unit))
         print(f"[wf] 0봉 — 먼저 백필: {hint}", file=sys.stderr)
         return 1
+    factory = None
+    if args.strategy not in ("trend", "ensemble"):   # 임의 등록 전략 → 고정구성 factory(fold별 새 인스턴스)
+        from trading.strategy.registry import get_strategy
+        if args.source == "clickhouse":
+            bar_min = 1 if args.ch_table in ("candles_1m", "stock_candles_1m") else 1440
+        else:
+            bar_min = args.bar_min or args.unit
+
+        def factory():
+            s = get_strategy(args.strategy)
+            if hasattr(s, "configure"):              # 횡단면/인트라데이: 봉 간격 주입
+                s.configure(bar_min)
+            return s
+        try:
+            factory()                                # 미등록 전략 조기 검출
+        except ValueError as e:
+            print(f"[wf] {e}", file=sys.stderr)
+            return 2
+
     ppy = ppy_fn(symbols[0], sample_sec) if symbols else None   # 자산군 인지 연율화(코인 무영향)
     result = run_walkforward(bars, initial, fills, sample_sec,
                              args.is_days * _DAY, args.oos_days * _DAY, args.step_days * _DAY,
-                             strategy=args.strategy, periods_per_year=ppy)
+                             strategy=args.strategy, periods_per_year=ppy, factory=factory)
     _print(result)
     return 0
 
