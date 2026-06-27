@@ -57,6 +57,7 @@ def print_summary(metrics: dict, meta: dict, engine) -> None:
     print(f"  손익비(PF)  : {('%.2f' % float(m['profit_factor'])) if m['profit_factor'] is not None else 'N/A'}")
     print(f"  평균이익    : {_num(m['avg_win'])}   평균손실: {_num(m['avg_loss'])}")
     print(f"  총수수료    : {_num(m['total_fees'])} KRW")
+    print(f"  총거래세    : {_num(m['total_tax'])} KRW")
     print(f"  평균보유    : {m['avg_holding_sec']:.0f}s")
     print("=" * 56)
 
@@ -66,10 +67,10 @@ def write_outputs(out_dir: str, engine, metrics: dict, meta: dict) -> None:
 
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["symbol", "qty", "entry_price", "exit_price", "buy_fee", "sell_fee",
+        w.writerow(["symbol", "qty", "entry_price", "exit_price", "buy_fee", "sell_fee", "sell_tax",
                     "pnl", "return_pct", "reason", "entry_ts", "exit_ts", "holding_sec"])
         for t in engine.closed_trades:
-            w.writerow([t.symbol, t.qty, t.entry_price, t.exit_price, t.buy_fee, t.sell_fee,
+            w.writerow([t.symbol, t.qty, t.entry_price, t.exit_price, t.buy_fee, t.sell_fee, t.sell_tax,
                         t.pnl, t.return_pct, t.reason, t.entry_ts, t.exit_ts, t.holding_sec])
 
     with open(os.path.join(out_dir, "equity.csv"), "w", newline="", encoding="utf-8") as f:

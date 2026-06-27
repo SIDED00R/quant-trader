@@ -47,6 +47,20 @@ class TestMetrics(unittest.TestCase):
         self.assertEqual(s["num_trades"], 0)
         self.assertEqual(s["win_rate"], Decimal("0"))
         self.assertIsNone(s["profit_factor"])
+        self.assertEqual(s["total_fees"], Decimal("0"))
+        self.assertEqual(s["total_tax"], Decimal("0"))
+
+    def test_trade_stats_total_fees_and_tax(self):
+        # 국내주식 거래(수수료+매도세) + 코인 거래(세금 0, 기본값) 혼합 집계
+        stock = ClosedTrade(
+            symbol="005930", qty=Decimal("10"), entry_price=Decimal("100"), exit_price=Decimal("110"),
+            buy_fee=Decimal("3"), sell_fee=Decimal("4"), pnl=Decimal("90"), return_pct=Decimal("0"),
+            reason="TAKE", entry_ts=0.0, exit_ts=5.0, sell_tax=Decimal("16"),
+        )
+        coin = _trade(5)  # buy_fee/sell_fee/sell_tax = 0(기본)
+        s = trade_stats([stock, coin])
+        self.assertEqual(s["total_fees"], Decimal("7"))   # (3+4)+(0+0) — 세금 미포함(불변)
+        self.assertEqual(s["total_tax"], Decimal("16"))   # 16+0 — 코인 기여 0
 
     def test_sharpe_edge_cases(self):
         self.assertEqual(annualized_sharpe([100.0], 525600), 0.0)        # 표본 부족

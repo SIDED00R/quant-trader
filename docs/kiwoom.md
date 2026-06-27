@@ -154,11 +154,11 @@
 | `api/routes/orders.py` | `api/routes/stock_orders.py`(신규) | orders.py 검증 미러 + 정수수량·장시간·세금 가드. main.py에 include_router 1줄 |
 | `api/web/index.html` 체결 패널 | 주식 체결 패널 1개 + `loadStockExecs()` | refresh() Promise.all에 추가. 평가자산 합산은 자산군 분리 필요(통합은 9단계) |
 
-### 체결·계좌 모델 확장점
-- **정수 주문단위**: `place_order`/`stock_orders` 진입부에서 `quantity.to_integral_value(ROUND_DOWN)`, <1주면 거부(절사 후 0주 조용한 미주문 방지 로그). 백테스트는 `backtest/engine.py` buy()/sell() 입구에서 동일 절사.
-- **매도 거래세**: `backtest/fills.py`에 `tax(price,qty)`(fee 스타일, SELL만), `account.apply_sell`의 `proceeds=price*qty-fee-tax`. 라이브는 키움 응답에 세금이 포함돼 오므로 응답 수수료/세금을 그대로 기록. `STOCK_SELL_TAX_RATE` config 추가.
-- **장 운영시간 게이트**: 신규 `common/market_hours.py`에 `is_market_open(symbol, ts)`(코인=항상 True, 주식=KRX 09:00–15:30 KST+휴장일). 단건 검증 단계에선 장외 주문 거부/접수표시로 충분.
-- **라이브-백테스트 수학 미러링**(account.py 도크스트링 계약): 세금·정수화는 두 경로 동시 반영.
+### 체결·계좌 모델 확장점 — ✅ 백테스트 반영 완료(#120/PR#121), 라이브 가드는 #5 이월
+- **정수 주문단위**: ✅ 백테스트 `backtest/engine.py`의 `_adjust_qty`(주식 `to_integral_value(ROUND_DOWN)`, <1주 skip 로그; 코인 무영향). 라이브 `place_order`/`stock_orders` 진입부 절사는 단건 주문 검증(#5) 때 적용.
+- **매도 거래세**: ✅ `backtest/fills.py:tax(symbol,price,qty)`(**국내주식만** 0.20%, 미국·코인=0), `account.apply_sell(tax=...)`의 `proceeds=price*qty-fee-tax`, `models.ClosedTrade.sell_tax`. `STOCK_SELL_TAX_RATE` config 추가. 라이브는 키움/KIS 응답의 수수료/세금을 그대로 기록.
+- **장 운영시간 게이트**: ✅ 신규 `common/market_hours.py`(`asset_class`·`is_coin`·`is_stock`·`is_market_open(symbol, now=None)` — 코인 항상 True, 국내주식 KRX 평일 09:00–15:30 KST, 미국주식 미지원=False). 휴장일 캘린더·라이브 주문 게이트는 #5.
+- **라이브-백테스트 수학 미러링**(account.py 도크스트링 계약): ✅ 백테스트(세금·정수화) 반영, 라이브 미러링은 #5.
 
 ## 8. 종목 유니버스 선정 논의
 
