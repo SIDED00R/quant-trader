@@ -145,6 +145,13 @@ ENSEMBLE_SYMBOLS = [s.strip() for s in os.getenv("ENSEMBLE_SYMBOLS", "KRW-BTC,KR
 # ⚠️ 적응 가중치는 과적합 위험(walk-forward에서 고정>최적화). 검증 전까지 기본 off.
 ENSEMBLE_ADAPTIVE = os.getenv("ENSEMBLE_ADAPTIVE", "false").strip().lower() in ("1", "true", "yes")
 
+# ── 횡단면(인트라데이) 전략 (strategy/cross_sectional.py) ──
+# 매 봉 전 종목을 랭킹해 상위 N을 동일가중 long-or-cash로 보유(research §2.4 롱 다리). 회전율 억제가 1차 생존조건.
+XS_LOOKBACK = int(os.getenv("XS_LOOKBACK", "30"))            # 랭킹 수익률 산출 룩백(봉)
+XS_TOP_N = int(os.getenv("XS_TOP_N", "10"))                 # 보유 상위 종목 수
+XS_REBALANCE_BAND = Decimal(os.getenv("XS_REBALANCE_BAND", "0.3"))  # 목표 드리프트 밴드(저회전 — decide와 공유)
+XS_MAX_WEIGHT = Decimal(os.getenv("XS_MAX_WEIGHT", "0.2"))  # 종목당 비중 상한(동일가중 1/N과 min)
+
 # ── 부하 재평가 잡 가중치 정책(5.4, backtest/reeval_weights.py) ──
 # 보수적 가드: "최적화로 향상"이 아니라 "열화 부하 자동 강등"이 목적. 동일가중 기준 소폭 이탈만 허용.
 # 각 가중치 하한/상한 = 동일가중 × 배수(부하 수 무관). floor>0 → demote≠delete(완전 제거 금지).

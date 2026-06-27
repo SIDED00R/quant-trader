@@ -137,6 +137,11 @@ def main(argv=None) -> int:
         print(f"[backtest] 잘못된 인자(--initial/--fee/--slippage-bps/--strategy): {e}", file=sys.stderr)
         return 2
 
+    if hasattr(strategy, "configure"):   # 횡단면 전략: 데이터 봉 간격(분) 주입 — 봉키 정규화 기준
+        bar_min = (args.bar_min or args.unit) if args.source == "upbit" else (
+            1 if args.ch_table in ("candles_1m", "stock_candles_1m") else 1440)
+        strategy.configure(bar_min)
+
     account = BacktestAccount(initial)
     engine = BacktestEngine(account, fills, equity_sample_sec=args.sample_sec)
 

@@ -5,6 +5,7 @@
 from trading.strategy.base import Strategy
 from trading.strategy.bollinger import BollingerStrategy
 from trading.strategy.breakout import BreakoutStrategy
+from trading.strategy.cross_sectional import XSMomentumStrategy, XSReversalStrategy
 from trading.strategy.ensemble import EnsembleStrategy
 from trading.strategy.macd import MACDStrategy
 from trading.strategy.rsi import RSIStrategy
@@ -19,6 +20,8 @@ _REGISTRY: dict[str, type[Strategy]] = {
     BreakoutStrategy.name: BreakoutStrategy,
     TrendStrategy.name: TrendStrategy,
     EnsembleStrategy.name: EnsembleStrategy,
+    XSReversalStrategy.name: XSReversalStrategy,
+    XSMomentumStrategy.name: XSMomentumStrategy,
 }
 
 

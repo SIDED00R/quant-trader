@@ -48,6 +48,12 @@ class BacktestEngine:
     def open_symbol_count(self) -> int:
         return len(self.account.positions)
 
+    def iter_positions(self) -> list[str]:
+        return list(self.account.positions)   # 보유 심볼(횡단면 리밸런싱 청산 대상)
+
+    def price(self, symbol: str) -> Decimal:
+        return self.last_price.get(symbol, Decimal(0))   # 체결 기준가(사이징=체결 일치)
+
     def _adjust_qty(self, symbol: str, qty: Decimal) -> Decimal:
         """주식=정수 주 내림(ROUND_DOWN, 1주 미만은 0 → 호출측 skip). 코인=원본 그대로(무영향)."""
         if not is_stock(symbol):
@@ -57,22 +63,22 @@ class BacktestEngine:
             _log.info("skip %s: 1주 미만 주문 무시(정수단위, qty=%s)", symbol, qty)
         return floored
 
-    def buy(self, symbol: str, qty: Decimal, ts: float) -> bool:
+    def buy(self, symbol: str, qty: Decimal, ts: float, price: Decimal | None = None) -> bool:
         qty = self._adjust_qty(symbol, qty)
         if qty <= 0:
             return False
-        mp = self.last_price.get(symbol)
+        mp = price if price is not None else self.last_price.get(symbol)   # 명시가=호출측 일관 체결(횡단면)
         if mp is None or mp <= 0:
             return False
         fp = self.fills.fill_price("BUY", mp)
         fee = self.fills.fee(fp, qty)
         return self.account.apply_buy(symbol, fp, qty, fee, ts)
 
-    def sell(self, symbol: str, qty: Decimal, reason: str, ts: float) -> bool:
+    def sell(self, symbol: str, qty: Decimal, reason: str, ts: float, price: Decimal | None = None) -> bool:
         qty = self._adjust_qty(symbol, qty)
         if qty <= 0:
             return False
-        mp = self.last_price.get(symbol)
+        mp = price if price is not None else self.last_price.get(symbol)
         if mp is None or mp <= 0:
             return False
         fp = self.fills.fill_price("SELL", mp)
