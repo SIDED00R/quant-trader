@@ -78,3 +78,25 @@ def periods_per_year(symbol: str, sample_sec: float) -> float:
     sess = _SESSION_SECONDS[kind]
     obs_per_day = max(1.0, sess / sample_sec) if sample_sec > 0 else 1.0
     return days * obs_per_day
+
+
+def _local_tz(symbol: str):
+    """심볼의 로컬 거래 타임존(국내=KST, 미국=ET, 코인=UTC)."""
+    kind = asset_class(symbol)
+    return _KST if kind == "STOCK_KR" else (_et() if kind == "STOCK_US" else timezone.utc)
+
+
+def session_date(symbol: str, now: datetime):
+    """심볼의 로컬 거래일(date) — 인트라데이 세션 경계 감지용(KR=KST·US=ET·코인=UTC). now는 tz-aware."""
+    return now.astimezone(_local_tz(symbol)).date()
+
+
+def seconds_to_close(symbol: str, now: datetime) -> float | None:
+    """정규장 마감까지 남은 초. 코인=None(마감 없음). 음수면 마감 후. now는 tz-aware."""
+    kind = asset_class(symbol)
+    if kind == "COIN":
+        return None
+    close = _KRX_CLOSE if kind == "STOCK_KR" else _US_CLOSE
+    local = now.astimezone(_local_tz(symbol))
+    close_dt = local.replace(hour=close.hour, minute=close.minute, second=0, microsecond=0)
+    return (close_dt - local).total_seconds()
