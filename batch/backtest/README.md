@@ -21,9 +21,12 @@
 
 # 또는 ClickHouse candles_1m 사용(Docker 필요, 1분 고정)
 .venv/Scripts/python -m batch.backtest.run --source clickhouse --symbols KRW-BTC --start "2026-06-01 00:00:00"
+
+# 주식 일봉(토스 적재본 stock_candles_1d)으로 백테스트 — 정수 주·국내 매도세 반영
+.venv/Scripts/python -m batch.backtest.run --source clickhouse --ch-table stock_candles_1d --symbols 005930 --strategy ensemble --sample-sec 86400
 ```
 
-결과는 표준출력 요약 + `--out` 디렉터리에 `trades.csv`, `equity.csv`, `run_meta.json`(재현용 설정·git 커밋)으로 저장된다.
+결과는 표준출력 요약 + `--out` 디렉터리에 `trades.csv`, `equity.csv`, `run_meta.json`(재현용 설정·git 커밋)으로 저장된다. 주식은 `총거래세` 요약·`trades.csv`의 `sell_tax` 컬럼으로 매도세를 분리 표기한다.
 
 ### 상위 타임프레임 리샘플 (`--bar-min`)
 

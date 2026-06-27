@@ -120,6 +120,7 @@ def trade_stats(trades: list) -> dict:
         "avg_win": (gross_profit / len(wins)) if wins else Decimal(0),
         "avg_loss": (gross_loss / len(losses)) if losses else Decimal(0),
         "total_fees": sum((t.buy_fee + t.sell_fee for t in trades), Decimal(0)),
+        "total_tax": sum((t.sell_tax for t in trades), Decimal(0)),  # 매도 거래세(국내주식만 >0, 코인=0)
         "avg_holding_sec": (sum(t.holding_sec for t in trades) / n) if n else 0.0,
     }
 

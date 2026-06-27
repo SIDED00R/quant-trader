@@ -50,6 +50,11 @@ class TestDatasourceTableWhitelist(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(load_clickhouse_candles(table="candles_1m; DROP TABLE x"))
 
+    def test_stock_daily_table_allowed(self):
+        # 주식 일봉 테이블은 화이트리스트에 포함(8단계 주식 백테스트 입력)
+        from batch.backtest.datasource import _TABLES
+        self.assertIn("stock_candles_1d", _TABLES)
+
 
 if __name__ == "__main__":
     unittest.main()

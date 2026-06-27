@@ -4,6 +4,8 @@
   .venv/Scripts/python -m batch.backtest.run --source upbit --days 730 --sample-sec 86400 --out runs/sma_base
 예) ClickHouse candles_1m로 백테스트:
   .venv/Scripts/python -m batch.backtest.run --source clickhouse --symbols KRW-BTC --start "2026-06-01 00:00:00"
+예) 주식 일봉(토스 적재본)으로 백테스트:
+  .venv/Scripts/python -m batch.backtest.run --source clickhouse --ch-table stock_candles_1d --symbols 005930 --strategy ensemble --sample-sec 86400
 업비트 소스는 사전 백필 필요: python -m batch.backtest.backfill --days 730 --symbols KRW-BTC,KRW-ETH
 """
 import argparse
@@ -88,8 +90,9 @@ def parse_args(argv=None):
     p.add_argument("--strategy", default="sma", help=f"전략 이름 {available()}")
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=REST 백필 캐시 / clickhouse=candles_1m·1d")
-    p.add_argument("--ch-table", default="candles_1m", choices=["candles_1m", "candles_1d"],
-                   help="clickhouse 소스 테이블(1d=장기 일봉)")
+    p.add_argument("--ch-table", default="candles_1m",
+                   choices=["candles_1m", "candles_1d", "stock_candles_1d"],
+                   help="clickhouse 소스 테이블(1d=코인 장기 일봉, stock_candles_1d=주식 일봉)")
     p.add_argument("--symbols", default="", help="쉼표 구분(upbit는 미지정 시 config SYMBOLS, clickhouse는 전체)")
     p.add_argument("--unit", type=int, default=1, help="분봉 단위(upbit 캐시 unit과 일치)")
     p.add_argument("--bar-min", type=int, default=0,
@@ -146,7 +149,7 @@ def main(argv=None) -> int:
             print("[backtest] 0봉 — 캐시가 비었습니다. 먼저 백필: "
                   "python -m batch.backtest.backfill --days {} --unit {}".format(args.days, args.unit), file=sys.stderr)
         else:
-            print("[backtest] 0봉 — ClickHouse candles_1m/기간/심볼을 확인하세요.", file=sys.stderr)
+            print(f"[backtest] 0봉 — ClickHouse {args.ch_table}/기간/심볼을 확인하세요.", file=sys.stderr)
         return 1
 
     metrics = compute_metrics(engine.closed_trades, engine.equity_curve, initial,
