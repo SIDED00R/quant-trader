@@ -118,7 +118,7 @@
 
 ## 8단계 — 주식 앙상블 (구조 재사용)
 - [ ] 코인 `Strategy`/`Commander`/신호버스 구조를 주식에 재사용 (`stock.signals` 토픽)
-- [~] 주식용 알고리즘 백테스트·기준치 선별 (주식 데이터 기준) — 데이터 경로 지원 완료(#122: `datasource`에 `stock_candles_1d` 허용·`run.py --ch-table`·`metrics.total_tax`+리포트 매도세). 기준치 선별·유니버스 확정은 잔여. *후속: `walkforward` 매도세 집계·`TREND_BARS_PER_YEAR` 주식 ~252.*
+- [~] 주식용 알고리즘 백테스트·기준치 선별 (주식 데이터 기준) — 하니스 지원 완료(#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계). 기준치 선별·유니버스 확정은 잔여(ClickHouse 주식 일봉 적재 후 실행). *후속: `TREND_BARS_PER_YEAR`/연율화를 주식 거래일 ~252로 분기(현 코인 365 공용).*
 - [ ] 주식 모의매매 라이브 + 성과 검증
 
 ## 9단계 — 통합 자산배분
