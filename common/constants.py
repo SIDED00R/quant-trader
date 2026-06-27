@@ -12,6 +12,7 @@ COLUMNS_STOCK_CANDLES_1D = [
     "symbol", "window_start", "open", "high", "low", "close", "volume",
     "currency", "market",
 ]
+COLUMNS_STOCK_CANDLES_1M = COLUMNS_STOCK_CANDLES_1D   # 주식 분봉도 동일 컬럼(통화/시장 차원 포함)
 
 # ── HTTP 수집/재시도 (Upbit·Toss REST + WS 재연결 백오프 공통) ──
 HTTP_PAGE = 200            # 캔들/시세 페이지당 최대 레코드
