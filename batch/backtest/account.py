@@ -61,12 +61,16 @@ class BacktestAccount:
             p.qty = new_qty
         return True
 
-    def apply_sell(self, symbol: str, price: Decimal, qty: Decimal, fee: Decimal, ts: float) -> ClosedTrade | None:
-        """매도 체결 적용. 보유 부족이면 None(거부). 성공 시 ClosedTrade(reason 미설정) 반환."""
+    def apply_sell(self, symbol: str, price: Decimal, qty: Decimal, fee: Decimal, ts: float,
+                   tax: Decimal = Decimal(0)) -> ClosedTrade | None:
+        """매도 체결 적용. 보유 부족이면 None(거부). 성공 시 ClosedTrade(reason 미설정) 반환.
+
+        tax(매도 거래세)는 국내주식만 >0이며 proceeds·pnl에 반영된다(기본 0 → 코인/기존 호출 무영향).
+        """
         p = self.positions.get(symbol)
         if p is None or p.qty < qty:   # portfolio.updater: held < qty → REJECTED
             return None
-        proceeds = price * qty - fee
+        proceeds = price * qty - fee - tax
         self.cash = _q(self.cash + proceeds)
         cost_basis = qty * p.avg
         pnl = proceeds - cost_basis
@@ -78,7 +82,7 @@ class BacktestAccount:
         trade = ClosedTrade(
             symbol=symbol, qty=qty, entry_price=p.entry_price, exit_price=price,
             buy_fee=buy_fee_portion, sell_fee=fee, pnl=pnl, return_pct=return_pct,
-            reason="", entry_ts=p.entry_ts, exit_ts=ts,
+            reason="", entry_ts=p.entry_ts, exit_ts=ts, sell_tax=tax,
         )
         p.qty -= qty
         if p.qty <= 0:
