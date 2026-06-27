@@ -8,7 +8,8 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from common.config import FEE_RATE
+from common.config import FEE_RATE, STOCK_SELL_TAX_RATE
+from common.market_hours import asset_class
 
 QUANT_FEE = Decimal("0.0001")  # engine.execute의 수수료 양자화 단위와 일치
 
@@ -32,3 +33,13 @@ class FillModel:
 
     def fee(self, price: Decimal, qty: Decimal) -> Decimal:
         return (price * qty * self.fee_rate).quantize(QUANT_FEE)
+
+    def tax(self, symbol: str, price: Decimal, qty: Decimal) -> Decimal:
+        """매도 거래세 — 국내주식(STOCK_KR)만 STOCK_SELL_TAX_RATE 적용. 코인·미국주식=0.
+
+        매수엔 호출하지 않아 매수/매도 비대칭은 호출측(engine.sell만 호출)에서 보장된다.
+        미국은 KOSPI 거래세가 없어 0(미국 수수료/세제는 별도 — 현 단계 미모델).
+        """
+        if asset_class(symbol) != "STOCK_KR":
+            return Decimal(0)
+        return (price * qty * STOCK_SELL_TAX_RATE).quantize(QUANT_FEE)

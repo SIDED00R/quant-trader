@@ -4,11 +4,15 @@
 매 틱: 최신가 갱신 → strategy.on_tick → 평가자산으로 틱 단위 MDD(정확)와 final_equity 갱신.
 자산곡선은 균등 시간그리드(sample_sec)로 직전가 carry-forward 표본화 → Sharpe 연율화 가정과 정합.
 """
-from decimal import Decimal
+import logging
+from decimal import ROUND_DOWN, Decimal
 
 from batch.backtest.account import BacktestAccount
 from batch.backtest.fills import FillModel
 from batch.backtest.models import ClosedTrade
+from common.market_hours import is_stock
+
+_log = logging.getLogger(__name__)
 
 
 class BacktestEngine:
@@ -44,7 +48,19 @@ class BacktestEngine:
     def open_symbol_count(self) -> int:
         return len(self.account.positions)
 
+    def _adjust_qty(self, symbol: str, qty: Decimal) -> Decimal:
+        """주식=정수 주 내림(ROUND_DOWN, 1주 미만은 0 → 호출측 skip). 코인=원본 그대로(무영향)."""
+        if not is_stock(symbol):
+            return qty
+        floored = qty.to_integral_value(rounding=ROUND_DOWN)
+        if floored <= 0:
+            _log.info("skip %s: 1주 미만 주문 무시(정수단위, qty=%s)", symbol, qty)
+        return floored
+
     def buy(self, symbol: str, qty: Decimal, ts: float) -> bool:
+        qty = self._adjust_qty(symbol, qty)
+        if qty <= 0:
+            return False
         mp = self.last_price.get(symbol)
         if mp is None or mp <= 0:
             return False
@@ -53,12 +69,16 @@ class BacktestEngine:
         return self.account.apply_buy(symbol, fp, qty, fee, ts)
 
     def sell(self, symbol: str, qty: Decimal, reason: str, ts: float) -> bool:
+        qty = self._adjust_qty(symbol, qty)
+        if qty <= 0:
+            return False
         mp = self.last_price.get(symbol)
         if mp is None or mp <= 0:
             return False
         fp = self.fills.fill_price("SELL", mp)
         fee = self.fills.fee(fp, qty)
-        trade = self.account.apply_sell(symbol, fp, qty, fee, ts)
+        tax = self.fills.tax(symbol, fp, qty)   # 코인=0, 국내주식=거래세
+        trade = self.account.apply_sell(symbol, fp, qty, fee, ts, tax=tax)
         if trade is None:
             return False
         trade.reason = reason

@@ -23,11 +23,12 @@ class ClosedTrade:
     exit_price: Decimal     # 청산 체결가
     buy_fee: Decimal
     sell_fee: Decimal
-    pnl: Decimal            # 실현 손익(매수·매도 수수료 모두 반영)
+    pnl: Decimal            # 실현 손익(매수·매도 수수료·매도세 모두 반영)
     return_pct: Decimal     # pnl / 취득원가(수수료 포함 평단 기준)
     reason: str             # STOP | TAKE | TRAIL | DEADCROSS
     entry_ts: float
     exit_ts: float
+    sell_tax: Decimal = Decimal(0)   # 매도 거래세(국내주식만 >0, 코인/미국=0). 기본값=기존 호출 무영향
 
     @property
     def holding_sec(self) -> float:

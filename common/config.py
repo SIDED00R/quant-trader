@@ -52,6 +52,8 @@ KIWOOM_WS_URL = (
 
 # ── 거래 ──
 FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
+# 주식 매도 거래세(증권거래세+농특세). 2026 KOSPI/KOSDAQ 0.20%. 매수엔 없음·코인=0(국내주식만 적용).
+STOCK_SELL_TAX_RATE = Decimal(os.getenv("STOCK_SELL_TAX_RATE", "0.0020"))
 
 # ── 토스증권 Open API (데이터/조회 전용 — 매매는 키움 모의 유지) ──
 # 주식 일봉 백필 데이터 소스(백테스트 입력). client_credentials OAuth2, 클라이언트당 토큰 1개.
