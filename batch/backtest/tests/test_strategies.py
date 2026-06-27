@@ -22,7 +22,8 @@ def _dq(prices):
 class TestRegistry(unittest.TestCase):
     def test_all_registered(self):
         self.assertEqual(set(available()),
-                         {"sma", "rsi", "macd", "bollinger", "breakout", "trend", "ensemble"})
+                         {"sma", "rsi", "macd", "bollinger", "breakout", "trend", "ensemble",
+                          "xs_momentum", "xs_reversal", "orb", "intraday_momentum"})
 
     def test_get_strategy_returns_named_instance(self):
         for name in available():
