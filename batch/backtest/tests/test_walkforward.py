@@ -64,6 +64,29 @@ class TestEndToEnd(unittest.TestCase):
                                  180 * _DAY, 90 * _DAY, 90 * _DAY, log=lambda *a: None)
         self.assertIn("error", result)
 
+    def test_generic_fixed_strategy_via_factory(self):
+        # 임의 등록 전략(고정구성)도 factory로 walk-forward 가능 — xs_reversal 예시(n_trials=1→PSR)
+        from trading.strategy.cross_sectional import XSReversalStrategy
+        bars = [
+            BTick(sym, Decimal(str(round(p, 4))), float(i) * _DAY)
+            for i in range(600)
+            for sym, p in (("A", 100 + i * 0.1), ("B", max(1.0, 100 - i * 0.05)), ("C", 100.0))
+        ]
+        result = run_walkforward(
+            bars, Decimal("1000000"), FillModel(), _DAY, 180 * _DAY, 90 * _DAY, 90 * _DAY,
+            strategy="xs_reversal", log=lambda *a: None,
+            factory=lambda: XSReversalStrategy(bar_min=1440, lookback=5, top_n=1, max_weight=Decimal("1")),
+        )
+        self.assertNotIn("error", result)
+        self.assertEqual(result["strategy"], "xs_reversal")
+        self.assertEqual(result["aggregate"]["n_trials"], 1)        # 고정구성 → PSR
+        self.assertGreaterEqual(result["aggregate"]["oos_folds"], 1)
+
+    def test_generic_strategy_requires_factory(self):
+        result = run_walkforward([BTick("A", Decimal("1"), 0.0)], Decimal("1"), FillModel(),
+                                 _DAY, _DAY, _DAY, _DAY, strategy="xs_reversal", log=lambda *a: None)
+        self.assertIn("error", result)                             # factory 없으면 오류
+
     def test_ensemble_strategy_path(self):
         # --strategy ensemble 경로: 고정 구성이라 IS 선택 없이 OOS 평가, n_trials=1(PSR)
         bars = [
