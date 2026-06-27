@@ -1,16 +1,32 @@
 """자산군 판정 + 시장 개장시간 (단일 책임: 심볼 → 자산군 → 거래가능시간).
 
 심볼 형태로 자산군을 가른다 — 코인=`KRW-` 접두, 국내주식=6자리 숫자(005930), 그 외=미국주식 티커.
-코인은 24/7이라 `is_market_open`이 항상 True이고, 주식만 정규장 시간을 검사한다.
+코인은 24/7이라 `is_market_open`이 항상 True이고, 주식만 정규장 시간을 검사한다(KRX·US).
+연율화 기준(`periods_per_year`)도 자산군별로 다르다 — 코인 365×24h, 주식 252거래일×6.5h 정규장.
 `common/` 소속이라 백테스트·프로덕션 양쪽에서 import 가능하다(batch 비의존 — 경계 규칙 준수).
 """
 from datetime import datetime, time, timedelta, timezone
+from functools import lru_cache
 
 _KST = timezone(timedelta(hours=9))
 
 # KRX 정규장(streaming/ingester/stock_kiwoom.py 주석과 동일: 09:00~15:30 KST)
 _KRX_OPEN = time(9, 0)
 _KRX_CLOSE = time(15, 30)
+# US 정규장 09:30~16:00 ET(서머타임은 zoneinfo가 처리)
+_US_OPEN = time(9, 30)
+_US_CLOSE = time(16, 0)
+
+# 연율화 기준(자산군별): 거래일/년 · 활성 거래시간/일(초). 주식 정규장=6.5h=23,400초.
+_TRADING_DAYS = {"COIN": 365.0, "STOCK_KR": 252.0, "STOCK_US": 252.0}
+_SESSION_SECONDS = {"COIN": 86400.0, "STOCK_KR": 23400.0, "STOCK_US": 23400.0}
+
+
+@lru_cache(maxsize=1)
+def _et():
+    """미국 동부 타임존(DST 자동). zoneinfo는 US 세션 검사 시에만 로드 — import 부작용 최소화."""
+    from zoneinfo import ZoneInfo
+    return ZoneInfo("America/New_York")
 
 
 def asset_class(symbol: str) -> str:
@@ -31,20 +47,34 @@ def is_stock(symbol: str) -> bool:
 
 
 def is_market_open(symbol: str, now: datetime | None = None) -> bool:
-    """거래 가능 시간 여부. 코인=항상 True. 국내주식=KRX 평일 09:00–15:30 KST.
+    """정규장 거래시간 여부. 코인=항상 True. 국내주식=KRX 평일 09:00–15:30 KST,
+    미국주식=평일 09:30–16:00 ET(서머타임 zoneinfo 처리).
 
-    미국주식(STOCK_US)은 서머타임·휴장일 처리가 필요해 본 단계에선 미지원 → False(주문 거부).
-    공휴일 캘린더도 미반영(라이브 검증 단계에서 도입 — stock_kiwoom.py의 '라이브 후 도입' 패턴과 일관).
-    백테스트는 과거 틱 재생이라 이 함수를 쓰지 않는다 — 라이브 주문 게이트(7단계 #5)용이다.
+    공휴일 캘린더는 미반영(라이브 검증 단계에서 도입 — stock_kiwoom.py의 '라이브 후 도입' 패턴과 일관).
+    분봉 백테스트의 정규장 필터(시간외 봉 제외)와 라이브 주문 게이트 양쪽에서 쓴다.
     """
     kind = asset_class(symbol)
     if kind == "COIN":
         return True
+    if now is None:
+        now = datetime.now(timezone.utc)
     if kind == "STOCK_KR":
-        if now is None:
-            now = datetime.now(timezone.utc)
-        kst = now.astimezone(_KST)
-        if kst.weekday() >= 5:          # 토(5)·일(6) 휴장
-            return False
-        return _KRX_OPEN <= kst.time() <= _KRX_CLOSE
-    return False                         # STOCK_US: 미지원(후속 확장)
+        local, lo, hi = now.astimezone(_KST), _KRX_OPEN, _KRX_CLOSE
+    else:                                # STOCK_US
+        local, lo, hi = now.astimezone(_et()), _US_OPEN, _US_CLOSE
+    if local.weekday() >= 5:             # 토(5)·일(6) 휴장
+        return False
+    return lo <= local.time() <= hi
+
+
+def periods_per_year(symbol: str, sample_sec: float) -> float:
+    """자산군 인지 연율화 계수(연간 표본 수). Sharpe/DSR 연율화용.
+
+    = 거래일/년 × max(1, 활성거래시간/표본간격). 코인(24/7)은 기존 SECONDS_PER_YEAR/sample_sec와
+    동치(무영향). 주식은 252거래일×6.5h 정규장 기준 — 분봉이면 252×390=98,280, 일봉이면 252.
+    """
+    kind = asset_class(symbol)
+    days = _TRADING_DAYS[kind]
+    sess = _SESSION_SECONDS[kind]
+    obs_per_day = max(1.0, sess / sample_sec) if sample_sec > 0 else 1.0
+    return days * obs_per_day

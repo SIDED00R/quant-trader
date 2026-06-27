@@ -126,11 +126,13 @@ def trade_stats(trades: list) -> dict:
 
 
 def compute_metrics(closed_trades, equity_curve, initial_cash, final_equity,
-                    mdd_override=None, sample_sec=60.0) -> dict:
+                    mdd_override=None, sample_sec=60.0, periods_per_year=None) -> dict:
     eq_values = [v for _, v in equity_curve]
     mdd = mdd_override if mdd_override is not None else max_drawdown(eq_values)
-    periods_per_year = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
-    sharpe = annualized_sharpe([float(v) for v in eq_values], periods_per_year)
+    # periods_per_year 명시되면 자산군 인지 연율화(주식 252×세션). 미지정 시 24/7 기준(코인).
+    ppy = periods_per_year if periods_per_year is not None else (
+        SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR)
+    sharpe = annualized_sharpe([float(v) for v in eq_values], ppy)
     m = {
         "initial_equity": initial_cash,
         "final_equity": final_equity,

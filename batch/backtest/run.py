@@ -12,6 +12,7 @@ import argparse
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from common.config import (
@@ -49,7 +50,15 @@ from batch.backtest.fills import FillModel
 from batch.backtest.metrics import compute_metrics
 from batch.backtest.report import print_summary, write_outputs
 from batch.backtest.upbit_candles import load as load_candle_cache
+from common.market_hours import is_market_open, periods_per_year
 from trading.strategy.registry import available, get_strategy
+
+
+def _regular_session_only(candles):
+    """정규장 봉만 통과(주식 분봉의 시간외 봉 제외). market_hours 기준(KR 09:00–15:30 KST / US 09:30–16:00 ET)."""
+    for t in candles:
+        if is_market_open(t.symbol, datetime.fromtimestamp(t.ts, timezone.utc)):
+            yield t
 
 
 def _strategy_params(name: str) -> dict:
@@ -105,6 +114,8 @@ def parse_args(argv=None):
     p.add_argument("--fee", default=str(FEE_RATE), help="수수료율(기본=config FEE_RATE)")
     p.add_argument("--slippage-bps", default="0", help="불리한 슬리피지(bps, 기본 0=라이브 가정)")
     p.add_argument("--sample-sec", type=float, default=60.0, help="자산곡선 표본 간격(초, 장기엔 86400 권장)")
+    p.add_argument("--all-hours", action="store_true",
+                   help="주식 분봉(stock_candles_1m)의 정규장 외 봉도 포함(기본: 정규장만)")
     p.add_argument("--out", default="", help="결과 CSV/메타 저장 디렉터리")
     return p.parse_args(argv)
 
@@ -139,6 +150,8 @@ def main(argv=None) -> int:
             candles = load_clickhouse_candles(symbols=symbols or None,
                                               start=args.start or None, end=args.end or None,
                                               table=args.ch_table)
+            if args.ch_table == "stock_candles_1m" and not args.all_hours:
+                candles = _regular_session_only(candles)   # 시간외 봉 제외(정규장만)
         engine.run(candles, strategy)
     except Exception as e:
         print(f"[backtest] 데이터 로드 실패: {e}", file=sys.stderr)
@@ -152,9 +165,11 @@ def main(argv=None) -> int:
             print(f"[backtest] 0봉 — ClickHouse {args.ch_table}/기간/심볼을 확인하세요.", file=sys.stderr)
         return 1
 
+    rep = symbols[0] if symbols else ("000000" if args.ch_table.startswith("stock") else "KRW-BTC")
+    ppy = periods_per_year(rep, args.sample_sec)   # 자산군 인지 연율화(코인 무영향, 주식 252×세션)
     metrics = compute_metrics(engine.closed_trades, engine.equity_curve, initial,
                               engine.final_equity, mdd_override=engine.max_drawdown,
-                              sample_sec=args.sample_sec)
+                              sample_sec=args.sample_sec, periods_per_year=ppy)
     meta = {
         "strategy": strategy.name,
         "source": args.source,
@@ -167,6 +182,7 @@ def main(argv=None) -> int:
         "fee_rate": str(fills.fee_rate),
         "slippage_bps": str(fills.slippage_bps),
         "sample_sec": args.sample_sec,
+        "periods_per_year": ppy,
         "git_commit": _git_commit(),
         "strategy_params": _strategy_params(strategy.name),
     }

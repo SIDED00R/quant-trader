@@ -9,7 +9,7 @@ from decimal import Decimal
 from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
-from common.market_hours import asset_class, is_coin, is_market_open, is_stock
+from common.market_hours import asset_class, is_coin, is_market_open, is_stock, periods_per_year
 
 UTC = timezone.utc
 
@@ -48,8 +48,33 @@ class TestMarketHours(unittest.TestCase):
         # 토요일 10:00 KST → 휴장
         self.assertFalse(is_market_open("005930", datetime(2026, 6, 27, 1, 0, tzinfo=UTC)))
 
-    def test_us_stock_unsupported_false(self):
-        self.assertFalse(is_market_open("AAPL", datetime(2026, 6, 29, 1, 0, tzinfo=UTC)))
+    def test_us_summer_session_edt(self):
+        # 2026-06-29(월) 여름 EDT(UTC-4): 09:30 ET = 13:30 UTC
+        self.assertTrue(is_market_open("AAPL", datetime(2026, 6, 29, 14, 0, tzinfo=UTC)))    # 10:00 EDT open
+        self.assertFalse(is_market_open("AAPL", datetime(2026, 6, 29, 13, 0, tzinfo=UTC)))   # 09:00 EDT 장전
+        self.assertTrue(is_market_open("AAPL", datetime(2026, 6, 29, 20, 0, tzinfo=UTC)))    # 16:00 EDT 경계 open
+        self.assertFalse(is_market_open("AAPL", datetime(2026, 6, 29, 20, 1, tzinfo=UTC)))   # 16:01 EDT 장후
+
+    def test_us_winter_est_and_dst(self):
+        # 2026-01-05(월) 겨울 EST(UTC-5): 09:30 ET = 14:30 UTC
+        self.assertTrue(is_market_open("AAPL", datetime(2026, 1, 5, 15, 0, tzinfo=UTC)))     # 10:00 EST open
+        # 동일 13:45 UTC가 여름엔 open(09:45 EDT)·겨울엔 closed(08:45 EST) → DST 반영
+        self.assertTrue(is_market_open("AAPL", datetime(2026, 6, 29, 13, 45, tzinfo=UTC)))
+        self.assertFalse(is_market_open("AAPL", datetime(2026, 1, 5, 13, 45, tzinfo=UTC)))
+
+    def test_us_weekend_closed(self):
+        self.assertFalse(is_market_open("AAPL", datetime(2026, 6, 27, 14, 0, tzinfo=UTC)))   # 토요일
+
+
+class TestPeriodsPerYear(unittest.TestCase):
+    def test_coin_unchanged_24_7(self):
+        self.assertEqual(periods_per_year("KRW-BTC", 86400), 365.0)        # 일봉
+        self.assertEqual(periods_per_year("KRW-BTC", 60), 365.0 * 1440)    # 분봉 = 525,600
+
+    def test_stock_trading_days_and_session(self):
+        self.assertEqual(periods_per_year("005930", 86400), 252.0)         # 주식 일봉
+        self.assertEqual(periods_per_year("005930", 60), 252.0 * 390)      # 주식 분봉 = 98,280(6.5h)
+        self.assertEqual(periods_per_year("AAPL", 60), 252.0 * 390)        # 미국주식 동일 세션
 
 
 class TestFillTax(unittest.TestCase):
