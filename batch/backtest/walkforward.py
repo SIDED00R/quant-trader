@@ -13,9 +13,11 @@ import math
 import statistics
 import sys
 import time
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from common.config import FEE_RATE, INITIAL_BALANCE, SYMBOLS
+from common.market_hours import is_market_open, periods_per_year as ppy_fn
 from batch.backtest.account import BacktestAccount
 from batch.backtest.datasource import load_clickhouse_candles
 from batch.backtest.engine import BacktestEngine
@@ -98,9 +100,11 @@ def _folds(t0, t1, prime_sec, is_sec, oos_sec, step_sec):
     return folds
 
 
-def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var):
+def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var, periods_per_year=None):
     """fold별 OOS 결과 → 집계 dict(합성수익·양수fold·OOS Sharpe·Deflated/Probabilistic Sharpe)."""
-    ppy = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
+    # periods_per_year 명시되면 자산군 인지 연율화(주식 252×세션). 미지정 시 24/7 기준(코인).
+    ppy = periods_per_year if periods_per_year is not None else (
+        SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR)
     compound = 1.0
     for fr in fold_results:
         compound *= (1.0 + fr["return"])
@@ -120,7 +124,7 @@ def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var):
     }
 
 
-def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log):
+def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log, periods_per_year=None):
     """앙상블(고정 구성) walk-forward — IS 파라미터 선택 없이 각 OOS만 평가(n_trials=1 → PSR)."""
     prime_bars = max(s.warmup_bars for s in EnsembleStrategy().signals)
     folds = _folds(bars[0].ts, bars[-1].ts, prime_bars * sample_sec, is_sec, oos_sec, step_sec)
@@ -136,16 +140,17 @@ def _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, l
         combined_oos_rets.extend(oosr["rets"])
         fold_results.append({"fold": i, "params": None, "is_return": None, **oosr})
         log(f"[wf] fold {i}: 앙상블 OOS {oosr['return']*100:+.1f}% ({oosr['num_trades']}거래)")
-    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, 1, 0.0)  # 고정구성 → N=1(PSR)
+    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, 1, 0.0, periods_per_year)  # 고정구성 → N=1(PSR)
     return {"folds": fold_results, "aggregate": agg, "strategy": "ensemble"}
 
 
-def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, strategy="trend", log=print):
+def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, strategy="trend", log=print,
+                    periods_per_year=None):
     """walk-forward 실행 → fold별 OOS 성과 + 집계. strategy='trend'(그리드 선택) / 'ensemble'(고정 구성)."""
     if not bars:
         return {"folds": [], "error": "no bars"}
     if strategy == "ensemble":
-        return _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log)
+        return _run_ensemble(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec, log, periods_per_year)
     combos = _combos()
     # prime 길이 = 그리드 전 조합 중 최장 워밍업(전략의 실제 warmup_bars를 직접 읽음 — 공식 발산 방지)
     prime_bars = max(TrendStrategy(short=s, long=l).warmup_bars for s, l in combos)
@@ -184,7 +189,7 @@ def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
         for s, l in combos
     ]
     sr_var = statistics.pvariance(full_sharpes) if len(full_sharpes) >= 2 else 0.0
-    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, len(combos), sr_var)
+    agg = _aggregate(fold_results, combined_oos_rets, sample_sec, len(combos), sr_var, periods_per_year)
     return {"folds": fold_results, "aggregate": agg, "strategy": "trend"}
 
 
@@ -247,6 +252,8 @@ def parse_args(argv=None):
     p.add_argument("--step-days", type=int, default=90, help="fold 전진 간격(기본=OOS 길이→연속)")
     p.add_argument("--initial", default=str(INITIAL_BALANCE), help="초기 가상자금(KRW)")
     p.add_argument("--fee", default=str(FEE_RATE), help="수수료율")
+    p.add_argument("--all-hours", action="store_true",
+                   help="주식 분봉(stock_candles_1m)의 정규장 외 봉도 포함(기본: 정규장만)")
     return p.parse_args(argv)
 
 
@@ -267,7 +274,9 @@ def main(argv=None) -> int:
     try:
         if args.source == "clickhouse":
             bars = list(load_clickhouse_candles(symbols=symbols, table=args.ch_table))
-            sample_sec = 60.0 if args.ch_table == "candles_1m" else 86400.0  # 일봉 테이블(코인·주식)=86400
+            if args.ch_table == "stock_candles_1m" and not args.all_hours:
+                bars = [t for t in bars if is_market_open(t.symbol, datetime.fromtimestamp(t.ts, timezone.utc))]
+            sample_sec = 60.0 if args.ch_table in ("candles_1m", "stock_candles_1m") else 86400.0  # 분봉=60·일봉=86400
         else:
             start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
             bars = list(load_candle_cache(symbols, args.unit, args.cache_dir,
@@ -281,9 +290,10 @@ def main(argv=None) -> int:
                 else "python -m batch.backtest.backfill --days {} --unit {}".format(args.days, args.unit))
         print(f"[wf] 0봉 — 먼저 백필: {hint}", file=sys.stderr)
         return 1
+    ppy = ppy_fn(symbols[0], sample_sec) if symbols else None   # 자산군 인지 연율화(코인 무영향)
     result = run_walkforward(bars, initial, fills, sample_sec,
                              args.is_days * _DAY, args.oos_days * _DAY, args.step_days * _DAY,
-                             strategy=args.strategy)
+                             strategy=args.strategy, periods_per_year=ppy)
     _print(result)
     return 0
 
