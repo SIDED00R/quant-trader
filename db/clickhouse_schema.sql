@@ -81,3 +81,18 @@ CREATE TABLE IF NOT EXISTS stock_candles_1m (
 )
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (symbol, window_start);
+
+-- ML 피처 저장(단계: ML 피처 파이프라인). 롱 포맷(피처 추가가 잦아 스키마 변경 없이 확장).
+-- value = raw 피처값(횡단면 rank/z 정규화는 학습 시점에 적용). batch/features/compute.py가 적재.
+-- 재실행 멱등(ReplacingMergeTree). 학습 시 (symbol,date) 피벗해 wide로 사용.
+CREATE TABLE IF NOT EXISTS stock_features_daily (
+    symbol      LowCardinality(String),
+    date        Date,
+    market      LowCardinality(String),   -- KR | US
+    feature     LowCardinality(String),
+    value       Float64,
+    updated_at  DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY market
+ORDER BY (symbol, date, feature);

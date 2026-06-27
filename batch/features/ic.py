@@ -14,20 +14,10 @@ import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
+from batch.features.compute import load_ohlcv
 from batch.features.ohlcv import compute_features, feature_columns
-from common.clickhouse_client import create_client
 
 MIN_SYMS = 30          # 횡단면 IC 계산 최소 종목수
-
-
-def _load(market: str) -> pd.DataFrame:
-    rows = create_client().query(
-        f"SELECT symbol, window_start, open, high, low, close, volume "
-        f"FROM stock_candles_1d WHERE market='{market}' ORDER BY symbol, window_start").result_rows
-    df = pd.DataFrame(rows, columns=["symbol", "date", "open", "high", "low", "close", "volume"])
-    for c in ("open", "high", "low", "close", "volume"):
-        df[c] = df[c].astype(float)
-    return df
 
 
 def _forward_return(panel: pd.DataFrame, h: int) -> pd.Series:
@@ -50,7 +40,7 @@ def _nw_tstat(ic: np.ndarray, lag: int) -> float:
 
 
 def rank_ic(market: str, horizon: int = 21) -> pd.DataFrame:
-    panel = _load(market)
+    panel = load_ohlcv(market)
     feats = compute_features(panel)
     cols = feature_columns(feats)          # fwd 추가 전에 피처 목록 확정(라벨 누설 방지)
     feats["fwd"] = _forward_return(panel.sort_values(["symbol", "date"]).reset_index(drop=True), horizon).values
