@@ -55,8 +55,10 @@ class _NullBroker:
     def cash(self): return Decimal(0)
     def equity(self): return Decimal(0)
     def open_symbol_count(self): return 0
-    def buy(self, s, q, ts): return False
-    def sell(self, s, q, r, ts): return False
+    def iter_positions(self): return []
+    def price(self, s): return Decimal(0)
+    def buy(self, s, q, ts, price=None): return False
+    def sell(self, s, q, r, ts, price=None): return False
 
 
 def _evaluate(bars, factory, prime_start, eval_start, eval_end, initial, fills, sample_sec):
