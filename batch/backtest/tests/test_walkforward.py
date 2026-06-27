@@ -57,6 +57,7 @@ class TestEndToEnd(unittest.TestCase):
         dsr = result["aggregate"]["deflated_sharpe"]
         self.assertTrue(dsr is None or 0.0 <= dsr <= 1.0)
         self.assertEqual(result["aggregate"]["n_trials"], len(_combos()))
+        self.assertEqual(result["aggregate"]["oos_total_tax"], Decimal("0"))  # 코인=매도 거래세 0(회귀)
 
     def test_empty_bars_error(self):
         result = run_walkforward([], Decimal("1000000"), FillModel(), _DAY,

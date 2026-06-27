@@ -78,7 +78,8 @@ def _evaluate(bars, factory, prime_start, eval_start, eval_end, initial, fills, 
     ret = final / float(initial) - 1.0         # 계좌가 OOS에서 새로 시작 → 기준은 initial(prime 무활동 보장)
     rets = [eq_vals[i] / eq_vals[i - 1] - 1.0 for i in range(1, len(eq_vals)) if eq_vals[i - 1] > 0]
     fees = sum((t.buy_fee + t.sell_fee for t in engine.closed_trades), Decimal(0))
-    return {"return": ret, "rets": rets, "num_trades": len(engine.closed_trades), "fees": fees}
+    tax = sum((t.sell_tax for t in engine.closed_trades), Decimal(0))  # 매도 거래세(국내주식만 >0, 코인=0)
+    return {"return": ret, "rets": rets, "num_trades": len(engine.closed_trades), "fees": fees, "tax": tax}
 
 
 def _folds(t0, t1, prime_sec, is_sec, oos_sec, step_sec):
@@ -110,6 +111,8 @@ def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var):
         "oos_mean_return": statistics.mean([fr["return"] for fr in fold_results]) if fold_results else 0.0,
         "oos_total_trades": sum(fr["num_trades"] for fr in fold_results),
         "oos_total_fees": sum((fr["fees"] for fr in fold_results), Decimal(0)),
+        "oos_total_tax": sum((fr["tax"] for fr in fold_results), Decimal(0)),
+
         "combined_oos_sharpe": _sharpe_from_rets(combined_oos_rets, ppy),
         "n_trials": n_trials,
         "sr_variance": sr_var,
@@ -213,6 +216,7 @@ def _print(result):
     print(f"  OOS 합성수익률   : {a['oos_compound_return']*100:+.2f}%")
     print(f"  OOS 평균(폴드)   : {a['oos_mean_return']*100:+.2f}%")
     print(f"  OOS 총거래/수수료: {a['oos_total_trades']}건 / {a['oos_total_fees']:,.0f} KRW")
+    print(f"  OOS 매도 거래세  : {a['oos_total_tax']:,.0f} KRW")
     print(f"  OOS Sharpe(연율) : {a['combined_oos_sharpe']:.2f}")
     dsr = a["deflated_sharpe"]
     print(f"  Deflated Sharpe  : {dsr:.3f} (시도 N={a['n_trials']})" if dsr is not None
@@ -231,8 +235,9 @@ def parse_args(argv=None):
     p.add_argument("--symbols", default="", help="쉼표 구분(미지정 시 config SYMBOLS)")
     p.add_argument("--source", default="upbit", choices=["upbit", "clickhouse"],
                    help="upbit=CSV 캐시(리샘플) / clickhouse=candles_1d 장기 일봉")
-    p.add_argument("--ch-table", default="candles_1d", choices=["candles_1m", "candles_1d"],
-                   help="clickhouse 소스 테이블")
+    p.add_argument("--ch-table", default="candles_1d",
+                   choices=["candles_1m", "candles_1d", "stock_candles_1d"],
+                   help="clickhouse 소스 테이블(candles_1d=코인 일봉, stock_candles_1d=주식 일봉)")
     p.add_argument("--unit", type=int, default=1, help="캐시 분봉 단위(upbit)")
     p.add_argument("--bar-min", type=int, default=1440, help="리샘플 타임프레임 분(upbit, 기본 1440=일봉)")
     p.add_argument("--days", type=int, default=730, help="최근 N일(upbit 캐시 필터)")
@@ -262,7 +267,7 @@ def main(argv=None) -> int:
     try:
         if args.source == "clickhouse":
             bars = list(load_clickhouse_candles(symbols=symbols, table=args.ch_table))
-            sample_sec = 86400.0 if args.ch_table == "candles_1d" else 60.0
+            sample_sec = 60.0 if args.ch_table == "candles_1m" else 86400.0  # 일봉 테이블(코인·주식)=86400
         else:
             start_ms = int((time.time() - args.days * 86400) * 1000) if args.days > 0 else None
             bars = list(load_candle_cache(symbols, args.unit, args.cache_dir,
