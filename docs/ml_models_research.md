@@ -90,6 +90,21 @@
 
 > **요지**: 우리 이질 5모델은 상관이 낮아 **단순 동일가중(rank 평균)만으로 결합 이득**을 얻을 가능성이 크다. 화려한 학습형 결합/딥 MoE는 자유도가 곧 DSR 손실 — **측정으로 동일가중을 이길 때만** 채택.
 
+## 7-1. 베이스라인 결과 (LightGBM, OOF purged walk-forward) — 정직한 게이트
+
+`batch/ml/baseline_lgbm.py`, 58피처(KR은 +US컨텍스트 65), 라벨=횡단면 z-score fwd 21d, 5시드앙상블, 6fold expanding.
+
+| 모델 | Rank IC | ICIR | **NW_t(겹침보정)** | 롱숏 Sharpe | days |
+|---|---|---|---|---|---|
+| LGBM-US | 2.06% | 0.146 | **1.6** | 1.17 | 1515 |
+| LGBM-KR | 0.99% | 0.093 | **1.0** | 1.13 | 1474 |
+
+**정직한 해석**:
+- **양수지만 통계적으로 약함**(NW_t < 2). 단변량 full-sample IC(Amihud 3.3% 등)는 **OOF·다변량에서 크게 줄었다** — full-sample→OOF 하락 + 다변량 희석. 이게 진짜 OOS 수치다.
+- **롱숏 Sharpe ~1.1**이나 21일 겹침으로 과대 → NW_t 해석(약함)이 더 신뢰.
+- **KR 다변량(0.99%)이 자기 단변량 강피처(Amihud 3.3%·dolvol −4.2%)보다 약함** → 모델이 KR 신호를 잘 못 짜냄(피처 희석/노이즈). 피처선택·lambdarank·중요도 진단 필요.
+- 함의: **저SNR·생존편향에서 단순 회귀 GBDT는 약한 게이트**. 개선 레버 = ① **LambdaRankIC 손실**(평가=학습 정렬, 조사상 고ROI) ② 피처선택 ③ DL(GRU/MASTER) ④ 외부데이터(수급·펀더멘털).
+
 ## 8. 다음 구현 순서
 1. **공유 학습 인프라**: 라벨 생성(횡단면 rank) + purged/embargo CV 분할기 + Rank IC/ICIR/DSR 평가 + 시드앙상블 — 모든 모델 공용.
 2. **LightGBM 베이스라인**(CPU): US/KR 분리, KR은 US 컨텍스트 포함, lambdarank, 시드앙상블 → 게이트 기준선 확정.
