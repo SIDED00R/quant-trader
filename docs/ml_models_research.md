@@ -105,6 +105,19 @@
 - **KR 다변량(0.99%)이 자기 단변량 강피처(Amihud 3.3%·dolvol −4.2%)보다 약함** → 모델이 KR 신호를 잘 못 짜냄(피처 희석/노이즈). 피처선택·lambdarank·중요도 진단 필요.
 - 함의: **저SNR·생존편향에서 단순 회귀 GBDT는 약한 게이트**. 개선 레버 = ① **LambdaRankIC 손실**(평가=학습 정렬, 조사상 고ROI) ② 피처선택 ③ DL(GRU/MASTER) ④ 외부데이터(수급·펀더멘털).
 
+### CPU 개선 #1 — LambdaRank 손실 (회귀 vs lambdarank, 동일 config)
+| 모델 | Rank IC | ICIR | NW_t | LS Sharpe | LS mean |
+|---|---|---|---|---|---|
+| US 회귀 | 2.06% | 0.146 | 1.6 | 1.17 | 1.74% |
+| **US lambdarank** | **3.09%** | **0.171** | **1.8** | 1.22 | 2.66% |
+| KR 회귀 | 0.99% | 0.093 | 1.0 | 1.13 | 1.77% |
+| KR lambdarank | 0.67% | 0.057 | 0.6 | 1.14 | 1.87% |
+
+- **LambdaRank는 US를 개선**(NW_t 1.6→1.8, IC 2.06→3.09%), **KR은 악화**(0.99→0.67%). 평가=학습 정렬이 US에선 통하나 KR 노이즈엔 역효과.
+- **KR 진단(중요도 top)**: `amihud21, usx_vol21(US변동성), volofvol, dolvol21, retvol63...` — 모델이 KR 예측에 **US 컨텍스트(usx_vol21 #2)에 크게 의존**. 정작 KR 자체 OHLCV 신호는 약함.
+- **핵심 발견 — KR은 OHLCV만으로 OOS 신호가 약하다.** 단변량 full-sample IC(Amihud 3.3%·dolvol −4.2%)가 OOF purged-CV에서 0.7%로 붕괴 = full-sample 낙관/레짐 불안정. **KR의 진짜 unlock은 외국인 수급·공매도(KRX, 키 대기)일 가능성** — 즉 KR엔 외부데이터가 *additive*가 아니라 *necessary*일 수 있다(사용자의 KR 외부데이터 직감이 옳음). **US는 OHLCV ML만으로 작동(marginal)**.
+- 남은 CPU 레버: 피처선택(KR 개선 기대 낮음 — 문제는 피처수 아니라 OOS 붕괴), 레짐분석. → DL 라운드는 US에서 더 짜낼 여지 확인 + KR은 DL로도 구제 안 되는지 확인용.
+
 ## 8. 다음 구현 순서
 1. **공유 학습 인프라**: 라벨 생성(횡단면 rank) + purged/embargo CV 분할기 + Rank IC/ICIR/DSR 평가 + 시드앙상블 — 모든 모델 공용.
 2. **LightGBM 베이스라인**(CPU): US/KR 분리, KR은 US 컨텍스트 포함, lambdarank, 시드앙상블 → 게이트 기준선 확정.
