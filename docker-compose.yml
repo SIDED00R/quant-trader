@@ -250,7 +250,7 @@ services:
 
   # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
   # 라이브와 분리: `docker compose run --rm reeval python -m batch.backtest.reeval_weights [--dry-run]`.
-  # 5.5 Airflow DAG가 이 서비스를(또는 온디맨드 VM에서) 주기 실행한다. kafka 불요(postgres+clickhouse만).
+  # Cloud Scheduler가 온디맨드 VM을 기동해 주기 실행한다(Airflow 미도입). kafka 불요(postgres+clickhouse만).
   reeval:
     build:
       context: .

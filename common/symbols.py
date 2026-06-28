@@ -32,3 +32,9 @@ def resolve_symbols() -> list[str]:
             print(f"[symbols] 업비트 마켓 조회 실패: {e}; 폴백={SYMBOLS}")
             return _cache or SYMBOLS
     return _cache or SYMBOLS
+
+
+def get_us_symbols(ch) -> list[str]:
+    """저장된 US 일봉의 종목 목록(distinct·정렬). 펀더멘털·13F·섹터 수집 공통 쿼리."""
+    return [r[0] for r in ch.query(
+        "SELECT DISTINCT symbol FROM stock_candles_1d WHERE market='US' ORDER BY symbol").result_rows]

@@ -1,0 +1,9 @@
+# 주식 ML 파이프라인 전용 의존성 (batch/features, batch/ml).
+# 프로덕션 이미지는 batch/ 제외라 production requirements.txt와 분리(경계 유지).
+# 설치: .venv/Scripts/python -m pip install -r requirements-ml.txt
+pandas>=2.0
+numpy>=1.26
+scikit-learn>=1.4
+lightgbm>=4.0
+pykrx>=1.0          # KRX 데이터(외국인 수급·공매도·KR PIT) — KRX_ID/KRX_PW 필요
+torch>=2.0

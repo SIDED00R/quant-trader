@@ -178,7 +178,8 @@ def main(argv=None) -> int:
     meta = {
         "strategy": strategy.name,
         "source": args.source,
-        "unit_min": args.unit if args.source == "upbit" else 1,  # clickhouse는 candles_1m(1분) 고정
+        "unit_min": (args.unit if args.source == "upbit"        # 봉 길이(분): 분봉=1·일봉=1440
+                     else 1 if args.ch_table in ("candles_1m", "stock_candles_1m") else 1440),
         "bar_min": args.bar_min or None,                          # 리샘플 타임프레임(None=원본)
         "symbols": symbols or (SYMBOLS if args.source == "upbit" else None),
         "days": args.days if args.source == "upbit" else None,
