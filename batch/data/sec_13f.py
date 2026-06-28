@@ -30,25 +30,25 @@ _MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
            "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
 
 
-def _universe_figi(tickers: list, client: httpx.Client, log=print) -> dict:
-    """ticker→compositeFIGI (OpenFIGI, 캐시). 키없음 25/min·10/batch."""
+def _cusip_to_ticker(cusips: list, universe: set, client: httpx.Client, log=print) -> dict:
+    """CUSIP→ticker (OpenFIGI ID_CUSIP, 검증됨·안정). 우리 유니버스 종목만 반환. 캐시.
+    키없음 25/min·10/batch → 상위 CUSIP만 매핑."""
     os.makedirs(_CACHE, exist_ok=True)
-    fp = os.path.join(_CACHE, "figi_map.json")
-    if os.path.exists(fp):
-        return json.load(open(fp, encoding="utf-8"))
-    out = {}
-    for i in range(0, len(tickers), 10):
-        b = [{"idType": "TICKER", "idValue": t, "exchCode": "US"} for t in tickers[i:i + 10]]
+    fp = os.path.join(_CACHE, "cusip_map.json")
+    cache = json.load(open(fp, encoding="utf-8")) if os.path.exists(fp) else {}
+    todo = [c for c in cusips if c not in cache]
+    for i in range(0, len(todo), 10):
+        b = [{"idType": "ID_CUSIP", "idValue": cu} for cu in todo[i:i + 10]]
         r = client.post("https://api.openfigi.com/v3/mapping", json=b)
         if r.status_code == 200:
-            for t, d in zip(tickers[i:i + 10], r.json()):
-                if d.get("data"):
-                    out[t] = d["data"][0].get("compositeFIGI") or d["data"][0].get("figi")
+            for cu, d in zip(todo[i:i + 10], r.json()):
+                tk = d["data"][0].get("ticker") if d.get("data") else None
+                cache[cu] = tk
         time.sleep(2.5)
-        if (i + 10) % 100 == 0:
-            log(f"[13f] figi {i+10}/{len(tickers)}")
-    json.dump(out, open(fp, "w"), ensure_ascii=False)
-    return out
+        if (i + 10) % 200 == 0:
+            log(f"[13f] cusip→ticker {i+10}/{len(todo)}")
+    json.dump(cache, open(fp, "w"), ensure_ascii=False)
+    return {cu: tk for cu, tk in cache.items() if tk in universe}
 
 
 def _zip_urls(client: httpx.Client, start_year: int) -> list:
@@ -116,28 +116,27 @@ def collect(start_year: int = 2019, log=print) -> int:
     ch = create_client()
     us = [r[0] for r in ch.query("SELECT DISTINCT symbol FROM stock_candles_1d WHERE market='US' ORDER BY symbol").result_rows]
     total = 0
+    universe = set(us)
     with httpx.Client(timeout=180, headers=_UA, follow_redirects=True) as c:
-        figi = _universe_figi(us, c, log)
-        figi2tk = {v: k for k, v in figi.items()}
         quarters = _zip_urls(c, start_year)
-        log(f"[13f] 유니버스 FIGI {len(figi)}, 분기 {len(quarters)}개")
-        # 부트스트랩: FIGI 채워진 '완성된' 최근 분기들(마감 경과)의 합집합으로 FIGI→CUSIP→ticker.
-        # (최신 분기는 공시 마감 전이라 거의 빔 → 제외. CUSIP은 구분기에도 공통 키.)
+        log(f"[13f] 분기 {len(quarters)}개")
+        # 부트스트랩: 최근 '완성'분기에서 CUSIP별 보유기관수 집계 → 상위 CUSIP을 CUSIP→ticker 매핑.
+        # (보유기관 많은 상위 CUSIP = 대형주 = 우리 유니버스 포함. CUSIP은 전분기 공통 키.)
         cutoff = date.today() - timedelta(days=50)
-        boot_qs = [q for q in quarters if q[1] <= cutoff][-3:] or quarters[-1:]
-        cusip2tk = {}
-        for url, _pe in boot_qs:
-            zf, it = _fetch_zip(url, c)
-            if not it:
-                continue
-            with zf.open(it) as f:
-                f.readline()
-                for raw in io.TextIOWrapper(f, encoding="latin1"):
-                    p = raw.rstrip("\n").split("\t")
-                    if len(p) >= 6 and p[5] in figi2tk:
-                        cusip2tk[p[4]] = figi2tk[p[5]]
+        boot_q = ([q for q in quarters if q[1] <= cutoff] or quarters)[-1]
+        zf, it = _fetch_zip(boot_q[0], c)
+        holders = {}
+        with zf.open(it) as f:
+            f.readline()
+            for raw in io.TextIOWrapper(f, encoding="latin1"):
+                p = raw.rstrip("\n").split("\t")
+                if len(p) < 10 or p[9].strip():        # 주식만(옵션 제외)
+                    continue
+                holders.setdefault(p[4], set()).add(p[0])
+        top = sorted(holders, key=lambda cu: -len(holders[cu]))[:3000]
+        cusip2tk = _cusip_to_ticker(top, universe, c, log)
         cusips = set(cusip2tk)
-        log(f"[13f] 부트스트랩 CUSIP {len(cusips)} (완성분기 {len(boot_qs)}개 합집합)")
+        log(f"[13f] 부트스트랩 CUSIP {len(cusips)}/{len(universe)}종목 (상위 {len(top)} 매핑)")
         for url, pe in quarters:
             zf, it = _fetch_zip(url, c)
             if zf is None or it is None:
