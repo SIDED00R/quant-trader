@@ -96,3 +96,32 @@ CREATE TABLE IF NOT EXISTS stock_features_daily (
 ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY market
 ORDER BY (symbol, date, feature);
+
+-- US 펀더멘털 원본(SEC EDGAR companyfacts). 롱 포맷·vintage 보존(정정공시 대비 filed_date별 보관).
+-- point-in-time: 사용 시 filed_date ≤ 거래일 게이팅. batch/data/fundamentals.py가 적재(재실행 멱등).
+CREATE TABLE IF NOT EXISTS fundamentals_quarterly (
+    symbol       LowCardinality(String),
+    concept      LowCardinality(String),   -- shares|equity|assets|net_income|revenue|op_cashflow
+    period_end   Date,
+    filed_date   Date,
+    form         LowCardinality(String),   -- 10-Q | 10-K | ...
+    duration_d   UInt16,                   -- flow 기간(일). instant=0
+    value        Float64,
+    source       LowCardinality(String) DEFAULT 'EDGAR',
+    ingested_at  DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, concept, period_end, filed_date);
+
+-- 매크로 시계열(FRED). 전 종목 공통 레짐 피처(금리·수익률곡선·VIX·환율·유가). 휴일 전일캐리(ffill).
+-- batch/data/fred.py가 적재(FRED_API_KEY 필요). 일별 증분: 재실행 시 최신 추가(멱등).
+CREATE TABLE IF NOT EXISTS macro_daily (
+    date     Date,
+    dgs10    Float64,  dgs2  Float64,  dgs3mo Float64,
+    t10y2y   Float64,  t10y3m Float64,
+    vix      Float64,  usdkrw Float64, dxy Float64, wti Float64,
+    source   LowCardinality(String) DEFAULT 'FRED',
+    ingested_at DateTime64(3,'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY date;

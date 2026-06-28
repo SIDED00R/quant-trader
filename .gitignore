@@ -10,8 +10,8 @@ env/
 .env
 .env.local
 
-# Data / logs
-data/
+# Data / logs (루트 한정 — batch/data 등 코드 디렉터리는 추적)
+/data/
 logs/
 *.log
 runs/
