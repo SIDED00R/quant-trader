@@ -63,21 +63,30 @@ def _zip_urls(client: httpx.Client, start_year: int) -> list:
     return sorted(out, key=lambda x: x[1])
 
 
-def _fetch_zip(url: str, client: httpx.Client) -> zipfile.ZipFile:
+def _fetch_zip(url: str, client: httpx.Client):
+    """분기 ZIP을 캐시에서 또는 다운로드. 손상 캐시는 재다운로드. (zf, infotable_member) 반환."""
     fn = url.split("/")[-1]
     fp = os.path.join(_CACHE, fn)
-    if os.path.exists(fp):
-        return zipfile.ZipFile(fp)
-    r = client.get(url)
-    r.raise_for_status()
-    open(fp, "wb").write(r.content)
-    return zipfile.ZipFile(io.BytesIO(r.content))
+    for attempt in (1, 2):
+        if not os.path.exists(fp):
+            r = client.get(url)
+            r.raise_for_status()
+            open(fp, "wb").write(r.content)
+        try:
+            zf = zipfile.ZipFile(fp)
+            it = next((n for n in zf.namelist() if n.upper().endswith("INFOTABLE.TSV")), None)
+            if it:
+                return zf, it
+            return zf, None                            # 구조 변형: INFOTABLE 없음
+        except zipfile.BadZipFile:
+            os.remove(fp)                              # 손상 캐시 → 재다운로드
+    return None, None
 
 
-def _aggregate(zf: zipfile.ZipFile, cusips: set) -> dict:
+def _aggregate(zf: zipfile.ZipFile, infotable: str, cusips: set) -> dict:
     """INFOTABLE 스트리밍 → CUSIP별 {holders:set, shares, value} (우리 CUSIP만, 옵션 제외)."""
     agg = {}
-    with zf.open("INFOTABLE.tsv") as f:
+    with zf.open(infotable) as f:
         f.readline()                                    # 헤더
         for raw in io.TextIOWrapper(f, encoding="latin1"):
             p = raw.rstrip("\n").split("\t")
@@ -104,9 +113,9 @@ def collect(start_year: int = 2019, log=print) -> int:
         quarters = _zip_urls(c, start_year)
         log(f"[13f] 유니버스 FIGI {len(figi)}, 분기 {len(quarters)}개")
         # 부트스트랩: 최근분기에서 FIGI→CUSIP→ticker (CUSIP은 전분기 공통 키)
-        recent = _fetch_zip(quarters[-1][0], c)
+        recent, rit = _fetch_zip(quarters[-1][0], c)
         cusip2tk = {}
-        with recent.open("INFOTABLE.tsv") as f:
+        with recent.open(rit) as f:
             f.readline()
             for raw in io.TextIOWrapper(f, encoding="latin1"):
                 p = raw.rstrip("\n").split("\t")
@@ -115,8 +124,11 @@ def collect(start_year: int = 2019, log=print) -> int:
         cusips = set(cusip2tk)
         log(f"[13f] 부트스트랩 CUSIP {len(cusips)}/{len(us)}종목")
         for url, pe in quarters:
-            zf = _fetch_zip(url, c)
-            agg = _aggregate(zf, cusips)
+            zf, it = _fetch_zip(url, c)
+            if zf is None or it is None:
+                log(f"[13f] {pe}: INFOTABLE 없음/손상 — 건너뜀")
+                continue
+            agg = _aggregate(zf, it, cusips)
             rows = [[cusip2tk[cu], pe, len(a["h"]), a["sh"], a["v"]] for cu, a in agg.items() if cu in cusip2tk]
             if rows:
                 ch.insert("institutional_13f", rows,
