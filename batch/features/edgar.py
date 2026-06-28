@@ -154,6 +154,41 @@ def daily_fundamentals_from_store(panel: pd.DataFrame, log=print) -> pd.DataFram
     return res
 
 
+def daily_13f_from_store(panel: pd.DataFrame, log=print) -> pd.DataFrame:
+    """저장된 institutional_13f에서 일별 기관보유 피처 파생(누설없음).
+
+    13F 마감은 분기말+45일 → filed=period_end+45d as-of(그 이후만 사용). 보유기관수·총주식수(로그)
+    + QoQ 변화(기관 누적/분산 신호). df[symbol,date,f13_*].
+    """
+    from common.clickhouse_client import create_client
+    rows = create_client().query(
+        "SELECT symbol, period_end, num_holders, total_shares FROM institutional_13f FINAL").result_rows
+    if not rows:
+        log("[13f] institutional_13f 비어있음")
+        return pd.DataFrame()
+    q = pd.DataFrame(rows, columns=["symbol", "period_end", "num_holders", "total_shares"])
+    q["period_end"] = pd.to_datetime(q["period_end"])
+    q["filed"] = q["period_end"] + pd.Timedelta(days=45)
+    q = q.sort_values(["symbol", "period_end"])
+    q["holders_qoq"] = q.groupby("symbol")["num_holders"].pct_change()
+    q["shares_qoq"] = q.groupby("symbol")["total_shares"].pct_change()
+    by = {s: gg for s, gg in q.groupby("symbol")}
+    out = []
+    for s, g in panel.groupby("symbol"):
+        if s not in by:
+            continue
+        g = g.sort_values("date"); qs = by[s]
+        f = pd.DataFrame({"symbol": s, "date": g["date"].values})
+        f["f13_holders"] = np.log1p(_asof(g["date"], qs.rename(columns={"num_holders": "v"})[["filed", "v"]].rename(columns={"filed": "filed"}), "v"))
+        f["f13_shares"] = np.log1p(_asof(g["date"], qs.rename(columns={"total_shares": "v"})[["filed", "v"]], "v"))
+        f["f13_holders_qoq"] = _asof(g["date"], qs.rename(columns={"holders_qoq": "v"})[["filed", "v"]], "v")
+        f["f13_shares_qoq"] = _asof(g["date"], qs.rename(columns={"shares_qoq": "v"})[["filed", "v"]], "v")
+        out.append(f)
+    res = pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+    log(f"[13f] {res['symbol'].nunique() if len(res) else 0}종목 기관보유 피처")
+    return res
+
+
 def build_us_fundamentals(panel: pd.DataFrame, log=print) -> pd.DataFrame:
     """US 패널[symbol,date,close,volume] → 일별 펀더멘털 피처 df[symbol,date,fund_*,sector] (누설없음)."""
     cikmap = ticker_cik_map()

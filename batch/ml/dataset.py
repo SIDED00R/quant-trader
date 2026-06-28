@@ -11,7 +11,7 @@ import pandas as pd
 
 from batch.features.compute import load_ohlcv
 from batch.features.cross_market import attach_us_context
-from batch.features.edgar import daily_fundamentals_from_store
+from batch.features.edgar import daily_13f_from_store, daily_fundamentals_from_store
 from batch.features.ohlcv import compute_features, feature_columns
 from common.clickhouse_client import create_client
 
@@ -39,7 +39,7 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 
 
 def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
-                  fundamentals: bool = True, macro: bool = True):
+                  fundamentals: bool = True, macro: bool = True, inst13f: bool = True):
     """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
 
     US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag).
@@ -53,6 +53,10 @@ def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
         fund = daily_fundamentals_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
         if len(fund):
             feats = feats.merge(fund, on=["symbol", "date"], how="left")
+        if inst13f:
+            f13 = daily_13f_from_store(panel[["symbol", "date"]], log=lambda *a: None)
+            if len(f13):
+                feats = feats.merge(f13, on=["symbol", "date"], how="left")
     if macro:                                          # 매크로(전 종목 공통 레짐)
         m = _load_macro()
         if market == "US":                             # 동시점(macro(d) 종가시점 가용)
