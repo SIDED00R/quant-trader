@@ -15,8 +15,16 @@ from common.kis_account import _headers, _tr, split_account
 
 
 def _is_kr(symbol: str) -> bool:
-    """KR=6자리 숫자 종목코드, US=영문 티커."""
-    return symbol.isdigit()
+    """KR=6자 종목코드(숫자 포함, 영숫자 단축코드 0009K0 등 포함), US=영문 티커."""
+    return len(symbol) == 6 and any(c.isdigit() for c in symbol)
+
+
+def _validate(side: str, qty: int) -> None:
+    """주문 안전 가드 — 무재시도 자금경로라 무음 폴백 방지."""
+    if side not in ("BUY", "SELL"):
+        raise ValueError(f"side는 BUY|SELL만 허용 — got {side!r}")
+    if qty <= 0:
+        raise ValueError(f"qty는 양수여야 함 — got {qty}")
 
 
 def _hashkey(body: dict) -> str:
@@ -45,6 +53,7 @@ def _post_order(path: str, tr_id: str, body: dict) -> dict:
 
 def place_domestic_order(symbol: str, side: str, qty: int, price: int | None = None) -> dict:
     """국내 현금주문. price 있으면 지정가(00), 없으면 시장가(01). side: BUY|SELL."""
+    _validate(side, qty)
     cano, prdt = split_account()
     tr = _tr("TTTC0802U" if side == "BUY" else "TTTC0801U")
     body = {
@@ -58,6 +67,7 @@ def place_domestic_order(symbol: str, side: str, qty: int, price: int | None = N
 
 def place_overseas_order(symbol: str, side: str, qty: int, price, exchange: str = KIS_DEFAULT_EXCHANGE) -> dict:
     """해외(미국) 지정가 주문. 미국은 지정가만 — price 필수. side: BUY|SELL."""
+    _validate(side, qty)
     cano, prdt = split_account()
     tr = _tr("TTTT1002U" if side == "BUY" else "TTTT1006U")
     body = {
