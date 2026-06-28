@@ -5,7 +5,8 @@ from decimal import Decimal
 
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from batch.backtest.walkforward import _combos, _evaluate, _folds, _sharpe_from_rets, run_walkforward
+from batch.backtest.metrics import _sharpe_from_returns
+from batch.backtest.walkforward import _combos, _evaluate, _folds, run_walkforward
 from trading.strategy.trend import TrendStrategy
 
 _DAY = 86400.0
@@ -36,11 +37,11 @@ class TestCombos(unittest.TestCase):
 
 class TestSharpeFromRets(unittest.TestCase):
     def test_flat_is_zero(self):
-        self.assertEqual(_sharpe_from_rets([0.0, 0.0, 0.0]), 0.0)
+        self.assertEqual(_sharpe_from_returns([0.0, 0.0, 0.0]), 0.0)
 
     def test_annualization_scales(self):
         rets = [0.01, -0.005, 0.012, 0.0, 0.008]
-        self.assertAlmostEqual(_sharpe_from_rets(rets, 4.0), _sharpe_from_rets(rets, 1.0) * 2.0)
+        self.assertAlmostEqual(_sharpe_from_returns(rets, 4.0), _sharpe_from_returns(rets, 1.0) * 2.0)
 
 
 class TestEndToEnd(unittest.TestCase):

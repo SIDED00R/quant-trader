@@ -92,15 +92,18 @@ def max_drawdown(values: list[Decimal]) -> Decimal:
     return mdd
 
 
-def annualized_sharpe(values: list[float], periods_per_year: float) -> float:
-    """표본 자산값 시계열의 연율화 Sharpe(무위험수익 0 가정). 표본<2면 0."""
-    rets = [values[i] / values[i - 1] - 1 for i in range(1, len(values)) if values[i - 1] > 0]
+def _sharpe_from_returns(rets: list[float], periods_per_year: float = 1.0) -> float:
+    """봉별 수익률 리스트의 Sharpe(평균/모표준편차×√ppy). ppy=1이면 비연율(봉별). 표본<2·무변동 시 0."""
     if len(rets) < 2:
         return 0.0
     sd = statistics.pstdev(rets)
-    if sd == 0:
-        return 0.0
-    return statistics.mean(rets) / sd * math.sqrt(periods_per_year)
+    return statistics.mean(rets) / sd * math.sqrt(periods_per_year) if sd > 0 else 0.0
+
+
+def annualized_sharpe(values: list[float], periods_per_year: float) -> float:
+    """표본 자산값 시계열의 연율화 Sharpe(무위험수익 0 가정). 표본<2면 0."""
+    rets = [values[i] / values[i - 1] - 1 for i in range(1, len(values)) if values[i - 1] > 0]
+    return _sharpe_from_returns(rets, periods_per_year)
 
 
 def trade_stats(trades: list) -> dict:

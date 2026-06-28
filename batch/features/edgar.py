@@ -6,11 +6,11 @@
 파생: 시가총액(mktcap=close×shares, GKX 중요도 2위)·회전율(turnover)·PBR·PER·PSR·ROE·ROA·매출성장.
 companyfacts JSON은 캐시(재호출 회피). SEC 예절: User-Agent + ≤10req/s.
 """
-import json
 import os
 import time
 
 import httpx
+from common.cache import dump_json, load_json
 import numpy as np
 import pandas as pd
 
@@ -39,7 +39,7 @@ def fetch_companyfacts(cik: str, client: httpx.Client, req_sleep: float = 0.12) 
     fp = os.path.join(_CACHE, f"{cik}.json")
     if os.path.exists(fp):
         try:
-            return json.load(open(fp, encoding="utf-8"))
+            return load_json(fp)
         except Exception:
             pass
     time.sleep(req_sleep)
@@ -47,7 +47,7 @@ def fetch_companyfacts(cik: str, client: httpx.Client, req_sleep: float = 0.12) 
     if r.status_code != 200:
         return None
     j = r.json()
-    json.dump(j, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+    dump_json(fp, j)
     return j
 
 
@@ -179,7 +179,7 @@ def daily_13f_from_store(panel: pd.DataFrame, log=print) -> pd.DataFrame:
             continue
         g = g.sort_values("date"); qs = by[s]
         f = pd.DataFrame({"symbol": s, "date": g["date"].values})
-        f["f13_holders"] = np.log1p(_asof(g["date"], qs.rename(columns={"num_holders": "v"})[["filed", "v"]].rename(columns={"filed": "filed"}), "v"))
+        f["f13_holders"] = np.log1p(_asof(g["date"], qs.rename(columns={"num_holders": "v"})[["filed", "v"]], "v"))
         f["f13_shares"] = np.log1p(_asof(g["date"], qs.rename(columns={"total_shares": "v"})[["filed", "v"]], "v"))
         f["f13_holders_qoq"] = _asof(g["date"], qs.rename(columns={"holders_qoq": "v"})[["filed", "v"]], "v")
         f["f13_shares_qoq"] = _asof(g["date"], qs.rename(columns={"shares_qoq": "v"})[["filed", "v"]], "v")

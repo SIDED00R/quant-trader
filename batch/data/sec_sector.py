@@ -5,7 +5,6 @@
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.sec_sector
 """
-import json
 import os
 import sys
 import time
@@ -15,13 +14,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from batch.features import edgar
+from common.cache import dump_json, load_json
 from common.clickhouse_client import create_client
+from common.symbols import get_us_symbols
 
 _CACHE = os.path.join(edgar._CACHE, "sic_map.json")
 
 
 def fetch_sic(symbols, client, log=print) -> dict:
-    cache = json.load(open(_CACHE, encoding="utf-8")) if os.path.exists(_CACHE) else {}
+    cache = load_json(_CACHE, {})
     cikmap = edgar.ticker_cik_map()
     for i, t in enumerate(symbols):
         if t in cache:
@@ -37,7 +38,7 @@ def fetch_sic(symbols, client, log=print) -> dict:
             cache[t] = None
         if (i + 1) % 100 == 0:
             log(f"[sector] {i+1}/{len(symbols)}")
-    json.dump(cache, open(_CACHE, "w"), ensure_ascii=False)
+    dump_json(_CACHE, cache)
     return cache
 
 
@@ -47,7 +48,7 @@ def main(argv=None) -> int:
     except Exception:
         pass
     ch = create_client()
-    us = [r[0] for r in ch.query("SELECT DISTINCT symbol FROM stock_candles_1d WHERE market='US' ORDER BY symbol").result_rows]
+    us = get_us_symbols(ch)
     with httpx.Client(timeout=20, headers=edgar._UA) as c:
         sic = fetch_sic(us, c)
     rows = [[t, v["sic"], v["desc"], v["sic"][:2]] for t, v in sic.items() if v and v.get("sic")]

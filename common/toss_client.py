@@ -17,7 +17,6 @@ from common.config import TOSS_CLIENT_ID, TOSS_CLIENT_SECRET, TOSS_REST_BASE
 from common.oauth_token import TokenCache
 
 _TOKEN_PATH = "/oauth2/token"
-_EXPIRY_MARGIN = timedelta(minutes=10)  # 만료 10분 전 선제 재발급
 
 
 def _request_token() -> tuple[str, datetime]:
@@ -44,7 +43,7 @@ def _request_token() -> tuple[str, datetime]:
     return body["access_token"], expires_at
 
 
-_cache = TokenCache(_request_token, _EXPIRY_MARGIN, "toss")
+_cache = TokenCache(_request_token, "toss")
 
 
 def get_access_token(force: bool = False) -> str:

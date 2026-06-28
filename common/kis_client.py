@@ -16,7 +16,6 @@ from common.config import KIS_APPKEY, KIS_APPSECRET, KIS_REST_BASE
 from common.oauth_token import TokenCache
 
 _TOKEN_PATH = "/oauth2/tokenP"
-_EXPIRY_MARGIN = timedelta(minutes=10)  # 만료 10분 전 선제 재발급
 
 
 def _request_token() -> tuple[str, datetime]:
@@ -42,7 +41,7 @@ def _request_token() -> tuple[str, datetime]:
     return body["access_token"], expires_at
 
 
-_cache = TokenCache(_request_token, _EXPIRY_MARGIN, "kis")
+_cache = TokenCache(_request_token, "kis")
 
 
 def get_access_token(force: bool = False) -> str:

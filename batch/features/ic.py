@@ -16,27 +16,11 @@ from dotenv import load_dotenv
 load_dotenv()
 from batch.features.compute import load_ohlcv
 from batch.features.ohlcv import compute_features, feature_columns
-
-MIN_SYMS = 30          # 횡단면 IC 계산 최소 종목수
+from batch.ml.evaluate import MIN_SYMS, _nw_t          # NW-t·MIN_SYMS 정본(중복 제거)
 
 
 def _forward_return(panel: pd.DataFrame, h: int) -> pd.Series:
     return panel.groupby("symbol")["close"].transform(lambda s: s.shift(-h) / s - 1)
-
-
-def _nw_tstat(ic: np.ndarray, lag: int) -> float:
-    """겹치는 윈도 자기상관을 보정한 평균 IC의 Newey-West t값."""
-    ic = ic[~np.isnan(ic)]
-    n = len(ic)
-    if n < 20:
-        return np.nan
-    x = ic - ic.mean()
-    s = (x @ x) / n
-    for L in range(1, min(lag, n - 1) + 1):
-        w = 1 - L / (lag + 1)
-        s += 2 * w * (x[L:] @ x[:-L]) / n
-    se = np.sqrt(s / n)
-    return ic.mean() / se if se > 0 else np.nan
 
 
 def rank_ic(market: str, horizon: int = 21) -> pd.DataFrame:
@@ -56,7 +40,7 @@ def rank_ic(market: str, horizon: int = 21) -> pd.DataFrame:
         arr = ics.to_numpy()
         m, sd = arr.mean(), arr.std()
         res.append({"feature": ft, "mean_ic": m, "icir": m / sd if sd else 0,
-                    "pct_pos": (arr > 0).mean(), "nw_t": _nw_tstat(arr, horizon - 1), "n_days": len(arr)})
+                    "pct_pos": (arr > 0).mean(), "nw_t": _nw_t(arr, horizon - 1), "n_days": len(arr)})
     return pd.DataFrame(res).sort_values("mean_ic", key=lambda s: s.abs(), ascending=False)
 
 

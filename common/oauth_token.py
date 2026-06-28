@@ -5,14 +5,17 @@
 각 클라이언트는 `request_fn`(→ (token, expires_at(UTC)))만 주입한다.
 """
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable
+
+DEFAULT_EXPIRY_MARGIN = timedelta(minutes=10)  # 만료 10분 전 선제 재발급(브로커 공통)
 
 
 class TokenCache:
     """request_fn으로 발급한 토큰을 캐시. 만료 margin 전 또는 force 시 재발급."""
 
-    def __init__(self, request_fn: Callable[[], tuple[str, datetime]], margin, name: str):
+    def __init__(self, request_fn: Callable[[], tuple[str, datetime]], name: str,
+                 margin: timedelta = DEFAULT_EXPIRY_MARGIN):
         self._request_fn = request_fn
         self._margin = margin
         self._name = name

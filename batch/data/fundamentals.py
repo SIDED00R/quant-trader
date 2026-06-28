@@ -8,7 +8,6 @@ vintage 보존(정정공시 대비 filed_date별 모든 값 저장) → point-in
   --fetch 없으면 캐시된 companyfacts만 적재(다른 작업과 SEC rate 충돌 회피).
 """
 import argparse
-import json
 import os
 import sys
 from datetime import date
@@ -19,7 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from batch.features import edgar
+from common.cache import load_json
 from common.clickhouse_client import create_client
+from common.symbols import get_us_symbols
 
 _CONCEPTS = {
     "shares": edgar._SHARES, "equity": edgar._EQUITY, "assets": edgar._ASSETS,
@@ -48,8 +49,7 @@ def store_us_fundamentals(symbols=None, fetch: bool = False, log=print):
     cikmap = edgar.ticker_cik_map()
     ch = create_client()
     if symbols is None:
-        symbols = [r[0] for r in ch.query(
-            "SELECT DISTINCT symbol FROM stock_candles_1d WHERE market='US' ORDER BY symbol").result_rows]
+        symbols = get_us_symbols(ch)
     nsym, total = 0, 0
     with httpx.Client(timeout=30, headers=edgar._UA) as hc:
         for sym in symbols:
@@ -60,7 +60,7 @@ def store_us_fundamentals(symbols=None, fetch: bool = False, log=print):
                 facts = edgar.fetch_companyfacts(cik, hc)
             else:
                 fp = os.path.join(edgar._CACHE, f"{cik}.json")
-                facts = json.load(open(fp, encoding="utf-8")) if os.path.exists(fp) else None
+                facts = load_json(fp)
             if not facts:
                 continue
             r = _rows(sym, facts)

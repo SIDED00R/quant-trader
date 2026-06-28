@@ -9,7 +9,6 @@
 대상은 저회전 추세 전략(strategy/trend.py) — 상위 타임프레임(--bar-min, 기본 일봉)에서 평가한다.
 """
 import argparse
-import math
 import statistics
 import sys
 import time
@@ -22,7 +21,7 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.datasource import load_clickhouse_candles
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
-from batch.backtest.metrics import SECONDS_PER_YEAR, deflated_sharpe
+from batch.backtest.metrics import SECONDS_PER_YEAR, _sharpe_from_returns, deflated_sharpe
 from batch.backtest.upbit_candles import load as load_candle_cache
 from trading.strategy.ensemble import EnsembleStrategy
 from trading.strategy.trend import TrendStrategy
@@ -35,14 +34,6 @@ _DAY = 86400.0
 def _combos():
     """(short, long) 파라미터 그리드 — short < long 만. 시도 수 N = len(combos)."""
     return [(s, l) for s in _GRID_SHORT for l in _GRID_LONG if s < l]
-
-
-def _sharpe_from_rets(rets, ppy=1.0):
-    """봉별 수익률 리스트에서 직접 Sharpe(평균/표준편차×√ppy). ppy=1이면 비연율(봉별)."""
-    if len(rets) < 2:
-        return 0.0
-    sd = statistics.pstdev(rets)
-    return statistics.mean(rets) / sd * math.sqrt(ppy) if sd > 0 else 0.0
 
 
 class _NullBroker:
@@ -119,7 +110,7 @@ def _aggregate(fold_results, combined_oos_rets, sample_sec, n_trials, sr_var, pe
         "oos_total_fees": sum((fr["fees"] for fr in fold_results), Decimal(0)),
         "oos_total_tax": sum((fr["tax"] for fr in fold_results), Decimal(0)),
 
-        "combined_oos_sharpe": _sharpe_from_rets(combined_oos_rets, ppy),
+        "combined_oos_sharpe": _sharpe_from_returns(combined_oos_rets, ppy),
         "n_trials": n_trials,
         "sr_variance": sr_var,
         "deflated_sharpe": deflated_sharpe(combined_oos_rets, sr_var, n_trials),
@@ -201,8 +192,8 @@ def run_walkforward(bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec,
 
     # 그리드 각 조합의 전체기간 봉별 Sharpe 분산 → Deflated Sharpe의 다중시도 보정 입력
     full_sharpes = [
-        _sharpe_from_rets(_evaluate(bars, lambda s=s, l=l: TrendStrategy(short=s, long=l),
-                                    t0, t0, t1, initial, fills, sample_sec)["rets"])
+        _sharpe_from_returns(_evaluate(bars, lambda s=s, l=l: TrendStrategy(short=s, long=l),
+                                       t0, t0, t1, initial, fills, sample_sec)["rets"])
         for s, l in combos
     ]
     sr_var = statistics.pvariance(full_sharpes) if len(full_sharpes) >= 2 else 0.0

@@ -12,7 +12,6 @@ from common.config import KIWOOM_APP_KEY, KIWOOM_APP_SECRET, KIWOOM_REST_BASE
 from common.oauth_token import TokenCache
 
 _TOKEN_PATH = "/oauth2/token"
-_EXPIRY_MARGIN = timedelta(minutes=10)  # 만료 10분 전 선제 재발급
 _KST = timezone(timedelta(hours=9))
 
 
@@ -50,7 +49,7 @@ def _request_token() -> tuple[str, datetime]:
     return body["token"], _parse_expiry(body.get("expires_dt"))
 
 
-_cache = TokenCache(_request_token, _EXPIRY_MARGIN, "kiwoom")
+_cache = TokenCache(_request_token, "kiwoom")
 
 
 def get_access_token(force: bool = False) -> str:
