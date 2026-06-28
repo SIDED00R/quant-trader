@@ -26,7 +26,11 @@ def main(argv=None) -> int:
     p.add_argument("--days", type=int, default=2000, help="과거 일수(기본 ~5.5년)")
     p.add_argument("--table", default="stock_candles_1d", help="대상 ClickHouse 테이블")
     a = p.parse_args(argv)
-    raw = open(a.symbols_file, encoding="utf-8").read().replace("\n", ",") if a.symbols_file else a.symbols
+    if a.symbols_file:
+        with open(a.symbols_file, encoding="utf-8") as fh:    # 핸들 누수 방지
+            raw = fh.read().replace("\n", ",")
+    else:
+        raw = a.symbols
     symbols = [s.strip() for s in raw.split(",") if s.strip()]
     if not symbols:
         print("[stock-daily] 대상 종목이 없습니다.", file=sys.stderr)
