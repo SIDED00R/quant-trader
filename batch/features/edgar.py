@@ -101,7 +101,7 @@ def _features_from_concepts(sym: str, g: pd.DataFrame, cf: pd.DataFrame) -> pd.D
     f["fund_mktcap"] = np.where(mktcap > 0, np.log(np.where(mktcap > 0, mktcap, 1)), np.nan)
     f["fund_turnover"] = vol / (sh + EPS)
     f["fund_pbr"] = mktcap / (eq + EPS)
-    f["fund_per"] = mktcap / ni
+    f["fund_per"] = mktcap / np.where(ni != 0, ni, np.nan)   # ni=0만 NaN(PER 정의불가)·음수(적자)는 보존
     f["fund_psr"] = mktcap / (rv + EPS)
     f["fund_roe"] = ni / (eq + EPS)
     f["fund_roa"] = ni / (at + EPS)
