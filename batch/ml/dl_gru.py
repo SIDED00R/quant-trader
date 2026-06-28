@@ -25,30 +25,31 @@ EPS = 1e-9
 
 
 class GRUNet(nn.Module):
-    def __init__(self, n_ch=5, hidden=64, layers=2, dropout=0.2):
+    def __init__(self, n_ch=5, hidden=48, layers=1, dropout=0.0):
         super().__init__()
-        self.gru = nn.GRU(n_ch, hidden, layers, batch_first=True, dropout=dropout)
-        self.head = nn.Sequential(nn.Linear(hidden, hidden // 2), nn.ReLU(), nn.Linear(hidden // 2, 1))
+        self.gru = nn.GRU(n_ch, hidden, layers, batch_first=True,
+                          dropout=dropout if layers > 1 else 0.0)
+        self.head = nn.Sequential(nn.Linear(hidden, hidden // 2), nn.ReLU(),
+                                  nn.Dropout(0.2), nn.Linear(hidden // 2, 1))
 
     def forward(self, x):
         _, h = self.gru(x)
         return self.head(h[-1]).squeeze(-1)
 
 
-class _DS(torch.utils.data.Dataset):
-    """on-the-fly 윈도: (sym_id,t) → 정규화된 [LB,5] + 라벨."""
-    def __init__(self, chan, idx, y):
-        self.chan, self.idx, self.y = chan, idx, y
-
-    def __len__(self):
-        return len(self.idx)
-
-    def __getitem__(self, i):
-        s, t = self.idx[i]
-        w = self.chan[s][t - LB + 1:t + 1].astype(np.float32).copy()   # [LB,5] = O,H,L,C,V
-        w[:, :4] /= (w[-1, 3] + EPS)                                    # OHLC / 당일종가
-        w[:, 4] /= (w[:, 4].mean() + EPS)                              # V / 윈도평균
-        return torch.from_numpy(w), np.float32(self.y[i])
+def _build_X(chan: dict, idx: np.ndarray) -> np.ndarray:
+    """모든 샘플의 정규화 시퀀스를 한 번에 precompute → [N,LB,5] float32 (종목별 벡터화)."""
+    X = np.empty((len(idx), LB, 5), dtype=np.float32)
+    for s in np.unique(idx[:, 0]):
+        sel = np.where(idx[:, 0] == s)[0]
+        arr = chan[s].astype(np.float32)
+        wins = np.stack([arr[t - LB + 1:t + 1] for t in idx[sel, 1]])  # [m,LB,5]
+        c = wins[:, -1, 3:4][:, :, None] + EPS                         # 당일종가
+        vm = wins[:, :, 4].mean(axis=1)[:, None] + EPS                 # 윈도평균 거래량
+        wins[:, :, :4] /= c
+        wins[:, :, 4] /= vm
+        X[sel] = wins
+    return X
 
 
 def _prepare(market: str, horizon: int):
@@ -66,13 +67,14 @@ def _prepare(market: str, horizon: int):
     return chan, idx, meta
 
 
-def _train_predict(chan, tr_idx, tr_y, te_idx, epochs, seed):
+def _train_predict(Xtr, ytr, Xte, epochs, seed):
     torch.manual_seed(seed)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     net = GRUNet().to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-5)
     lossf = nn.MSELoss()
-    dl = torch.utils.data.DataLoader(_DS(chan, tr_idx, tr_y), batch_size=2048, shuffle=True, num_workers=0)
+    dl = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(Xtr, ytr),
+                                     batch_size=2048, shuffle=True, num_workers=0)
     for _ in range(epochs):
         net.train()
         for xb, yb in dl:
@@ -83,31 +85,34 @@ def _train_predict(chan, tr_idx, tr_y, te_idx, epochs, seed):
     net.eval()
     preds = []
     with torch.no_grad():
-        te_dl = torch.utils.data.DataLoader(_DS(chan, te_idx, np.zeros(len(te_idx))), batch_size=4096)
-        for xb, _ in te_dl:
-            preds.append(net(xb.to(dev)).cpu().numpy())
+        for i in range(0, len(Xte), 8192):
+            preds.append(net(Xte[i:i + 8192].to(dev)).cpu().numpy())
     return np.concatenate(preds)
 
 
 def run(market: str, horizon: int, folds: int, seeds: int, epochs: int) -> dict:
     chan, idx, meta = _prepare(market, horizon)
     dates = meta["date"].unique()
-    print(f"[GRU-{market}] {len(meta):,} 샘플, 날짜 {len(dates)} ({folds}fold, {seeds}시드, {epochs}ep, dev={'cuda' if torch.cuda.is_available() else 'cpu'})")
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"[GRU-{market}] {len(meta):,} 샘플, 날짜 {len(dates)} ({folds}fold, {seeds}시드, {epochs}ep, dev={dev}) 시퀀스 텐서 생성...")
+    X = torch.from_numpy(_build_X(chan, idx))                 # [N,LB,5] 한 번만 precompute
+    y = torch.from_numpy(meta["label"].to_numpy(np.float32))
+    print(f"[GRU-{market}] X={tuple(X.shape)} 준비 완료")
     oof = []
     for i, (tr_d, te_d) in enumerate(purged_walkforward(dates, n_splits=folds, horizon=horizon)):
-        trm = meta["date"].isin(set(tr_d)).to_numpy(); tem = meta["date"].isin(set(te_d)).to_numpy()
+        trm = torch.from_numpy(meta["date"].isin(set(tr_d)).to_numpy())
+        tem = torch.from_numpy(meta["date"].isin(set(te_d)).to_numpy())
         if not trm.any() or not tem.any():
             continue
-        tr_idx, tr_y = idx[trm], meta["label"].to_numpy()[trm]
-        te_idx = idx[tem]
-        pred = np.zeros(len(te_idx))
+        Xtr, ytr, Xte = X[trm], y[trm], X[tem]
+        pred = np.zeros(int(tem.sum()))
         for s in range(seeds):
-            pred += _train_predict(chan, tr_idx, tr_y, te_idx, epochs, s)
+            pred += _train_predict(Xtr, ytr, Xte, epochs, s)
         pred /= seeds
-        sub = meta.loc[tem, ["date", "symbol", "fwd"]].reset_index(drop=True)
+        sub = meta.loc[tem.numpy(), ["date", "symbol", "fwd"]].reset_index(drop=True)
         sub["pred"] = pred
         oof.append(sub.rename(columns={"fwd": "fwd_ret"}))
-        print(f"  fold{i+1}: train {trm.sum():,} → test {tem.sum():,} ({te_d[0]}~{te_d[-1]})")
+        print(f"  fold{i+1}: train {int(trm.sum()):,} → test {int(tem.sum()):,} ({te_d[0]}~{te_d[-1]})")
     return summarize(pd.concat(oof, ignore_index=True), horizon=horizon, label=f"GRU-{market}")
 
 
