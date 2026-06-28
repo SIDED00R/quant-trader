@@ -14,7 +14,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-DATA = sys.argv[1] if len(sys.argv) > 1 else "/content"
+DATA = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "/content"
 LB, HZ, EPS = 60, 21, 1e-9
 SEEDS, FOLDS, EPOCHS = 5, 6, 40
 
@@ -164,9 +164,13 @@ if __name__ == "__main__":
     import torch
     print(f"[colab_train] dev={'cuda' if torch.cuda.is_available() else 'cpu'} "
           f"({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
-    tab = pd.read_parquet(f"{DATA}/us_tabular.parquet")
+    import glob
+    parts = sorted(glob.glob(f"{DATA}/tab_*.parquet"))
+    tab = (pd.concat([pd.read_parquet(p) for p in parts], ignore_index=True) if parts
+           else pd.read_parquet(f"{DATA}/us_tabular.parquet"))
     ohlcv = pd.read_parquet(f"{DATA}/us_ohlcv.parquet")
     cols = [c for c in tab.columns if c not in ("symbol", "date", "label", "fwd_ret")]
+    tab[cols] = tab[cols].astype("float32")          # float16(업로드용)→float32(학습)
     print(f"[colab_train] tabular {tab.shape} ({len(cols)}피처), ohlcv {ohlcv.shape}")
     res = [run_gbdt(tab, cols), run_mlp(tab, cols), run_gru(ohlcv)]
     print(f"\n{'model':8}{'meanIC':>9}{'ICIR':>8}{'NW_t':>7}{'LS_Sharpe':>11}{'days':>7}")
