@@ -11,6 +11,7 @@ import pandas as pd
 
 from batch.features.compute import load_ohlcv
 from batch.features.cross_market import attach_us_context
+from batch.features.edgar import build_us_fundamentals
 from batch.features.ohlcv import compute_features, feature_columns
 
 EPS = 1e-12
@@ -26,12 +27,20 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
     return df
 
 
-def build_dataset(market: str, horizon: int = 21, rank_features: bool = True):
-    """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label]."""
+def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
+                  fundamentals: bool = True):
+    """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
+
+    US: SEC EDGAR 펀더멘털(누설없음) 결합. KR: 누설없는 US 컨텍스트(수급/펀더멘털은 KRX/DART 키 후).
+    """
     panel = load_ohlcv(market)
     feats = compute_features(panel)
     if market == "KR":
         feats = attach_us_context(feats, panel, load_ohlcv("US"))
+    elif market == "US" and fundamentals:
+        fund = build_us_fundamentals(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
+        if len(fund):
+            feats = feats.merge(fund, on=["symbol", "date"], how="left")
     cols = feature_columns(feats)
 
     # 미래수익(라벨 원천) — 키 merge로 정렬
