@@ -8,15 +8,20 @@ Colab T4에서 `colab exec -f` 또는 `colab run`으로 실행. ClickHouse·repo
 
 데이터 경로: 인자 1 또는 /content (Colab 기본). 결과 /content/colab_results.json 저장.
 """
+import functools
 import json
+import os
 import sys
 
 import numpy as np
 import pandas as pd
 
-DATA = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "/content"
+print = functools.partial(print, flush=True)            # Colab 출력 즉시 가시화(블록버퍼링 방지)
+DATA = os.getenv("DL_DATA") or (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "/content")
 LB, HZ, EPS = 60, 21, 1e-9
-SEEDS, FOLDS, EPOCHS = 5, 6, 40
+SEEDS = int(os.getenv("DL_SEEDS", "5"))                 # 무료 GPU 회수 대비 env로 스케일 축소 가능
+FOLDS = int(os.getenv("DL_FOLDS", "6"))
+EPOCHS = int(os.getenv("DL_EPOCHS", "40"))
 
 
 # ---- 공통: purged walk-forward + Rank IC 평가 ----
@@ -165,17 +170,33 @@ if __name__ == "__main__":
     print(f"[colab_train] dev={'cuda' if torch.cuda.is_available() else 'cpu'} "
           f"({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
     import glob
-    parts = sorted(glob.glob(f"{DATA}/tab_*.parquet"))
-    tab = (pd.concat([pd.read_parquet(p) for p in parts], ignore_index=True) if parts
-           else pd.read_parquet(f"{DATA}/us_tabular.parquet"))
-    ohlcv = pd.read_parquet(f"{DATA}/us_ohlcv.parquet")
-    cols = [c for c in tab.columns if c not in ("symbol", "date", "label", "fwd_ret")]
-    tab[cols] = tab[cols].astype("float32")          # float16(업로드용)→float32(학습)
-    print(f"[colab_train] tabular {tab.shape} ({len(cols)}피처), ohlcv {ohlcv.shape}")
-    res = [run_gbdt(tab, cols), run_mlp(tab, cols), run_gru(ohlcv)]
+    sel = os.getenv("DL_MODELS", "GBDT,MLP,GRU").split(",")   # GRU는 GPU 필요 — CPU면 DL_MODELS=GBDT,MLP
+    out = f"{DATA}/colab_results.json"
+    print(f"[colab_train] 모델={sel} 스케일 SEEDS={SEEDS} FOLDS={FOLDS} EPOCHS={EPOCHS}")
+    tab, cols, ohlcv = None, [], None
+    if "GBDT" in sel or "MLP" in sel:                 # tabular는 트리/MLP만 필요
+        parts = sorted(glob.glob(f"{DATA}/tab_*.parquet"))
+        tab = (pd.concat([pd.read_parquet(p) for p in parts], ignore_index=True) if parts
+               else pd.read_parquet(f"{DATA}/us_tabular.parquet"))
+        cols = [c for c in tab.columns if c not in ("symbol", "date", "label", "fwd_ret")]
+        tab[cols] = tab[cols].astype("float32")      # float16(업로드용)→float32(학습)
+        print(f"[colab_train] tabular {tab.shape} ({len(cols)}피처)")
+    if "GRU" in sel:                                  # GRU는 raw OHLCV만 필요(19MB 한 파일)
+        ohlcv = pd.read_parquet(f"{DATA}/us_ohlcv.parquet")
+        print(f"[colab_train] ohlcv {ohlcv.shape}")
+    res = []
+    for name, fn in [("GBDT", lambda: run_gbdt(tab, cols)),     # 빠른 것부터 — 회수돼도 직전까지 보존
+                     ("MLP", lambda: run_mlp(tab, cols)),
+                     ("GRU", lambda: run_gru(ohlcv))]:
+        if name not in sel:
+            continue
+        print(f"[colab_train] {name} 시작...")
+        r = fn()
+        res.append(r)
+        json.dump(res, open(out, "w"), indent=2)                # 모델별 증분 저장
+        print(f"[colab_train] {name} 완료: meanIC={r['mean_ic']*100:.2f}% NW_t={r['nw_t']:.1f} → {out}")
     print(f"\n{'model':8}{'meanIC':>9}{'ICIR':>8}{'NW_t':>7}{'LS_Sharpe':>11}{'days':>7}")
     print("-" * 50)
     for r in res:
         print(f"{r['model']:8}{r['mean_ic']*100:>8.2f}%{r['icir']:>8.3f}{r['nw_t']:>7.1f}{r['ls_sharpe']:>11.2f}{r['days']:>7}")
-    json.dump(res, open(f"{DATA}/colab_results.json", "w"), indent=2)
-    print(f"\n[colab_train] 결과 저장 → {DATA}/colab_results.json")
+    print(f"\n[colab_train] 결과 저장 → {out}")
