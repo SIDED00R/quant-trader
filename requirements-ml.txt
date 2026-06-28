@@ -6,3 +6,4 @@ numpy>=1.26
 scikit-learn>=1.4
 lightgbm>=4.0
 pykrx>=1.0          # KRX 데이터(외국인 수급·공매도·KR PIT) — KRX_ID/KRX_PW 필요
+torch>=2.0
