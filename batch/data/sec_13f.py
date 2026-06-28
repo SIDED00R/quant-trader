@@ -52,13 +52,22 @@ def _universe_figi(tickers: list, client: httpx.Client, log=print) -> dict:
 
 
 def _zip_urls(client: httpx.Client, start_year: int) -> list:
+    """날짜범위(최근)·분기형식(구형식) ZIP URL 모두 파싱 → [(url, period_end)] (start_year+)."""
     r = client.get(_LIST)
-    urls = re.findall(r'href="(/files/structureddata/data/form-13f-data-sets/[^"]+\.zip)"', r.text)
+    urls = re.findall(r'href="(/files/[^"]*form-13f-data-sets/[^"]+\.zip)"', r.text)
     out = []
     for u in urls:
-        m = re.search(r"-(\d{2})([a-z]{3})(\d{4})_form13f", u)
-        if m and int(m.group(3)) >= start_year:
+        name = u.split("/")[-1]
+        m = re.search(r"-(\d{2})([a-z]{3})(\d{4})_form13f", name)        # 날짜범위(종료일)
+        q = re.search(r"(\d{4})q(\d)_form13f", name)                     # 분기형식
+        if m:
             pe = date(int(m.group(3)), _MONTHS[m.group(2)], int(m.group(1)))
+        elif q:
+            qn = int(q.group(2))
+            pe = date(int(q.group(1)), qn * 3, [31, 30, 30, 31][qn - 1])  # q1..q4 분기말
+        else:
+            continue
+        if pe.year >= start_year:
             out.append(("https://www.sec.gov" + u, pe))
     return sorted(out, key=lambda x: x[1])
 
@@ -112,17 +121,23 @@ def collect(start_year: int = 2019, log=print) -> int:
         figi2tk = {v: k for k, v in figi.items()}
         quarters = _zip_urls(c, start_year)
         log(f"[13f] 유니버스 FIGI {len(figi)}, 분기 {len(quarters)}개")
-        # 부트스트랩: 최근분기에서 FIGI→CUSIP→ticker (CUSIP은 전분기 공통 키)
-        recent, rit = _fetch_zip(quarters[-1][0], c)
+        # 부트스트랩: FIGI 채워진 '완성된' 최근 분기들(마감 경과)의 합집합으로 FIGI→CUSIP→ticker.
+        # (최신 분기는 공시 마감 전이라 거의 빔 → 제외. CUSIP은 구분기에도 공통 키.)
+        cutoff = date.today() - timedelta(days=50)
+        boot_qs = [q for q in quarters if q[1] <= cutoff][-3:] or quarters[-1:]
         cusip2tk = {}
-        with recent.open(rit) as f:
-            f.readline()
-            for raw in io.TextIOWrapper(f, encoding="latin1"):
-                p = raw.rstrip("\n").split("\t")
-                if len(p) >= 6 and p[5] in figi2tk:
-                    cusip2tk[p[4]] = figi2tk[p[5]]
+        for url, _pe in boot_qs:
+            zf, it = _fetch_zip(url, c)
+            if not it:
+                continue
+            with zf.open(it) as f:
+                f.readline()
+                for raw in io.TextIOWrapper(f, encoding="latin1"):
+                    p = raw.rstrip("\n").split("\t")
+                    if len(p) >= 6 and p[5] in figi2tk:
+                        cusip2tk[p[4]] = figi2tk[p[5]]
         cusips = set(cusip2tk)
-        log(f"[13f] 부트스트랩 CUSIP {len(cusips)}/{len(us)}종목")
+        log(f"[13f] 부트스트랩 CUSIP {len(cusips)} (완성분기 {len(boot_qs)}개 합집합)")
         for url, pe in quarters:
             zf, it = _fetch_zip(url, c)
             if zf is None or it is None:
