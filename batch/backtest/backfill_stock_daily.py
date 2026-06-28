@@ -22,10 +22,16 @@ def main(argv=None) -> int:
         pass
     p = argparse.ArgumentParser(description="토스증권 주식 일봉 백필 → ClickHouse stock_candles_1d")
     p.add_argument("--symbols", default=_DEFAULT_SYMBOLS, help="쉼표 구분 (KR 6자리 / US 티커)")
+    p.add_argument("--symbols-file", help="종목 목록 파일(쉼표/줄바꿈 구분). 지정 시 --symbols 무시")
     p.add_argument("--days", type=int, default=2000, help="과거 일수(기본 ~5.5년)")
     p.add_argument("--table", default="stock_candles_1d", help="대상 ClickHouse 테이블")
     a = p.parse_args(argv)
-    symbols = [s.strip() for s in a.symbols.split(",") if s.strip()]
+    if a.symbols_file:
+        with open(a.symbols_file, encoding="utf-8") as fh:    # 핸들 누수 방지
+            raw = fh.read().replace("\n", ",")
+    else:
+        raw = a.symbols
+    symbols = [s.strip() for s in raw.split(",") if s.strip()]
     if not symbols:
         print("[stock-daily] 대상 종목이 없습니다.", file=sys.stderr)
         return 2
