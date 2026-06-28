@@ -59,8 +59,8 @@ def _fit_predict(tr: pd.DataFrame, te: pd.DataFrame, cols: list, seeds: int, obj
 
 
 def run_market(market: str, horizon: int, seeds: int, folds: int, objective: str,
-               fundamentals: bool = True, macro: bool = True, inst13f: bool = True) -> dict:
-    feats, cols = build_dataset(market, horizon, fundamentals=fundamentals, macro=macro, inst13f=inst13f)
+               fundamentals: bool = True, macro: bool = True, inst13f: bool = True, sector: bool = True) -> dict:
+    feats, cols = build_dataset(market, horizon, fundamentals=fundamentals, macro=macro, inst13f=inst13f, sector=sector)
     feats = feats.dropna(subset=["label"])               # 라벨 결측(말미 horizon) 제거
     dates = feats["date"].unique()
     print(f"[{market}] {feats['symbol'].nunique()}종목 {len(feats):,}행 {len(cols)}피처, "
@@ -96,9 +96,11 @@ def main(argv=None) -> int:
     p.add_argument("--no-fund", action="store_true", help="US 펀더멘털 제외")
     p.add_argument("--no-macro", action="store_true", help="매크로 제외")
     p.add_argument("--no-13f", dest="no_13f", action="store_true", help="US 13F 기관보유 제외")
+    p.add_argument("--no-sector", action="store_true", help="섹터/산업모멘텀 제외")
     a = p.parse_args(argv)
     rows = [run_market(mk, a.horizon, a.seeds, a.folds, a.objective,
-                       fundamentals=not a.no_fund, macro=not a.no_macro, inst13f=not a.no_13f) for mk in a.markets]
+                       fundamentals=not a.no_fund, macro=not a.no_macro, inst13f=not a.no_13f,
+                       sector=not a.no_sector) for mk in a.markets]
     print(f"\n===== LightGBM 베이스라인 (OOF, purged walk-forward) =====")
     print_summary(rows)
     return 0

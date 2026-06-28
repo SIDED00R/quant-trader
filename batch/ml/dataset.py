@@ -30,6 +30,18 @@ def _load_macro() -> pd.DataFrame:
     return df
 
 
+def _attach_sector(feats: pd.DataFrame) -> pd.DataFrame:
+    """SEC SIC 섹터로 산업모멘텀(indmom, GKX top-7) + 섹터중립 피처. 종목별 변동(섹터간 상이)."""
+    rows = create_client().query("SELECT symbol, sector2 FROM stock_meta FINAL").result_rows
+    sec = dict(rows)
+    feats["_sec"] = feats["symbol"].map(sec).fillna("NA")
+    g = feats.groupby(["date", "_sec"])
+    feats["indmom"] = g["mom12m"].transform("mean")              # 산업 모멘텀(Moskowitz-Grinblatt)
+    feats["mom12m_srel"] = feats["mom12m"] - feats["indmom"]     # 섹터중립 모멘텀
+    feats["retvol_srel"] = feats["retvol21"] - g["retvol21"].transform("mean")
+    return feats.drop(columns=["_sec"])
+
+
 def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
     """종목별 피처를 일별 횡단면 rank[-1,1]로 정규화(NaN 보존)."""
     g = df.groupby("date")
@@ -39,7 +51,8 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 
 
 def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
-                  fundamentals: bool = True, macro: bool = True, inst13f: bool = True):
+                  fundamentals: bool = True, macro: bool = True, inst13f: bool = True,
+                  sector: bool = True):
     """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
 
     US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag).
@@ -57,6 +70,8 @@ def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
             f13 = daily_13f_from_store(panel[["symbol", "date"]], log=lambda *a: None)
             if len(f13):
                 feats = feats.merge(f13, on=["symbol", "date"], how="left")
+        if sector:
+            feats = _attach_sector(feats)
     if macro:                                          # 매크로(전 종목 공통 레짐)
         m = _load_macro()
         if market == "US":                             # 동시점(macro(d) 종가시점 가용)

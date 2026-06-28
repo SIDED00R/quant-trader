@@ -163,3 +163,15 @@ CREATE TABLE IF NOT EXISTS institutional_13f (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, period_end);
+
+-- US 섹터(SEC SIC). 산업모멘텀(indmom)·sector-neutral 피처용. batch/data/sec_sector.py 적재.
+CREATE TABLE IF NOT EXISTS stock_meta (
+    symbol      LowCardinality(String),
+    sic         String,
+    sic_desc    String,
+    sector2     String,                     -- SIC 2자리 major group
+    source      LowCardinality(String) DEFAULT 'SEC',
+    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY symbol;
