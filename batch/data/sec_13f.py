@@ -100,7 +100,7 @@ def _aggregate(zf: zipfile.ZipFile, infotable: str, cusips: set) -> dict:
         f.readline()                                    # 헤더
         for raw in io.TextIOWrapper(f, encoding="latin1"):
             p = raw.rstrip("\n").split("\t")
-            if len(p) < 9 or p[4] not in cusips or p[9].strip():   # CUSIP idx4, PUTCALL idx9(옵션 제외)
+            if len(p) < 10 or p[4] not in cusips or p[9].strip():   # CUSIP idx4, PUTCALL idx9(옵션 제외)
                 continue
             a = agg.setdefault(p[4], {"h": set(), "sh": 0.0, "v": 0.0})
             a["h"].add(p[0])
