@@ -143,6 +143,18 @@
 - **확정 US 피처셋 = OHLCV + 펀더멘털(매크로 제외)**. **교훈: 외부데이터는 무지성 추가 금지, ablation으로 선별.**
 - KR: 외국인 수급(KRX 키 후)은 펀더멘털처럼 종목별 직접 신호라 유망. DART 펀더멘털도 동일 검증 예정.
 
+### DL 1차 비교 — GRU(raw 시퀀스) vs GBDT (US)
+`batch/ml/dl_gru.py`, raw OHLCV 5채널×60일(당일종가 정규화), 동일 purged CV.
+
+| 모델 | 입력 | Rank IC | ICIR | NW_t | LS Sharpe |
+|---|---|---|---|---|---|
+| **GBDT (lambdarank)** | 공학피처 58+펀더멘털+13F | **3.56%** | 0.200 | **2.2** | 1.18 |
+| GRU (축소: 1층·1시드·10ep) | raw 시퀀스 5×60 | 0.37% | 0.041 | 0.5 | 0.36 |
+
+- **현 결과: GRU ≪ GBDT**(0.37% vs 3.56%). 단 **GRU는 축소 CPU 실행으로 과소적합** 강함(Qlib GRU는 CSI300서 RankIC~5.8%, 우리 0.37%는 덜 학습됨). **CPU GRU 순환연산이 느려 풀스케일(5시드·다epoch·큰모델) 불가** → 공정한 DL 검증엔 **GPU 필요**.
+- **입력 비대칭**: GBDT=공학피처+외부데이터, GRU=raw OHLCV만. 정식 비교는 GRU에도 동일 외부데이터(static 결합) + GPU 풀학습 필요.
+- **현 챔피언 = GBDT(OHLCV+펀더멘털+13F, NW_t 2.2)**. DL은 GPU 풀스케일에서 재평가(서베이 prior: tabular는 GBDT가 강함 — DL이 이기려면 raw 시퀀스 풀학습 필요). GPU 투자 전 KR 외국인수급(키) 추가가 ROI 더 클 수 있음.
+
 ## 8. 다음 구현 순서
 1. **공유 학습 인프라**: 라벨 생성(횡단면 rank) + purged/embargo CV 분할기 + Rank IC/ICIR/DSR 평가 + 시드앙상블 — 모든 모델 공용.
 2. **LightGBM 베이스라인**(CPU): US/KR 분리, KR은 US 컨텍스트 포함, lambdarank, 시드앙상블 → 게이트 기준선 확정.
