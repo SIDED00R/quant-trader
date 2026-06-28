@@ -149,3 +149,17 @@ CREATE TABLE IF NOT EXISTS index_changes (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (index_name, date, symbol);
+
+-- US 13F 기관보유(SEC DERA, 분기). 우리 512종목만(CUSIP 필터). 보유기관수·총주식수가 robust 신호.
+-- VALUE는 2023Q1부터 천$→$ 단위변경 → 보조. batch/data/sec_13f.py 적재. 재실행 멱등.
+CREATE TABLE IF NOT EXISTS institutional_13f (
+    symbol       LowCardinality(String),
+    period_end   Date,
+    num_holders  UInt32,
+    total_shares Float64,
+    total_value  Float64,
+    source       LowCardinality(String) DEFAULT 'SEC-DERA',
+    ingested_at  DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, period_end);

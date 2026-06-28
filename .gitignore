@@ -28,3 +28,4 @@ docker/volumes/
 # 내부 문서 (GitHub 비공개 — 구현 상세/설계 근거)
 /IMPLEMENTATION.md
 batch/features/.edgar_cache/
+batch/data/.13f_cache/
