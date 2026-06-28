@@ -10,7 +10,7 @@ import httpx
 from common.constants import HTTP_MAX_BACKOFF, HTTP_MAX_RETRIES, HTTP_TIMEOUT
 
 
-def backoff(attempt: int, max_backoff: float = HTTP_MAX_BACKOFF) -> float:
+def _backoff(attempt: int, max_backoff: float = HTTP_MAX_BACKOFF) -> float:
     """지수 백오프 초(상한 max_backoff)."""
     return min(1.0 * (2 ** attempt), max_backoff)
 
@@ -36,10 +36,10 @@ def get_json(
             try:
                 r = c.get(url, **kwargs)
             except httpx.TransportError:                       # 타임아웃/연결오류 → 백오프 재시도
-                time.sleep(backoff(attempt, max_backoff))
+                time.sleep(_backoff(attempt, max_backoff))
                 continue
             if r.status_code == 429 or r.status_code >= 500:   # 레이트리밋/일시 서버오류 → 백오프 재시도
-                time.sleep(backoff(attempt, max_backoff))
+                time.sleep(_backoff(attempt, max_backoff))
                 continue
             r.raise_for_status()
             if req_sleep:

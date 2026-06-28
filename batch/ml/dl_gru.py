@@ -67,9 +67,13 @@ def _prepare(market: str, horizon: int):
     return chan, idx, meta
 
 
+def _device() -> str:
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def _train_predict(Xtr, ytr, Xte, epochs, seed):
     torch.manual_seed(seed)
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    dev = _device()
     net = GRUNet().to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-5)
     lossf = nn.MSELoss()
@@ -93,8 +97,7 @@ def _train_predict(Xtr, ytr, Xte, epochs, seed):
 def run(market: str, horizon: int, folds: int, seeds: int, epochs: int) -> dict:
     chan, idx, meta = _prepare(market, horizon)
     dates = meta["date"].unique()
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"[GRU-{market}] {len(meta):,} 샘플, 날짜 {len(dates)} ({folds}fold, {seeds}시드, {epochs}ep, dev={dev}) 시퀀스 텐서 생성...")
+    print(f"[GRU-{market}] {len(meta):,} 샘플, 날짜 {len(dates)} ({folds}fold, {seeds}시드, {epochs}ep, dev={_device()}) 시퀀스 텐서 생성...")
     X = torch.from_numpy(_build_X(chan, idx))                 # [N,LB,5] 한 번만 precompute
     y = torch.from_numpy(meta["label"].to_numpy(np.float32))
     print(f"[GRU-{market}] X={tuple(X.shape)} 준비 완료")

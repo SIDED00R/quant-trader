@@ -73,7 +73,8 @@ def _rebalance(acct, symbol, target_w, prices, band):
         return
     pos = _positions(acct)
     qty = pos.get(symbol, Decimal(0))
-    order = decide(qty, price, _cash(acct), _equity(_cash(acct), pos, prices), target_w, band)
+    cash = _cash(acct)                   # DB 1회 조회 — equity 계산과 공유
+    order = decide(qty, price, cash, _equity(cash, pos, prices), target_w, band)
     if order is None:
         return
     side, quantity = order

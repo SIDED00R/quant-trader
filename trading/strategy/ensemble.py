@@ -39,7 +39,7 @@ class EnsembleStrategy(Strategy):
         self.rebalance_band = float(ENSEMBLE_REBALANCE_BAND if rebalance_band is None else rebalance_band)
 
     def combined_target(self, symbol: str, price) -> Decimal:
-        """각 부하 신호를 갱신하고 가중평균 합성 목표비중(0=현금)을 반환. on_tick(주문)과 라이브 신호 발행이 공유.
+        """각 부하 신호를 갱신하고 가중평균 합성 목표비중(0=현금)을 반환. on_tick(주문)과 대시보드 API(api/routes/strategy)가 공유.
 
         부작용: 각 TrendSignal의 내부 상태(가격버퍼·long 래치)를 갱신한다(매 봉 1회 호출 가정).
         """

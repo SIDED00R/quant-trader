@@ -21,6 +21,7 @@ COLUMNS = COLUMNS_CANDLES
 
 
 def floor_minute(ts_iso: str) -> datetime:
+    """tz-aware(UTC) ISO 타임스탬프를 분 단위로 내림한 윈도우 키(tz-aware 유지)."""
     return datetime.fromisoformat(ts_iso).replace(second=0, microsecond=0)
 
 

@@ -70,7 +70,8 @@ def _per_symbol(g: pd.DataFrame) -> pd.DataFrame:
     f["fip"] = (np.sign(pret) * ((1 - pos_frac) - pos_frac)).values
 
     # --- 변동성/레인지 ---
-    f["retvol21"] = ret.rolling(21, min_periods=10).std().values
+    rv21 = ret.rolling(21, min_periods=10).std()
+    f["retvol21"] = rv21.values
     f["retvol63"] = ret.rolling(63, min_periods=30).std().values
     f["parkinson21"] = (0.361 * np.log(h / l) ** 2).rolling(21, min_periods=10).mean().values
     f["garman_klass21"] = (0.5 * np.log(h / l) ** 2 - 0.386 * np.log(c / o) ** 2).rolling(21, min_periods=10).mean().values
@@ -79,7 +80,7 @@ def _per_symbol(g: pd.DataFrame) -> pd.DataFrame:
     f["vol_termstruct"] = (yz20 / (yz60 + EPS)).values
     tr = pd.concat([h - l, (h - c.shift(1)).abs(), (l - c.shift(1)).abs()], axis=1).max(axis=1)
     f["atr14"] = (tr.ewm(alpha=1 / 14, min_periods=7).mean() / c).values
-    f["volofvol"] = ret.rolling(21, min_periods=10).std().rolling(63, min_periods=30).std().values
+    f["volofvol"] = rv21.rolling(63, min_periods=30).std().values     # retvol21(=rv21) 재사용
     f["skew21"] = ret.rolling(21, min_periods=10).skew().values
     f["kurt21"] = ret.rolling(21, min_periods=10).kurt().values
     r2 = ret ** 2
