@@ -125,3 +125,27 @@ CREATE TABLE IF NOT EXISTS macro_daily (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY date;
+
+-- 지수 PIT 멤버십(종목별 편입~편출 구간)·편입편출 이벤트. 생존편향 부분해결 + 이벤트 신호.
+-- S&P500은 PIT 정확(GitHub fja05680). batch/data/us_membership.py 적재. 재실행 멱등.
+CREATE TABLE IF NOT EXISTS index_membership (
+    symbol      LowCardinality(String),
+    index_name  LowCardinality(String),   -- SP500 | NASDAQ100 | KOSPI200 | KOSDAQ150
+    start_date  Date,
+    end_date    Date,                      -- 2099-12-31 = 현재 멤버
+    source      LowCardinality(String) DEFAULT 'github',
+    ingested_at DateTime64(3,'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (index_name, symbol, start_date);
+
+CREATE TABLE IF NOT EXISTS index_changes (
+    date        Date,
+    symbol      LowCardinality(String),
+    index_name  LowCardinality(String),
+    action      Enum8('add'=1, 'drop'=2),
+    source      LowCardinality(String) DEFAULT 'github',
+    ingested_at DateTime64(3,'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (index_name, date, symbol);
