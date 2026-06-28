@@ -101,6 +101,59 @@ def _asof(dates: pd.Series, series: pd.DataFrame, col: str) -> np.ndarray:
     return m.sort_index()[col].to_numpy()
 
 
+def _features_from_concepts(sym: str, g: pd.DataFrame, cf: pd.DataFrame) -> pd.DataFrame:
+    """저장된 분기 facts(cf: 한 종목)로 일별 펀더멘털 피처 파생(누설없음)."""
+    def inst(concept):
+        s = cf[(cf["concept"] == concept) & (cf["duration_d"] == 0)][["filed_date", "value"]]
+        s = s.rename(columns={"filed_date": "filed", "value": "val"}).sort_values("filed").drop_duplicates("filed", keep="last")
+        return _asof(g["date"], s, "val")
+
+    def ttm(concept):
+        q = cf[(cf["concept"] == concept) & (cf["duration_d"].between(80, 100))][["period_end", "filed_date", "value"]]
+        if q.empty:
+            return np.full(len(g), np.nan), np.full(len(g), np.nan)
+        q = q.sort_values(["period_end", "filed_date"]).drop_duplicates("period_end", keep="last").reset_index(drop=True)
+        q["ttm"] = q["value"].rolling(4).sum()
+        q["yoy"] = q["ttm"] / q["ttm"].shift(4) - 1
+        q = q.rename(columns={"filed_date": "filed"}).dropna(subset=["ttm"]).sort_values("filed")
+        return _asof(g["date"], q[["filed", "ttm"]], "ttm"), _asof(g["date"], q[["filed", "yoy"]], "yoy")
+
+    sh, eq, at = inst("shares"), inst("equity"), inst("assets")
+    ni, _ = ttm("net_income"); rv, rv_yoy = ttm("revenue")
+    close, vol = g["close"].to_numpy(), g["volume"].to_numpy()
+    mktcap = close * sh
+    f = pd.DataFrame({"symbol": sym, "date": g["date"].values})
+    f["fund_mktcap"] = np.where(mktcap > 0, np.log(np.where(mktcap > 0, mktcap, 1)), np.nan)
+    f["fund_turnover"] = vol / (sh + EPS)
+    f["fund_pbr"] = mktcap / (eq + EPS)
+    f["fund_per"] = mktcap / ni
+    f["fund_psr"] = mktcap / (rv + EPS)
+    f["fund_roe"] = ni / (eq + EPS)
+    f["fund_roa"] = ni / (at + EPS)
+    f["fund_rev_growth"] = rv_yoy
+    return f
+
+
+def daily_fundamentals_from_store(panel: pd.DataFrame, log=print) -> pd.DataFrame:
+    """저장된 fundamentals_quarterly에서 일별 펀더멘털 피처 파생(JSON 재파싱 없이 빠름)."""
+    from common.clickhouse_client import create_client
+    rows = create_client().query(
+        "SELECT symbol, concept, period_end, filed_date, duration_d, value "
+        "FROM fundamentals_quarterly FINAL").result_rows
+    if not rows:
+        log("[edgar] fundamentals_quarterly 비어있음 — batch.data.fundamentals 먼저 실행")
+        return pd.DataFrame()
+    cf = pd.DataFrame(rows, columns=["symbol", "concept", "period_end", "filed_date", "duration_d", "value"])
+    cf["filed_date"] = pd.to_datetime(cf["filed_date"]); cf["period_end"] = pd.to_datetime(cf["period_end"])
+    cf["value"] = cf["value"].astype(float)
+    by_sym = {s: gg for s, gg in cf.groupby("symbol")}
+    out = [_features_from_concepts(s, g.sort_values("date"), by_sym[s])
+           for s, g in panel.groupby("symbol") if s in by_sym]
+    res = pd.concat(out, ignore_index=True) if out else pd.DataFrame()
+    log(f"[edgar] {res['symbol'].nunique() if len(res) else 0}종목 펀더멘털(저장소)")
+    return res
+
+
 def build_us_fundamentals(panel: pd.DataFrame, log=print) -> pd.DataFrame:
     """US 패널[symbol,date,close,volume] → 일별 펀더멘털 피처 df[symbol,date,fund_*,sector] (누설없음)."""
     cikmap = ticker_cik_map()

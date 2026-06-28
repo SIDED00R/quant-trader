@@ -11,12 +11,23 @@ import pandas as pd
 
 from batch.features.compute import load_ohlcv
 from batch.features.cross_market import attach_us_context
-from batch.features.edgar import build_us_fundamentals
+from batch.features.edgar import daily_fundamentals_from_store
 from batch.features.ohlcv import compute_features, feature_columns
+from common.clickhouse_client import create_client
 
 EPS = 1e-12
-# 시장수준(날짜별 상수) US 피처 — 횡단면 rank 제외, raw 유지
-_MARKET_LEVEL = {"usx_mkt_ret", "usx_breadth", "usx_ret5", "usx_ret21", "usx_vol21"}
+_MACRO = ["dgs10", "dgs2", "dgs3mo", "t10y2y", "t10y3m", "vix", "usdkrw", "dxy", "wti"]
+# 시장수준(날짜별 상수) 피처 — 횡단면 rank 제외, raw 유지(트리 레짐 상호작용용)
+_MARKET_LEVEL = {"usx_mkt_ret", "usx_breadth", "usx_ret5", "usx_ret21", "usx_vol21", *_MACRO}
+
+
+def _load_macro() -> pd.DataFrame:
+    rows = create_client().query(f"SELECT date, {','.join(_MACRO)} FROM macro_daily FINAL ORDER BY date").result_rows
+    df = pd.DataFrame(rows, columns=["date", *_MACRO])
+    df["date"] = pd.to_datetime(df["date"])
+    for c in _MACRO:
+        df[c] = df[c].astype(float)
+    return df
 
 
 def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
@@ -28,19 +39,27 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 
 
 def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
-                  fundamentals: bool = True):
+                  fundamentals: bool = True, macro: bool = True):
     """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
 
-    US: SEC EDGAR 펀더멘털(누설없음) 결합. KR: 누설없는 US 컨텍스트(수급/펀더멘털은 KRX/DART 키 후).
+    US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag).
+    (KR 수급/공매도/펀더멘털은 KRX/DART 키 후 동일 방식 추가.)
     """
     panel = load_ohlcv(market)
     feats = compute_features(panel)
     if market == "KR":
         feats = attach_us_context(feats, panel, load_ohlcv("US"))
     elif market == "US" and fundamentals:
-        fund = build_us_fundamentals(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
+        fund = daily_fundamentals_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
         if len(fund):
             feats = feats.merge(fund, on=["symbol", "date"], how="left")
+    if macro:                                          # 매크로(전 종목 공통 레짐)
+        m = _load_macro()
+        if market == "US":                             # 동시점(macro(d) 종가시점 가용)
+            feats = feats.merge(m, on="date", how="left")
+        else:                                          # KR: 누설방지 — macro date < KR date
+            feats = pd.merge_asof(feats.sort_values("date"), m.sort_values("date"),
+                                  on="date", direction="backward", allow_exact_matches=False)
     cols = feature_columns(feats)
 
     # 미래수익(라벨 원천) — 키 merge로 정렬
