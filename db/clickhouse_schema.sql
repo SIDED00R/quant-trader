@@ -175,3 +175,53 @@ CREATE TABLE IF NOT EXISTS stock_meta (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY symbol;
+
+-- ── KR 외부데이터(KRX 정보데이터시스템, pykrx 로그인). 전부 KR 전용 변수(US 구조적 부재). ──
+-- 모두 batch/data/krx.py가 종목별 1패스로 적재(재실행 멱등). 발표 지연 주의 — 사용 시 시프트.
+
+-- KR 투자자별 순매수(12분류). 롱 포맷(투자자 차원) — 외국인/기관/개인 등이 핵심 수급 신호.
+-- value=순매수금액(원), volume=순매수수량(주). EOD 장마감(~18시) 확정 → t일은 t종가 이후 게이팅.
+CREATE TABLE IF NOT EXISTS stock_investor_flow (
+    date        Date,
+    symbol      LowCardinality(String),
+    investor    LowCardinality(String),   -- foreign|individual|pension|invest_trust|insurance|fin_invest|...
+    net_value   Float64,                  -- 순매수금액(원)
+    net_volume  Float64,                  -- 순매수수량(주)
+    source      LowCardinality(String) DEFAULT 'KRX',
+    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, date, investor);
+
+-- KR 외국인 보유/한도소진율. 피처는 지분율·한도소진률의 Δ(수준은 다중공선성).
+CREATE TABLE IF NOT EXISTS stock_foreign_holding (
+    date            Date,
+    symbol          LowCardinality(String),
+    listed_shares   Float64,              -- 상장주식수
+    held_shares     Float64,              -- 외국인 보유수량
+    holding_ratio   Float64,              -- 지분율(%)
+    limit_shares    Float64,              -- 한도수량
+    exhaustion_rate Float64,              -- 한도소진률(%)
+    source          LowCardinality(String) DEFAULT 'KRX',
+    ingested_at     DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, date);
+
+-- KR 공매도(잔고+거래량 병합). 잔고 2016-06~, 거래량 ~2017~. T+2 지연 발표 → 사용 시 시프트.
+-- 공매도 금지구간(2020-03~2021-05, 2023-11~2025-03)은 0/결측 → 레짐 더미 권장.
+CREATE TABLE IF NOT EXISTS stock_short (
+    date                Date,
+    symbol              LowCardinality(String),
+    short_volume        Float64,          -- 공매도 거래량(주)
+    total_volume        Float64,          -- 전체 거래량(주)
+    short_volume_ratio  Float64,          -- 공매도 비중(%)
+    short_balance_qty   Float64,          -- 공매도 잔고수량(주)
+    short_balance_value Float64,          -- 공매도 잔고금액(원)
+    market_cap          Float64,          -- 시가총액(원)
+    short_balance_ratio Float64,          -- 잔고비중(%)
+    source              LowCardinality(String) DEFAULT 'KRX',
+    ingested_at         DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, date);

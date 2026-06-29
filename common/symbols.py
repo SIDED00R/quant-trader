@@ -34,7 +34,18 @@ def resolve_symbols() -> list[str]:
     return _cache or SYMBOLS
 
 
-def get_us_symbols(ch) -> list[str]:
-    """저장된 US 일봉의 종목 목록(distinct·정렬). 펀더멘털·13F·섹터 수집 공통 쿼리."""
+def _market_symbols(ch, market: str) -> list[str]:
+    """저장된 stock_candles_1d의 시장별 종목 목록(distinct·정렬)."""
     return [r[0] for r in ch.query(
-        "SELECT DISTINCT symbol FROM stock_candles_1d WHERE market='US' ORDER BY symbol").result_rows]
+        "SELECT DISTINCT symbol FROM stock_candles_1d WHERE market={m:String} ORDER BY symbol",
+        parameters={"m": market}).result_rows]
+
+
+def get_us_symbols(ch) -> list[str]:
+    """US 일봉 종목 목록. 펀더멘털·13F·섹터 수집 공통 쿼리."""
+    return _market_symbols(ch, "US")
+
+
+def get_kr_symbols(ch) -> list[str]:
+    """KR 일봉 종목 목록. KRX 수급·공매도·외국인보유 수집 공통 쿼리."""
+    return _market_symbols(ch, "KR")
