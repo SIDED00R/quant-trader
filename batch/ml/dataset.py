@@ -54,20 +54,21 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 
 def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
                   fundamentals: bool = True, macro: bool = True, inst13f: bool = True,
-                  sector: bool = True):
+                  sector: bool = True, kr_micro: bool = True):
     """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
 
     US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag)
-    + DART 펀더멘털 + KRX 미시구조(수급·공매도·외국인보유, 발표지연 누설차단).
+    + DART 펀더멘털(fundamentals) + KRX 미시구조(kr_micro, 수급·공매도·외국인보유, 발표지연 누설차단).
     """
     panel = load_ohlcv(market)
     feats = compute_features(panel)
     if market == "KR":
         feats = attach_us_context(feats, panel, load_ohlcv("US"))
-        if fundamentals:                               # KR 펀더멘털(DART) + 미시구조(KRX 수급·공매도·외국인보유)
+        if fundamentals:                               # KR 펀더멘털(DART)
             fund = daily_fundamentals_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
             if len(fund):
                 feats = feats.merge(fund, on=["symbol", "date"], how="left")
+        if kr_micro:                                   # KRX 미시구조(수급·공매도·외국인보유)
             micro = daily_kr_microstructure_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
             if len(micro):
                 feats = feats.merge(micro, on=["symbol", "date"], how="left")
