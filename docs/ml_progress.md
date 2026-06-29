@@ -28,7 +28,7 @@
   | **+ 섹터**(산업모멘텀 indmom) | GKX top-7, 섹터중립 | **3.78%** | **2.3** | 채택(현 챔피언) |
   | + 매크로(금리·VIX·환율) | 레짐 | 2.05% | 1.5 | **제외(시장수준→과적합)** |
 - **교훈**: **검증된 외부데이터(펀더멘털·13F·섹터)는 누적 개선**(NW_t 1.8→2.3). **매크로(시장수준)는 무지성 추가 시 과적합** → ablation 선별 필수.
-- **KR**: 외국인수급·공매도·KR펀더멘털(KRX/DART 키 대기) 추가 시 동일 검증 예정.
+- **KR**: 외국인수급·공매도·KR펀더멘털 수집·검증 완료 → §7.
 
 ## 4. DL 비교 (완료, Issue#148) — 트리 압승, DL 미달
 - **무엇**: GBDT(lambdarank) vs MLP vs GRU(raw OHLCV 5채널×60일) head-to-head. 동일 데이터·purged CV·자체완결 스크립트(`batch/ml/colab_train.py`)로 같은 파이프라인 비교.
@@ -49,6 +49,19 @@
 
 ## 6. 코드 품질 (Issue#146, 머지됨)
 - **무엇**: 전 리포 9영역 병렬 리뷰(95이슈) → 검증된 중복 구현 통합(NW-t·Sharpe·MIN_SYMS·US쿼리·토큰마진·file leak 등), 문서·코드 4축 정합성 수정. colab 자체완결 복제 등은 의도적이라 제외. 후속 라인리뷰로 13F off-by-one 버그·PER 0분모 가드 등 수정. PR #144·#147·#117 머지 완료.
+
+## 7. KR 외부데이터 수집 + ablation (Issue#150/152/154/156)
+- **무엇/왜**: KR의 OHLCV-only ML이 OOS 약함(§ baseline)이라, "진짜 unlock은 외국인수급·공매도·펀더멘털" 가설을 검증. KRX(pykrx 로그인)·DART(키) 자격증명 확보 후 수집기 구축.
+- **수집기**: `batch/data/krx.py`(수급·공매도·외국인보유 → stock_investor_flow/short/foreign_holding), `kr_index_membership.py`(KOSPI200/KOSDAQ150 PIT), `kr_fundamentals.py`(DART → fundamentals_quarterly, source='DART', US와 동일 규약 plug-in). 피처: `batch/features/kr_microstructure.py`(누설차단 8종) + `dataset.py` KR 경로 배선.
+- **단변량 Rank IC(fwd21d, 2024–2026, 344종목)**: 공매도잔고비율 **−7.4%(NW_t −6.3)**·외국인보유율 +4.1%·외국인순매수20 +3.25%·외국인보유Δ +3.16%·연기금/기관 순매수 −3.9%/−3.5%(역방향). 단 full-sample·공매도금지 레짐 영향 → OOS로 재검증.
+- **OOS ablation(purged WF, 2024+ 미시활성 구간, lambdarank)**:
+  | 모델 | Rank IC | ICIR | NW_t | LS_Sharpe | 판정 |
+  |---|---|---|---|---|---|
+  | OHLCV 전용 | −1.28% | −0.13 | −1.0 | 0.50 | 약/음 |
+  | **+ DART 펀더멘털** | +0.78% | 0.08 | 0.5 | 1.32 | 채택 |
+  | **+ KRX 미시구조** | **+2.62%** | 0.26 | 1.7 | **1.56** | 채택(현 KR 최선) |
+- **교훈**: KR 외부데이터가 KR을 **음수→+2.6% OOF Rank IC, LS_Sharpe 0.5→1.56**으로 반전. 펀더·미시구조 **각각 marginal 기여 대등**(미시 +1.84pp·ICIR 0.08→0.26). 미시구조는 **중요도 top12 미진입이나 한계기여는 큼**(상관피처가 중요도 분산 → 중요도≠기여). **단 NW_t 1.7로 강(≥2) 미달**(미시 이력 2.5년 짧음)·공매도금지(2023-11~2025-03) 레짐 겹침 → 이력 확장 시 재확인.
+- **운영 메모**: per-symbol 수집기는 장기범위 느림(공매도 8년 ~3시간) → **by-date 전종목 함수**(`get_*_by_ticker`, `get_market_net_purchases_of_equities_by_ticker`)로 벌크 리팩터 권장(검증 적재는 이 방식으로 수행). pykrx는 **import 시점 KRX_ID/PW 로그인** → .env를 import 전 로드. DART는 thstrm=분기3개월·연간12개월(Q4=연간−Q3누적).
 
 ---
 *갱신: 외부데이터·DL·KR 추가 시 본 표를 이어서 기록. 절대값은 생존편향 미보정 잠정치.*
