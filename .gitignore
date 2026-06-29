@@ -29,4 +29,5 @@ docker/volumes/
 /IMPLEMENTATION.md
 batch/features/.edgar_cache/
 batch/data/.13f_cache/
+batch/data/.dart_cache/
 colab_data/
