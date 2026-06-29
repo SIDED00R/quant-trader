@@ -3,7 +3,7 @@
 KOSPI200(1028)·KOSDAQ150(2203)의 시점별 구성종목을 날짜 그리드(기본 월별)로 스냅샷,
 연속 스냅샷 diff로 멤버십 구간·편입편출 이벤트를 만든다. source='KRX'.
 
-⚠ pykrx는 import 시점에 KRX_ID/KRX_PW로 로그인하므로 .env를 import 전에 로드한다(아래 순서 유지).
+⚠ pykrx 로그인·.env 선로드는 batch.data._krx_session이 일원화(거기서 stock·require_login import).
 한계: 변경 시점 해상도 = 샘플링 주기(기본 월, US fja05680의 정확일과 달리 근사). --freq로 조절.
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.kr_index_membership [--start 2018-01-01] [--freq BMS]
@@ -14,22 +14,12 @@ import time
 from datetime import date
 
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()                        # ← pykrx import 전에 KRX_ID/KRX_PW 주입(로그인 트리거)
-from pykrx import stock              # noqa: E402  (import 시점 KRX 로그인)
-from pykrx.website.comm.auth import get_auth_session  # noqa: E402
-
-from common.clickhouse_client import create_client  # noqa: E402
+from batch.data._krx_session import require_login, stock
+from common.clickhouse_client import create_client
 
 _INDICES = {"KOSPI200": "1028", "KOSDAQ150": "2203"}
 _FAR = date(2099, 12, 31)            # 현재 멤버 표식(US 적재와 동일 규약)
-
-
-def _require_login() -> None:
-    s = get_auth_session()
-    if not (s and s.is_authenticated):
-        raise RuntimeError("KRX 로그인 실패 — KRX_ID/KRX_PW(.env)를 확인하세요.")
 
 
 def _snapshots(code: str, grid: list, sleep: float) -> list:
@@ -65,7 +55,7 @@ def _diff(name: str, snaps: list) -> tuple:
 
 
 def store_kr_membership(start="2018-01-01", freq="BMS", sleep=0.3, log=print):
-    _require_login()
+    require_login()
     today = pd.Timestamp.today().normalize()
     grid = list(pd.date_range(start=start, end=today, freq=freq))
     if not grid or grid[-1] != today:

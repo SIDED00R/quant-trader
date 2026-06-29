@@ -50,8 +50,13 @@ def daily_kr_microstructure_from_store(panel: pd.DataFrame, log=print) -> pd.Dat
         piv = flow.pivot_table(index=["symbol", "date"], columns="investor",
                                values="net_value", aggfunc="sum").reset_index()
         piv["foreign_net"] = piv.get("foreign", 0.0).fillna(0) + piv.get("other_foreign", 0.0).fillna(0)
-        # 기관: 상세 12분류(수집기) 합 또는 'institution' 집계(벌크 소스) — 소스 무관 동작
-        piv["inst_net"] = piv[[c for c in _INST if c in piv]].sum(axis=1) + piv.get("institution", 0.0).fillna(0)
+        # 기관 순매수: 벌크 소스의 'institution'(KRX 기관합계, 연기금 포함)이 있으면 그대로,
+        # per-symbol 소스면 상세 기관분류 합. 두 소스 모두 연기금 포함 = 기관합계 동일 의미.
+        # pension은 별도 피처로만 사용(institution에 합산하면 연기금 이중계산 → 금지).
+        if "institution" in piv:
+            piv["inst_net"] = piv["institution"].fillna(0)
+        else:
+            piv["inst_net"] = piv[[c for c in _INST if c in piv]].sum(axis=1)
         piv["pension_net"] = piv.get("pension", 0.0).fillna(0)
         piv["date"] = pd.to_datetime(piv["date"])
         flow_by = {s: g for s, g in piv.groupby("symbol")}
