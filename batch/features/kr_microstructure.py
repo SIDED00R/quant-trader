@@ -50,7 +50,8 @@ def daily_kr_microstructure_from_store(panel: pd.DataFrame, log=print) -> pd.Dat
         piv = flow.pivot_table(index=["symbol", "date"], columns="investor",
                                values="net_value", aggfunc="sum").reset_index()
         piv["foreign_net"] = piv.get("foreign", 0.0).fillna(0) + piv.get("other_foreign", 0.0).fillna(0)
-        piv["inst_net"] = piv[[c for c in _INST if c in piv]].sum(axis=1)
+        # 기관: 상세 12분류(수집기) 합 또는 'institution' 집계(벌크 소스) — 소스 무관 동작
+        piv["inst_net"] = piv[[c for c in _INST if c in piv]].sum(axis=1) + piv.get("institution", 0.0).fillna(0)
         piv["pension_net"] = piv.get("pension", 0.0).fillna(0)
         piv["date"] = pd.to_datetime(piv["date"])
         flow_by = {s: g for s, g in piv.groupby("symbol")}
