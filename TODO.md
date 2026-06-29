@@ -134,3 +134,19 @@
 - [ ] 전체 자산 100 기준 코인+주식 배분 정책 설계 (자산군 비중·리밸런싱)
 - [ ] 통합 대시보드 (코인+주식 합산 평가자산/손익)
 - [ ] 통합 운영 회고/문서화
+
+## ML 피처·외부데이터 트랙 (상세: `docs/ml_progress.md` §1~7)
+> 주식 횡단면 수익예측. **모델=GBDT(LightGBM lambdarank)** — DL(GRU/MLP) 비교서 채택(트리 압승, §4). 평가=purged walk-forward + Rank IC/ICIR/NW-t + 롱숏 Sharpe, US/KR 분리.
+- [x] OHLCV 피처(58)·GBDT 베이스라인·DL 비교·HP 튜닝 (#145~148)
+- [x] US 외부데이터 ablation → **OHLCV+펀더+13F+섹터 채택**(3.78%/NW_t2.3)
+- [x] **KR 외부데이터 수집·배선·OOS 검증 (2026-06-29 완료)**:
+  - [x] KRX 수급·공매도·외국인보유 수집기 `krx.py` + 고속 `krx_bulk.py`(by-date) — #150 / **PR #151**
+  - [x] KOSPI200·KOSDAQ150 PIT 멤버십 `kr_index_membership.py` — #152 / **PR #153**
+  - [x] DART 펀더멘털 `kr_fundamentals.py`(fundamentals_quarterly plug-in) — #154 / **PR #155**(#151 스택)
+  - [x] 피처 배선 `kr_microstructure.py` + `dataset.py` KR경로 + IC/ablation — #156 / **PR #157**
+  - [x] 데이터 적재: KR 미시구조 **2019-05~2026-06 (7년)·344종목**(수급 157만행), DART 펀더 344종목
+  - **견고 결론**: KR OHLCV 0.26% → +펀더+미시 **1.21% OOF Rank IC, LS_Sharpe 1.03→1.34**. 방향 일관 양(+)이나 **NW_t~1.0(강≥2 미달)** — KR은 구조적 약신호(US 3.4~3.8% 대비). 공매도 단변량 −7.4%는 full-sample·금지레짐 효과.
+- [ ] **(내일) PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼로 `_require_login`·`.env先로드` 중복 통합 ②README `batch/data` 목록 reconcile.
+- [ ] **(내일) 공매도 금지 레짐 분리 검증** — 금지구간(2020-03~2021-05, 2023-11~2025-03) 더미/제외로 공매도 신호 진위 최종 확인.
+- [ ] (후속) KR 챔피언 피처셋 확정 + `baseline_lgbm` 기본 반영, 추가 ablation(매크로 등 선별).
+- [ ] (후속) **생존편향 통제**(탈락·상폐 종목 가격 적재) — 절대 IC 과대의 본질, 별도 트랙.

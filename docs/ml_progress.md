@@ -28,7 +28,7 @@
   | **+ 섹터**(산업모멘텀 indmom) | GKX top-7, 섹터중립 | **3.78%** | **2.3** | 채택(현 챔피언) |
   | + 매크로(금리·VIX·환율) | 레짐 | 2.05% | 1.5 | **제외(시장수준→과적합)** |
 - **교훈**: **검증된 외부데이터(펀더멘털·13F·섹터)는 누적 개선**(NW_t 1.8→2.3). **매크로(시장수준)는 무지성 추가 시 과적합** → ablation 선별 필수.
-- **KR**: 외국인수급·공매도·KR펀더멘털(KRX/DART 키 대기) 추가 시 동일 검증 예정.
+- **KR**: 외국인수급·공매도·KR펀더멘털 수집·검증 완료 → §7.
 
 ## 4. DL 비교 (완료, Issue#148) — 트리 압승, DL 미달
 - **무엇**: GBDT(lambdarank) vs MLP vs GRU(raw OHLCV 5채널×60일) head-to-head. 동일 데이터·purged CV·자체완결 스크립트(`batch/ml/colab_train.py`)로 같은 파이프라인 비교.
@@ -49,6 +49,19 @@
 
 ## 6. 코드 품질 (Issue#146, 머지됨)
 - **무엇**: 전 리포 9영역 병렬 리뷰(95이슈) → 검증된 중복 구현 통합(NW-t·Sharpe·MIN_SYMS·US쿼리·토큰마진·file leak 등), 문서·코드 4축 정합성 수정. colab 자체완결 복제 등은 의도적이라 제외. 후속 라인리뷰로 13F off-by-one 버그·PER 0분모 가드 등 수정. PR #144·#147·#117 머지 완료.
+
+## 7. KR 외부데이터 수집 + ablation (Issue#150/152/154/156)
+- **무엇/왜**: KR의 OHLCV-only ML이 OOS 약함(§ baseline)이라, "진짜 unlock은 외국인수급·공매도·펀더멘털" 가설을 검증. KRX(pykrx 로그인)·DART(키) 자격증명 확보 후 수집기 구축.
+- **수집기**: `batch/data/krx.py`(수급·공매도·외국인보유 → stock_investor_flow/short/foreign_holding), `kr_index_membership.py`(KOSPI200/KOSDAQ150 PIT), `kr_fundamentals.py`(DART → fundamentals_quarterly, source='DART', US와 동일 규약 plug-in). 피처: `batch/features/kr_microstructure.py`(누설차단 8종) + `dataset.py` KR 경로 배선.
+- **단변량 Rank IC(fwd21d, 2024–2026, 344종목)**: 공매도잔고비율 **−7.4%(NW_t −6.3)**·외국인보유율 +4.1%·외국인순매수20 +3.25%·외국인보유Δ +3.16%·연기금/기관 순매수 −3.9%/−3.5%(역방향). 단 full-sample·공매도금지 레짐 영향 → OOS로 재검증.
+- **OOS ablation(purged WF, lambdarank). 미시구조 이력 확장(2.5년→7년, krx_bulk 2019-2023 백필) 후 견고 재검증**:
+  | 모델 | Rank IC(전체7y) | NW_t | LS_Sharpe | (참고)2.5년 미시 2024+ |
+  |---|---|---|---|---|
+  | OHLCV 전용 | 0.26% | 0.2 | 1.03 | −1.28%/NW_t−1.0 |
+  | **+ DART 펀더멘털** | 0.52% | 0.4 | 1.23 | +0.78%/0.5 |
+  | **+ KRX 미시구조** | **1.21%** | **1.0** | **1.34** | +2.62%/1.7(과대) |
+- **교훈(중요·견고)**: 이력 2.5년→7년 확장 시 미시 기여가 **하락**(2024+ IC 2.62%→1.48%, NW_t 1.7→1.1). **이전 1.7은 미시가 2024+에만 있어 '최근 레짐 전용'으로 학습된 과대치** — 7년 전 레짐에 걸쳐 평가하니 견고 NW_t **~1.0(강≥2 미달)**. 단 **방향은 모든 cut서 일관 양**(미시가 펀더 위 실질 기여, 전체 LS_Sharpe 1.03→1.34). **공매도 단변량 −7.4%의 강함=full-sample·공매도금지(2020-03~2021-05, 2023-11~2025-03) 레짐 효과로 확정**. **판정: KR 외부데이터 채택 가치 있음(약→+1.2%·LS_Sharpe 1.34)이나 강유의 아님** — US(3.4-3.8%) 대비 KR 구조적 약세 재확인("KR 신호 marginal").
+- **운영 메모**: per-symbol 수집기는 장기범위 느림(공매도 8년 ~3시간) → **by-date 전종목 함수**(`get_*_by_ticker`, `get_market_net_purchases_of_equities_by_ticker`)로 벌크 리팩터 권장(검증 적재는 이 방식으로 수행). pykrx는 **import 시점 KRX_ID/PW 로그인** → .env를 import 전 로드. DART는 thstrm=분기3개월·연간12개월(Q4=연간−Q3누적).
 
 ---
 *갱신: 외부데이터·DL·KR 추가 시 본 표를 이어서 기록. 절대값은 생존편향 미보정 잠정치.*

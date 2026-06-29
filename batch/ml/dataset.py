@@ -1,6 +1,7 @@
 """학습 데이터 조립 (단일 책임: OHLCV → 피처 + 라벨 행렬, 시장별).
 
-- 피처: batch/features/ohlcv(58) + (KR) 누설없는 US 컨텍스트(cross_market).
+- 피처: batch/features/ohlcv(58) + (US) EDGAR 펀더멘털·13F·섹터
+  + (KR) 누설없는 US 컨텍스트(cross_market) · DART 펀더멘털 · KRX 미시구조(수급·공매도·외국인보유).
 - 라벨: 미래 horizon일 수익률(fwd_ret)을 **일별 횡단면 z-score**로(절대수익 아님 → 비정상 완화).
 - 피처 정규화: 종목별 피처는 **일별 횡단면 rank[-1,1]**(GKX 표준, 레짐 상대화). 시장수준 US 피처
   (usx_mkt_* — 한 날짜 전종목 동일)는 rank 시 0이 되므로 raw 유지(트리 레짐 상호작용용).
@@ -12,6 +13,7 @@ import pandas as pd
 from batch.features.compute import load_ohlcv
 from batch.features.cross_market import attach_us_context
 from batch.features.edgar import daily_13f_from_store, daily_fundamentals_from_store
+from batch.features.kr_microstructure import daily_kr_microstructure_from_store
 from batch.features.ohlcv import compute_features, feature_columns
 from common.clickhouse_client import create_client
 
@@ -52,16 +54,24 @@ def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 
 def build_dataset(market: str, horizon: int = 21, rank_features: bool = True,
                   fundamentals: bool = True, macro: bool = True, inst13f: bool = True,
-                  sector: bool = True):
+                  sector: bool = True, kr_micro: bool = True):
     """(feats, feature_cols) 반환. feats: [symbol,date,<피처>,fwd_ret,label].
 
-    US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag).
-    (KR 수급/공매도/펀더멘털은 KRX/DART 키 후 동일 방식 추가.)
+    US: SEC EDGAR 펀더멘털 + 매크로(동시점). KR: 누설없는 US 컨텍스트 + 매크로(lag)
+    + DART 펀더멘털(fundamentals) + KRX 미시구조(kr_micro, 수급·공매도·외국인보유, 발표지연 누설차단).
     """
     panel = load_ohlcv(market)
     feats = compute_features(panel)
     if market == "KR":
         feats = attach_us_context(feats, panel, load_ohlcv("US"))
+        if fundamentals:                               # KR 펀더멘털(DART)
+            fund = daily_fundamentals_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
+            if len(fund):
+                feats = feats.merge(fund, on=["symbol", "date"], how="left")
+        if kr_micro:                                   # KRX 미시구조(수급·공매도·외국인보유)
+            micro = daily_kr_microstructure_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
+            if len(micro):
+                feats = feats.merge(micro, on=["symbol", "date"], how="left")
     elif market == "US" and fundamentals:
         fund = daily_fundamentals_from_store(panel[["symbol", "date", "close", "volume"]], log=lambda *a: None)
         if len(fund):
