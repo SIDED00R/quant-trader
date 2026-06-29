@@ -73,14 +73,14 @@ def _day_rows(ds: str, d: date, univ: set):
     return flow, hold, short
 
 
-def store_kr_bulk(start="2018-01-01", flush_every=50, log=print):
+def store_kr_bulk(start="2018-01-01", end=None, flush_every=50, log=print):
     _require_login()
     ch = create_client()
     univ = set(get_kr_symbols(ch))
     if not univ:
         log("[krx-bulk] 대상 종목 없음(stock_candles_1d market='KR' 비어있음).")
         return 0
-    days = _trading_days(start, date.today().strftime("%Y-%m-%d"))
+    days = _trading_days(start, end or date.today().strftime("%Y-%m-%d"))
     log(f"[krx-bulk] 거래일 {len(days)}일 ({days[0]}~{days[-1]}), 유니버스 {len(univ)}종목")
     fb, hb, sb, n, fail = [], [], [], 0, 0
 
@@ -114,8 +114,9 @@ def main(argv=None) -> int:
         pass
     p = argparse.ArgumentParser(description="KRX by-date 벌크 → 수급·공매도·외국인보유(고속 전체이력)")
     p.add_argument("--start", default="2018-01-01")
+    p.add_argument("--end", default=None, help="종료일(미지정 시 오늘). 갭 백필용")
     a = p.parse_args(argv)
-    store_kr_bulk(start=a.start)
+    store_kr_bulk(start=a.start, end=a.end)
     return 0
 
 
