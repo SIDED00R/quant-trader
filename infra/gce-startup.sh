@@ -24,12 +24,19 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-# 레포 클론/갱신 + 풀스택 기동 (public repo)
+# 레포 클론/갱신 + 풀스택 기동 (private repo — Secret Manager deploy key로 SSH fetch)
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+DK_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true)
+curl -s -H "Authorization: Bearer $DK_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/github-deploy-key/versions/latest:access" 2>/dev/null \
+  | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))" > /root/.ssh/id_ed25519 2>/dev/null || true
+chmod 600 /root/.ssh/id_ed25519 2>/dev/null || true
+export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 cd /opt
 if [ ! -d coin-auto-trader ]; then
-  git clone https://github.com/SIDED00R/coin-auto-trader.git
+  git clone git@github.com:SIDED00R/coin-auto-trader.git
 fi
 cd coin-auto-trader
+git remote set-url origin git@github.com:SIDED00R/coin-auto-trader.git   # https(익명) → SSH deploy key(private repo)
 git fetch origin main && git reset --hard origin/main   # 부팅 시 최신 main 반영(.env는 gitignore라 보존)
 cp -n .env.example .env || true
 

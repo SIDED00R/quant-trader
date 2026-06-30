@@ -27,8 +27,15 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 # ── 최신 코드 ──
-[ -d "$REPO" ] || git clone https://github.com/SIDED00R/coin-auto-trader.git "$REPO"
-cd "$REPO" && git fetch origin main && git reset --hard origin/main
+# GitHub deploy key (private repo) — Secret Manager → SSH 키, git을 SSH로
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+DK_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true)
+curl -s -H "Authorization: Bearer $DK_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/github-deploy-key/versions/latest:access" 2>/dev/null \
+  | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))" > /root/.ssh/id_ed25519 2>/dev/null || true
+chmod 600 /root/.ssh/id_ed25519 2>/dev/null || true
+export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+[ -d "$REPO" ] || git clone git@github.com:SIDED00R/coin-auto-trader.git "$REPO"
+cd "$REPO" && git remote set-url origin git@github.com:SIDED00R/coin-auto-trader.git && git fetch origin main && git reset --hard origin/main
 cp -n .env.example .env || true
 
 # ── KIS 자격증명 주입 (Secret Manager kis-env → .env, VM 토큰으로 REST 접근; 실패해도 진행) ──
