@@ -11,7 +11,10 @@ import sys
 from common import kis_balance
 from common.kis_order import place_overseas_order
 from common.kis_overseas_price import price_and_exchange
+from common.market_holidays import is_market_holiday, market_today
+from common.postgres_client import open_pool
 from trading.strategy.stock_trade_common import build_plan, confirm_fills, latest_closes
+from trading.strategy.weekly_marker import completed, mark_week_done, week_done
 
 _BUFFER = 1.02   # 지정가 매수 buffer(체결 보장)
 
@@ -25,7 +28,13 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
     """live=True면 buys 상위 max_orders개 KIS 해외 모의 지정가매수. 동일가중 USD 사이징·체결확인=잔고diff."""
     p = plan(top_n=top_n, macro=macro)
     if not live:
-        return {**p, "placed": []}
+        return {**p, "placed": [], "skipped": None}
+    open_pool()
+    today = market_today("US")
+    if week_done("US", today):                       # 그 주 이미 매매함 → 평일 재부팅 skip
+        return {**p, "placed": [], "skipped": f"이미 이번주 리밸런싱 완료({today})"}
+    if is_market_holiday("US", today):               # 휴장일 → 주문 미발주, 다음 평일 재시도
+        return {**p, "placed": [], "skipped": f"US 휴장일({today}) — 다음 평일 재시도"}
     bal = kis_balance.us_balance()
     before = {x["symbol"]: x["qty"] for x in bal["positions"]}
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
@@ -51,7 +60,9 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
         except Exception as e:
             placed.append({"symbol": sym, "accepted": False, "error": f"{type(e).__name__}: {e}"})
     confirm_fills(kis_balance.us_balance, before, placed)   # 잔고 폴링 체결확인(접수≠체결)
-    return {**p, "placed": placed}
+    if completed(p, placed):                                # 체결됨(또는 매수할 것 없음) → 그 주 완료 기록
+        mark_week_done("US", today)
+    return {**p, "placed": placed, "skipped": None}
 
 
 def main(argv=None) -> int:
@@ -68,6 +79,8 @@ def main(argv=None) -> int:
     r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
     print(f"[us-trade] bar={r['bar']} cash={r['cash']:,.2f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
+    if r.get("skipped"):
+        print(f"  skip: {r['skipped']}")
     for o in r.get("placed", []):
         print("  ", o)
     return 0
