@@ -225,3 +225,18 @@ CREATE TABLE IF NOT EXISTS stock_short (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, date);
+
+-- KR 상장폐지 종목 메타(FDR KRX-DELISTING). 생존편향 보정 — PIT 유니버스(상장~폐지 구간) 구성용.
+-- 상폐 종목 OHLCV는 stock_candles_1d(market='KR')에 함께 적재, 폐지일 이후 제외 게이팅은 본 표로.
+CREATE TABLE IF NOT EXISTS stock_delisting (
+    symbol         LowCardinality(String),
+    name           String,
+    market         LowCardinality(String),   -- KOSPI | KOSDAQ | KONEX
+    listing_date   Date32,                    -- Date32(1900~): 1970년 이전 상장 옛 기업 대응
+    delisting_date Date32,
+    reason         String,                    -- 폐지사유(감사의견거절·자본잠식·합병 등)
+    source         LowCardinality(String) DEFAULT 'FDR',
+    ingested_at    DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY symbol;
