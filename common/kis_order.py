@@ -12,6 +12,7 @@ import httpx
 from common.config import KIS_APPKEY, KIS_APPSECRET, KIS_REST_BASE
 from common.constants import BROKER_TIMEOUT, KIS_DEFAULT_EXCHANGE
 from common.kis_account import _headers, _tr, split_account
+from common.rate_limit import acquire
 
 
 def _is_kr(symbol: str) -> bool:
@@ -29,6 +30,7 @@ def _validate(side: str, qty: int) -> None:
 
 def _hashkey(body: dict) -> str:
     """주문 본문 → HASH (POST /uapi/hashkey). 주문 POST의 hashkey 헤더로 사용."""
+    acquire("kis", "rest")
     r = httpx.post(
         f"{KIS_REST_BASE}/uapi/hashkey",
         headers={"content-type": "application/json", "appkey": KIS_APPKEY, "appsecret": KIS_APPSECRET},
@@ -43,6 +45,7 @@ def _post_order(path: str, tr_id: str, body: dict) -> dict:
     """주문 POST(재시도 없음). rt_cd!=0이면 사유와 함께 예외. output(ODNO 등) 포함 응답 반환."""
     headers = _headers(tr_id)
     headers["hashkey"] = _hashkey(body)
+    acquire("kis", "rest")
     r = httpx.post(f"{KIS_REST_BASE}{path}", headers=headers, json=body, timeout=BROKER_TIMEOUT)
     r.raise_for_status()
     b = r.json()

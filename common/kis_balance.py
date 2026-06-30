@@ -15,6 +15,7 @@ from common.kis_account import (
     split_account,
 )
 from common.config import KIS_REST_BASE
+from common.rate_limit import acquire
 
 _US_EXCHANGES = ("NASD", "NYSE", "AMEX")
 
@@ -45,6 +46,7 @@ def kr_balance() -> dict:
 def us_buyable_usd() -> float:
     """해외주식 매수가능 외화금액(USD). 명목 종목/가로 조회해 주문가능 외화금액을 cash 근사로 사용."""
     cano, prdt = split_account()
+    acquire("kis", "rest")
     body = get_json(
         f"{KIS_REST_BASE}/uapi/overseas-stock/v1/trading/inquire-psamount",
         {

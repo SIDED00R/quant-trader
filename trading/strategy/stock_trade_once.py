@@ -4,6 +4,8 @@ dry_run=True(기본)면 주문 없이 매매계획만 반환(검증용). live면
 KR 유니버스. 잔고/포지션 소스 = KIS(kis_balance). 동일가중 top-N long-or-cash.
 주문은 무재시도 자금경로(kis_order) — 라이브는 호출처에서 명시적으로 켠다.
 """
+import time
+
 from batch.ml.stock_score import score_latest
 from common import kis_balance
 from common.kis_order import place_domestic_order
@@ -33,11 +35,25 @@ def execute(top_n: int = 30, macro: bool = False, live: bool = False, max_orders
     p = plan(top_n=top_n, macro=macro)
     if not live:
         return {**p, "placed": []}
+    # 체결 확인 기준선 — KIS 모의는 일별체결조회 미지원("내역 없음") → 잔고 포지션 증가분이 진실
+    before = {x["symbol"]: x["qty"] for x in kis_balance.kr_balance()["positions"]}
     placed = []
     for sym in p["buys"][:max_orders]:
         try:
-            resp = place_domestic_order(sym, "BUY", 1)  # 검증: 1주씩(수량 정책은 후속)
-            placed.append({"symbol": sym, "rt_cd": resp.get("rt_cd"), "msg": resp.get("msg1")})
+            resp = place_domestic_order(sym, "BUY", 1)   # 검증단계 1주씩(동일가중 사이징은 후속)
+            placed.append({"symbol": sym, "accepted": str(resp.get("rt_cd")) == "0", "msg": resp.get("msg1")})
         except Exception as e:
-            placed.append({"symbol": sym, "error": f"{type(e).__name__}: {e}"})
+            placed.append({"symbol": sym, "accepted": False, "error": f"{type(e).__name__}: {e}"})
+    # 잔고 폴링으로 실제 체결 확인(접수≠체결)
+    syms = [o["symbol"] for o in placed]
+    filled: dict = {}
+    for _ in range(6):
+        time.sleep(2)
+        after = {x["symbol"]: x["qty"] for x in kis_balance.kr_balance()["positions"]}
+        filled = {s: after.get(s, 0) - before.get(s, 0) for s in syms if after.get(s, 0) > before.get(s, 0)}
+        if len(filled) >= sum(1 for o in placed if o.get("accepted")):
+            break
+    for o in placed:
+        o["filled_qty"] = filled.get(o["symbol"], 0)
+        o["filled"] = o["symbol"] in filled
     return {**p, "placed": placed}
