@@ -52,16 +52,21 @@ ssh -i "$TUNNEL_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
     -fN -L 5432:localhost:5432 -L 8123:localhost:8123 tunnel@"$DATA_VM_IP" </dev/null >/dev/null 2>&1
 sleep 5
 
-# ── 1회 매매(network_mode:host로 127.0.0.1 터널 접속) ──
-# --build: trade-once는 코드를 이미지에 굽는다(소스 볼륨 없음). 위 git reset 한 최신 소스로 매번 재빌드해야
-#          낡은 이미지의 옛 코드가 실행되는 것을 막는다(없으면 #94 결정 기록 코드가 영영 안 돌았음).
-docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
-
-# ── 주식 주간 모의 리밸런싱 (월요일만; ML 이미지로 챔피언 스코어→KIS 모의주문) ──
-# date -u +%u: 1=월요일. 매매 VM은 매일 01:00 UTC(=KR 10:00 장중) 기동 → 월요일에만 주식 실행 = 주 1회.
-# stock-trade-once는 batch 이미지(lightgbm). KIS 자격증명은 VM .env에 있어야 함(메타데이터/시크릿 주입).
-if [ "$(date -u +%u)" = "1" ]; then
-  docker compose --profile trade run --build --rm stock-trade-once 2>&1 | tee /var/log/stock-trade.log
+# ── 기동 시각으로 분기 (두 스케줄러가 같은 VM을 start; 메타데이터 전달 채널 없어 UTC 시각으로 구분) ──
+# US-close 잡(tz=America/New_York 15:00 ET → 19:00 UTC 서머/20:00 UTC 윈터)이면 hour∈{19,20,21}.
+# 그 외(데일리 trade-vm-daily 01:00 UTC)는 코인+KR. 이 분기가 코인 이중매매를 막는다.
+# --build: trade-once류는 코드를 이미지에 굽는다(소스 볼륨 없음). 위 git reset 한 최신 소스로 매번 재빌드해야
+#          낡은 이미지의 옛 코드가 실행되는 것을 막는다(없으면 #94 결정 기록 코드가 영영 안 돌았음). 제거 금지.
+H=$(date -u +%H)
+if [ "$H" = "19" ] || [ "$H" = "20" ] || [ "$H" = "21" ]; then
+  # 미국장 막바지 기동 → US 해외 모의 리밸런싱만(주 1회, 스케줄러가 월요일 보장). batch 이미지(lightgbm).
+  docker compose --profile trade run --build --rm us-trade-once 2>&1 | tee /var/log/us-trade.log
+else
+  # 데일리 기동(01:00 UTC=KR 10:00 장중) → 코인 매매(매일) + KR 주식(월요일만, date -u +%u: 1=월).
+  docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
+  if [ "$(date -u +%u)" = "1" ]; then
+    docker compose --profile trade run --build --rm stock-trade-once 2>&1 | tee /var/log/stock-trade.log
+  fi
 fi
 
 # ── 정리 + self-stop ──

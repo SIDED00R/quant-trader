@@ -315,6 +315,28 @@ services:
       KIS_MOCK: ${KIS_MOCK:-true}
     command: python -m trading.strategy.stock_trade_once --live --top-n 10 --max-orders 5
 
+  # ── 온디맨드 US 주간 모의 리밸런싱 (profile: trade — 매매 VM, ML 이미지) ──
+  # KR판(stock-trade-once)의 US 대응. 차이: USD·해외 잔고/지정가주문(시장가 불가)·거래소 라우팅.
+  # 주 1회 — 스타트업이 UTC 부팅시각(미국장 막바지 윈도)으로만 실행. KIS 자격증명은 VM .env에서 주입.
+  us-trade-once:
+    build:
+      context: .
+      dockerfile: Dockerfile.batch
+    image: coin-auto-trader-batch
+    profiles: ["trade"]
+    restart: "no"
+    network_mode: host
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+      KIS_APPKEY: ${KIS_APPKEY:-}
+      KIS_APPSECRET: ${KIS_APPSECRET:-}
+      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+      KIS_MOCK: ${KIS_MOCK:-true}
+    command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
+
   api:
     <<: *app
     container_name: api
