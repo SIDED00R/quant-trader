@@ -232,8 +232,8 @@ CREATE TABLE IF NOT EXISTS stock_delisting (
     symbol         LowCardinality(String),
     name           String,
     market         LowCardinality(String),   -- KOSPI | KOSDAQ | KONEX
-    listing_date   Date,
-    delisting_date Date,
+    listing_date   Date32,                    -- Date32(1900~): 1970년 이전 상장 옛 기업 대응
+    delisting_date Date32,
     reason         String,                    -- 폐지사유(감사의견거절·자본잠식·합병 등)
     source         LowCardinality(String) DEFAULT 'FDR',
     ingested_at    DateTime64(3, 'UTC') DEFAULT now64(3)
