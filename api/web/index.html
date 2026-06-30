@@ -184,6 +184,7 @@
 <nav class="tabs">
   <button class="tab on" data-view="dashboard">대시보드</button>
   <button class="tab" data-view="decisions">매매 결정 기록</button>
+  <button class="tab" data-view="stocks">주식</button>
 </nav>
 
 <div id="view-dashboard">
@@ -255,6 +256,14 @@
     </table>
     <p class="muted" style="font-size:11px;margin-top:12px">행을 클릭하면 부하별 분석 근거가 펼쳐집니다 · 밑줄 친 용어에 마우스를 올리면 설명이 나옵니다.</p>
   </div>
+</div>
+
+<div id="view-stocks" hidden>
+  <section class="stance">
+    <div class="stance-head"><span class="lbl">주식 모의계좌</span>
+      <span class="sub" id="stocksSub">KIS 모의계좌 · 알고리즘 자동매매는 배선 예정 (현재 잔고 조회)</span></div>
+    <div class="rails" id="stockCards"><div class="muted" style="padding:8px">잔고 로딩…</div></div>
+  </section>
 </div>
 
 <div id="tip"></div>
@@ -461,7 +470,9 @@ function showView(name){
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.view === name));
   document.getElementById("view-dashboard").hidden = name !== "dashboard";
   document.getElementById("view-decisions").hidden = name !== "decisions";
+  document.getElementById("view-stocks").hidden = name !== "stocks";
   if(name === "decisions") loadDecisions();
+  if(name === "stocks") loadStocks();
 }
 
 // ── 용어 설명(호버 툴팁) ──
@@ -521,6 +532,30 @@ async function loadDecisions(){
       if(det){ det.hidden = !det.hidden; r.classList.toggle("open", !det.hidden); }
     });
   } catch(e){ tb.innerHTML = `<tr><td colspan="7" class="muted">결정 기록을 불러오지 못했습니다</td></tr>`; }
+}
+
+// ── 주식 모의계좌(KIS) ──
+const usd = n => "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+async function loadStocks(){
+  const box = document.getElementById("stockCards");
+  try {
+    const a = await api("/stocks/account");
+    box.innerHTML = [["국내주식 (KR)", a.kr, won], ["미국주식 (US)", a.us, usd]].map(([title, d, money]) => {
+      const rows = d.positions.length ? d.positions.map(p => {
+        const cls = p.pnl>0?"up":p.pnl<0?"down":"";
+        return `<tr><td>${p.symbol}</td><td class="num">${px(p.qty)}</td><td class="num">${money(p.avg)}</td>
+          <td class="num">${money(p.cur)}</td><td class="num">${money(p.eval)}</td>
+          <td class="num ${cls}">${p.pnl>=0?"+":""}${money(p.pnl)}</td></tr>`;
+      }).join("") : `<tr><td colspan="6" class="muted">보유 없음</td></tr>`;
+      return `<div class="panel">
+        <h2>${title} <span class="tag">KIS 모의</span></h2>
+        <div class="perf"><div class="cell"><div class="k">예수금</div><div class="val">${money(d.cash)}</div></div>
+          <div class="cell"><div class="k">보유종목</div><div class="val">${d.positions.length}</div></div></div>
+        <table style="margin-top:12px"><thead><tr><th>종목</th><th class="num">수량</th><th class="num">평균가</th>
+          <th class="num">현재가</th><th class="num">평가</th><th class="num">손익</th></tr></thead>
+          <tbody>${rows}</tbody></table></div>`;
+    }).join("");
+  } catch(e){ box.innerHTML = `<div class="muted" style="padding:8px">주식 잔고 조회 실패 — KIS 연결/모의계좌 확인</div>`; }
 }
 
 async function boot(){
