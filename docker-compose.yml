@@ -55,6 +55,26 @@ x-app: &app
     db-init:
       condition: service_completed_successfully
 
+# 온디맨드 주식 매매 공통 설정 (profile: trade — 매매 VM, batch 이미지). KR/US가 command만 다름.
+# DB 접근=SSH 터널 + network_mode:host(127.0.0.1). KIS 자격증명은 VM .env 주입.
+x-batch-trade: &batch-trade
+  build:
+    context: .
+    dockerfile: Dockerfile.batch
+  image: coin-auto-trader-batch
+  profiles: ["trade"]
+  restart: "no"
+  network_mode: host
+  environment:
+    POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+    CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+    KIS_APPKEY: ${KIS_APPKEY:-}
+    KIS_APPSECRET: ${KIS_APPSECRET:-}
+    KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+    KIS_MOCK: ${KIS_MOCK:-true}
+
 services:
   # ── Kafka (KRaft 단일 노드, Zookeeper 없음) ─────────────────────────
   kafka:
@@ -293,48 +313,16 @@ services:
       INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
     command: python -m trading.strategy.trade_once
 
-  # ── 온디맨드 주식 주간 모의 리밸런싱 (profile: trade — 매매 VM, ML 이미지) ──
-  # ML 스코어링(batch.ml.stock_score)+KIS 모의주문이라 batch 이미지(lightgbm 포함)+터널(host).
-  # 주 1회 — 스타트업 스크립트가 요일 게이트(월요일)로만 실행. KIS 자격증명은 VM .env에서 주입.
+  # ── 온디맨드 주식 주간 모의 리밸런싱 (월요일 KR장중) — ML 챔피언 스코어→KIS 모의주문 ──
+  # 스타트업이 요일 게이트(월요일)로만 실행. 공통 설정은 x-batch-trade 앵커.
   stock-trade-once:
-    build:
-      context: .
-      dockerfile: Dockerfile.batch
-    image: coin-auto-trader-batch
-    profiles: ["trade"]
-    restart: "no"
-    network_mode: host
-    environment:
-      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
-      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
-      KIS_APPKEY: ${KIS_APPKEY:-}
-      KIS_APPSECRET: ${KIS_APPSECRET:-}
-      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
-      KIS_MOCK: ${KIS_MOCK:-true}
+    <<: *batch-trade
     command: python -m trading.strategy.stock_trade_once --live --top-n 10 --max-orders 5
 
-  # ── 온디맨드 US 주간 모의 리밸런싱 (profile: trade — 매매 VM, ML 이미지) ──
-  # KR판(stock-trade-once)의 US 대응. 차이: USD·해외 잔고/지정가주문(시장가 불가)·거래소 라우팅.
-  # 주 1회 — 스타트업이 UTC 부팅시각(미국장 막바지 윈도)으로만 실행. KIS 자격증명은 VM .env에서 주입.
+  # ── 온디맨드 US 주간 모의 리밸런싱 (월요일 미국장 막바지) — KR판의 US 대응 ──
+  # 차이: USD·해외 잔고/지정가주문(시장가 불가)·거래소 라우팅. 스타트업이 UTC 부팅시각으로만 실행.
   us-trade-once:
-    build:
-      context: .
-      dockerfile: Dockerfile.batch
-    image: coin-auto-trader-batch
-    profiles: ["trade"]
-    restart: "no"
-    network_mode: host
-    environment:
-      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
-      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
-      KIS_APPKEY: ${KIS_APPKEY:-}
-      KIS_APPSECRET: ${KIS_APPSECRET:-}
-      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
-      KIS_MOCK: ${KIS_MOCK:-true}
+    <<: *batch-trade
     command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
 
   api:

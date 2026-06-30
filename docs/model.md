@@ -29,7 +29,7 @@
 
 ## 배포·운용
 - **환경**: GCE **2-VM** — 상시 데이터 VM `coin-trader-vm`(수집·저장·대시보드) + 온디맨드 매매 VM `coin-trade-vm`
-- **파이프라인(매일 01:00 UTC)**: Cloud Scheduler가 매매 VM 기동 → `trade_once`가 일봉 합성 목표비중 산출 → 주문·체결 **동기 처리**(SSH 터널로 데이터 VM DB 접근) → 자가 종료. (스트리밍 `commander`/`engine`은 로컬 개발용으로만 존재)
+- **파이프라인(매일 01:00 UTC)**: Cloud Scheduler가 매매 VM 기동 → `trade_once`가 일봉 합성 목표비중 산출 → 주문·체결 **동기 처리**(SSH 터널로 데이터 VM DB 접근) → 자가 종료. (스트리밍 `commander`/`engine`은 로컬 개발용으로만 존재) 같은 VM이 부팅 시각 분기로 월요일엔 KR 주식, 월 15:00 ET엔 US 주식도 실행(주식은 `docs/ml_progress.md`).
 - **거래 성격**: **모의(paper)** — 실거래 거래소 API 없음(가상 잔고). 초기 가상자본 ₩10,000,000
 - **대시보드**: `https://jh-coinlab.duckdns.org` (Basic Auth)
 
