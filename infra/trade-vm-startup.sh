@@ -53,18 +53,20 @@ ssh -i "$TUNNEL_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 sleep 5
 
 # ── 기동 시각으로 분기 (두 스케줄러가 같은 VM을 start; 메타데이터 전달 채널 없어 UTC 시각으로 구분) ──
-# US-close 잡(tz=America/New_York 15:00 ET → 19:00 UTC 서머/20:00 UTC 윈터)이면 hour∈{19,20,21}.
-# 그 외(데일리 trade-vm-daily 01:00 UTC)는 코인+KR. 이 분기가 코인 이중매매를 막는다.
+# US-close 잡(tz=America/New_York 15:00 ET)은 EDT면 19:00 UTC·EST면 20:00 UTC 발화 → BOOT_HOUR∈{19,20}.
+# 21은 부팅지연 여유(정상 부팅<5분이면 미사용). 그 외(데일리 01:00 UTC)는 코인+KR. 이 분기가 코인 이중매매를 막는다.
 # --build: trade-once류는 코드를 이미지에 굽는다(소스 볼륨 없음). 위 git reset 한 최신 소스로 매번 재빌드해야
 #          낡은 이미지의 옛 코드가 실행되는 것을 막는다(없으면 #94 결정 기록 코드가 영영 안 돌았음). 제거 금지.
-H=$(date -u +%H)
-if [ "$H" = "19" ] || [ "$H" = "20" ] || [ "$H" = "21" ]; then
-  # 미국장 막바지 기동 → US 해외 모의 리밸런싱만(주 1회, 스케줄러가 월요일 보장). batch 이미지(lightgbm).
+BOOT_HOUR=$(date -u +%H)
+BOOT_DOW=$(date -u +%u)   # 1=월요일
+if [ "$BOOT_HOUR" = "19" ] || [ "$BOOT_HOUR" = "20" ] || [ "$BOOT_HOUR" = "21" ]; then
+  # 미국장 막바지 기동 → US 해외 모의 리밸런싱만. 주간 주기는 스케줄러 cron(0 15 * * 1)이 보장
+  # (스크립트엔 요일 게이트 없음 — 이 시각대 수동 부팅은 요일 무관 US 매매 발생). batch 이미지(lightgbm).
   docker compose --profile trade run --build --rm us-trade-once 2>&1 | tee /var/log/us-trade.log
 else
-  # 데일리 기동(01:00 UTC=KR 10:00 장중) → 코인 매매(매일) + KR 주식(월요일만, date -u +%u: 1=월).
+  # 데일리 기동(01:00 UTC=KR 10:00 장중) → 코인 매매(매일) + KR 주식(월요일만).
   docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
-  if [ "$(date -u +%u)" = "1" ]; then
+  if [ "$BOOT_DOW" = "1" ]; then
     docker compose --profile trade run --build --rm stock-trade-once 2>&1 | tee /var/log/stock-trade.log
   fi
 fi

@@ -7,7 +7,7 @@
 - 생성된 프로젝트: `coin-auto-trader-jvfhgq` (프로젝트만 생성됨, 결제 미연결)
 - 계정: `mywinningtime@gmail.com`
 
-> ## 현재 배포 상태 (2026-06-20): **앙상블 라이브 배포됨 (모의) — 2-VM 온디맨드**
+> ## 현재 배포 상태 (2026-06-30): **라이브 배포됨 (모의) — 코인+주식(KR/US) 2-VM 온디맨드**
 > - **데이터 VM(상시)**: GCE `coin-trader-vm`(us-central1-a, **e2-medium 4GB**), `--profile data`로 **수집·저장·대시보드만**. 부팅 시 git pull. ≈$24/월. 내부IP 10.128.0.2.
 > - **매매 VM(온디맨드)**: GCE `coin-trade-vm`, 평소 **정지(TERMINATED)**. 두 Cloud Scheduler가 같은 VM을 `instances/start` 기동(메타데이터 전달 없음 → startup이 UTC 부팅시각으로 분기):
 >   - **`trade-vm-daily`**: 매일 01:00 UTC(KST 10:00) → 코인 `trade_once`(매일) + **KR 주식**(월요일만, KR장중) → poweroff.
@@ -15,7 +15,7 @@
 >   - SSH 터널로 데이터 VM DB 접근, 동기 매매. 가동시간만 과금(~$1/월).
 > - **공개 대시보드**: `https://jh-coinlab.duckdns.org` (Caddy 자동 HTTPS, Basic Auth).
 > - **라이브 매매 경로**: `trade_once`(동기 배치). 스트리밍 `commander`/`engine`/`portfolio`는 코드로만 존재(로컬 dev). **Kafka는 데이터 팬아웃만**(매매 미사용).
-> - **데이터**: ClickHouse candles_1d(BTC/ETH 2019-11~) + 전 KRW 마켓 틱 상시 수집. **모의 거래**(실거래 API 없음, 가상자본 ₩10M). 모델 출처 = `docs/model.md`.
+> - **데이터**: ClickHouse candles_1d(BTC/ETH 2019-11~) + 전 KRW 마켓 틱 상시 수집. **모의 거래**(실거래 API 없음) — 코인 가상잔고 ₩10M, 주식 KIS 모의계좌(KR ₩10M·US $100k). 모델 출처 = `docs/model.md`.
 > - **상시 비용 ~$66 → ~$25/월** (16GB 단일 → 4GB 데이터 + 온디맨드 매매로 분리).
 
 ---
