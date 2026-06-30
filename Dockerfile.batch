@@ -1,12 +1,13 @@
-# 배치(분석) 이미지 — 라이브 이미지(Dockerfile)는 batch/backtest를 일부러 제외하지만,
-# 재평가 잡(batch.backtest.reeval_weights)은 walk-forward/metrics가 필요하므로 batch를 포함한다.
-# 온디맨드 실행 전용(profile=batch). 라이브 서비스는 이 이미지를 쓰지 않는다(이중 매매·의존 격리).
+# 배치(분석/ML) 이미지 — 라이브 이미지(Dockerfile)는 batch/backtest를 일부러 제외하지만,
+# 재평가 잡(batch.backtest.reeval_weights)·주식 ML 트레이더(trading.strategy.stock_trade_once →
+# batch.ml.stock_score)는 walk-forward/metrics·lightgbm이 필요하므로 batch + ML deps를 포함한다.
+# 온디맨드 실행 전용(profile=batch|trade). 라이브 서비스는 이 이미지를 쓰지 않는다(이중 매매·의존 격리).
 FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-ml.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-ml.txt
 
 COPY common ./common
 COPY trading ./trading

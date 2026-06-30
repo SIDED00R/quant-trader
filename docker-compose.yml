@@ -289,6 +289,28 @@ services:
       INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
     command: python -m trading.strategy.trade_once
 
+  # ── 온디맨드 주식 주간 모의 리밸런싱 (profile: trade — 매매 VM, ML 이미지) ──
+  # ML 스코어링(batch.ml.stock_score)+KIS 모의주문이라 batch 이미지(lightgbm 포함)+터널(host).
+  # 주 1회 — 스타트업 스크립트가 요일 게이트(월요일)로만 실행. KIS 자격증명은 VM .env에서 주입.
+  stock-trade-once:
+    build:
+      context: .
+      dockerfile: Dockerfile.batch
+    image: coin-auto-trader-batch
+    profiles: ["trade"]
+    restart: "no"
+    network_mode: host
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+      KIS_APPKEY: ${KIS_APPKEY:-}
+      KIS_APPSECRET: ${KIS_APPSECRET:-}
+      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+      KIS_MOCK: ${KIS_MOCK:-true}
+    command: python -m trading.strategy.stock_trade_once --live --top-n 10 --max-orders 5
+
   api:
     <<: *app
     container_name: api
