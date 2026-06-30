@@ -1,6 +1,6 @@
 """자동매매 토글 라우트 (단일 책임: 계정별 auto_trade 플래그 조회/설정).
 
-봇은 auto_trade=TRUE 인 계정에 대해서만 매매한다(strategy/sma_trader.py).
+봇은 auto_trade=TRUE 인 계정에 대해서만 매매한다(trading/strategy/trade_once.py·commander.py).
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel

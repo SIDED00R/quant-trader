@@ -8,7 +8,6 @@ allow_exact_matches=False). 같은 날짜 US(D)는 미래 → 금지.
 주의: US 시장수준 집계(usx_mkt_*)는 한 날짜에 모든 KR 종목에 동일 → **횡단면 단변량 IC≈0**(정상).
 효용은 트리/NN의 **상호작용(US 레짐 × 종목특성)**과 **종목별 US 민감도(usx_beta)**에서 나온다.
 """
-import numpy as np
 import pandas as pd
 
 EPS = 1e-12
@@ -61,14 +60,3 @@ def attach_us_context(kr_feats: pd.DataFrame, kr_panel: pd.DataFrame, us_panel: 
     merged = _asof_backward(kr_feats, usm)             # 시장수준(누설없음)
     beta = us_beta(kr_panel, usm)                       # 종목수준(누설없음)
     return merged.merge(beta, on=["symbol", "date"], how="left")
-
-
-def verify_no_leak(kr_feats: pd.DataFrame, us_panel: pd.DataFrame) -> dict:
-    """누설 검증: 각 KR date에 매칭된 US date가 항상 더 과거(<)인지 확인."""
-    usm = us_market_daily(us_panel)
-    chk = _asof_backward(kr_feats[["symbol", "date"]].copy(), usm.assign(us_used=usm["date"]))
-    chk = chk.dropna(subset=["us_used"])
-    bad = (chk["us_used"] >= chk["date"]).sum()
-    gap = (pd.to_datetime(chk["date"]) - pd.to_datetime(chk["us_used"])).dt.days
-    return {"rows_checked": len(chk), "leak_rows": int(bad),
-            "min_gap_days": int(gap.min()), "median_gap_days": float(gap.median())}

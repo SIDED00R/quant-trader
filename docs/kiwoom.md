@@ -139,6 +139,8 @@
 
 ## 7. 기존 코인 인프라 재사용 매핑
 
+> ⚠️ 이 표는 **7단계 설계 시점의 재사용 계획**이다. 이후 ① 코인 인프라가 `streaming/`(ingester·sink)·`trading/`(engine) 하위로 이동했고(좌측 경로는 그 접두를 붙여 읽는다), ② 주식 체결 경로는 키움이 아닌 **KIS로 확정**(`common/kis_order.py`·읽기 라우트 `api/routes/stocks.py`)됐다 — 우측의 키움 주문 계획(`kiwoom_client` 주문·`stock_orders.py`)은 미채택.
+
 | 코인(기존) | 주식(신규) | 패턴 |
 |---|---|---|
 | `ingester/upbit_ws.py` → `market.ticks` | `ingester/stock_kiwoom.py` → `stock.ticks` | WS 연결/구독/정규화/발행/지수백오프 미러. 단 LOGIN·토큰·PING echo 추가 |
@@ -157,7 +159,7 @@
 ### 체결·계좌 모델 확장점 — ✅ 백테스트 반영 완료(#120/PR#121), 라이브 가드는 #5 이월
 - **정수 주문단위**: ✅ 백테스트 `backtest/engine.py`의 `_adjust_qty`(주식 `to_integral_value(ROUND_DOWN)`, <1주 skip 로그; 코인 무영향). 라이브 `place_order`/`stock_orders` 진입부 절사는 단건 주문 검증(#5) 때 적용.
 - **매도 거래세**: ✅ `backtest/fills.py:tax(symbol,price,qty)`(**국내주식만** 0.20%, 미국·코인=0), `account.apply_sell(tax=...)`의 `proceeds=price*qty-fee-tax`, `models.ClosedTrade.sell_tax`. `STOCK_SELL_TAX_RATE` config 추가. 라이브는 키움/KIS 응답의 수수료/세금을 그대로 기록.
-- **장 운영시간 게이트**: ✅ 신규 `common/market_hours.py`(`asset_class`·`is_coin`·`is_stock`·`is_market_open(symbol, now=None)` — 코인 항상 True, 국내주식 KRX 평일 09:00–15:30 KST, 미국주식 미지원=False). 휴장일 캘린더·라이브 주문 게이트는 #5.
+- **장 운영시간 게이트**: ✅ 신규 `common/market_hours.py`(`asset_class`·`is_coin`·`is_stock`·`is_market_open(symbol, now=None)` — 코인 항상 True, 국내주식 KRX 평일 09:00–15:30 KST, 미국주식 평일 09:30–16:00 ET 지원). 휴장일 캘린더·라이브 주문 게이트는 #5.
 - **라이브-백테스트 수학 미러링**(account.py 도크스트링 계약): ✅ 백테스트(세금·정수화) 반영, 라이브 미러링은 #5.
 
 ## 8. 종목 유니버스 선정 논의

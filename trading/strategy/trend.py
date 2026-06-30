@@ -12,7 +12,6 @@ from collections import deque
 from decimal import ROUND_DOWN, Decimal
 
 from common.config import (
-    FEE_RATE,
     MIN_ORDER_KRW,
     TREND_BARS_PER_YEAR,
     TREND_ENTRY_BAND,
@@ -25,8 +24,7 @@ from common.config import (
     TREND_VOL_TARGET,
 )
 from trading.strategy.base import Broker, MarketTick, Strategy
-
-_FEE_QUANT = Decimal("0.0001")  # 체결 수수료 양자화 단위(fills.QUANT_FEE와 동일) — 사이징 시 올림 여유분 예약
+from trading.strategy.rebalance import affordable_qty
 
 
 def _sma(closes: list[float], n: int) -> float:
@@ -48,16 +46,6 @@ def target_weight(ann_vol, vol_target: float, max_weight: Decimal) -> Decimal:
     if not ann_vol or ann_vol <= 0:
         return max_weight
     return min(max_weight, Decimal(str(vol_target)) / Decimal(str(ann_vol)))
-
-
-def affordable_qty(budget: Decimal, price: Decimal) -> Decimal:
-    """예산 내 매수 가능 수량 — 수수료 포함 비용 + 양자화 올림 여유분(_FEE_QUANT) 예약 후 내림.
-
-    budget==cash(전액 진입)에서도 체결가 반올림으로 잔고 거부되는 경우를 차단한다. budget·price<=0이면 0.
-    """
-    if budget <= 0 or price <= 0:
-        return Decimal(0)
-    return ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
 
 
 class TrendStrategy(Strategy):

@@ -7,7 +7,6 @@
   (usx_mkt_* — 한 날짜 전종목 동일)는 rank 시 0이 되므로 raw 유지(트리 레짐 상호작용용).
 키 정렬은 항상 (symbol,date) merge — 위치정렬 금지(누설/오정렬 방지).
 """
-import numpy as np
 import pandas as pd
 
 from batch.features.compute import load_ohlcv

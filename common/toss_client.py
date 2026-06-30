@@ -5,9 +5,11 @@ OAuth2 client_credentials grant. POST {base}/oauth2/token 에 application/x-www-
 키움식 return_code 아님)을 받는다. 이후 모든 호출은 Authorization: Bearer.
 출처: 토스 Open API 스펙 §Auth.
 
-⚠️ 클라이언트당 유효 토큰은 1개 — 재발급 시 이전 토큰이 즉시 무효화된다. 따라서 토큰은
-디스크에 저장하지 않고 프로세스 메모리에만 캐시한다. 같은 client_id를 여러 프로세스가
-동시에 쓰면 서로의 토큰을 죽이므로, 향후 라이브 워커 추가 시 토큰 중앙화가 필요하다.
+⚠️ 클라이언트당 유효 토큰은 1개 — 재발급 시 이전 토큰이 즉시 무효화된다. 토큰은 공용
+TokenCache를 통해 다른 브로커(키움/KIS)와 동일하게 파일에도 영속(시스템 임시폴더, 레포 밖)되어
+프로세스 간 재사용된다. 단 '유효 토큰 1개' 제약상 같은 client_id를 여러 프로세스가 동시에/연달아
+쓰면 재발급이 디스크에 남은 것을 포함해 서로의 토큰을 무효화할 수 있으므로, 향후 라이브 워커
+추가 시 토큰 중앙화(또는 토스 전용 메모리 캐시)가 필요하다.
 """
 from datetime import datetime, timedelta, timezone
 

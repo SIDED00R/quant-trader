@@ -203,7 +203,7 @@ RSI(14)→(RSI-50)/50·delta·돌파더미 · MACD→Histogram 부호전환·기
 
 ## 11. 다음 구현
 
-1. **피처 계산 모듈**(`batch/features/`): OHLCV 파생 피처 순수함수(모멘텀·변동성·유동성·Alpha158 서브셋·횡단면 rank) → `stock_features_daily` 적재
+1. **피처 계산 모듈**(`batch/features/`): OHLCV 파생 피처 순수함수(모멘텀·변동성·유동성·Alpha158 서브셋) → `stock_features_daily` 적재 *(횡단면 rank/z는 적재 대상 아님 — 학습 시점 정규화: §7·스키마 line 86)*
 2. **유용성 테스트 하니스**: Rank IC / ICIR / purged-embargo CV로 피처별 예측력 정량화(다중검정 보정) — "실제 유용한지" 게이트
 3. 통과 피처로 **ML(LightGBM)** → 통과 시 **DL(Alpha360 시퀀스)**. GPU는 DL 실학습 시에만.
 4. 외부 데이터(상장주식수·섹터·수급·펀더멘털) 확보되는 대로 피처 추가 후 동일 게이트 재측정.

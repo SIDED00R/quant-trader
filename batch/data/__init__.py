@@ -3,5 +3,5 @@
 모델 검증과 무관하게 데이터를 모아 저장(재사용 자산·point-in-time는 나중에 못 되살림).
 batch/features는 이 원본에서 피처를 파생한다. batch 전용(프로덕션 이미지 제외).
 소스: SEC EDGAR(펀더멘털·13F, 키리스), FRED(매크로, 키), GitHub(US 편입편출),
-KRX(KR 수급·공매도·외국인보유, pykrx 로그인), DART(KR 펀더멘털, 수집기 대기).
+KRX(KR 수급·공매도·외국인보유, pykrx 로그인), DART(KR 펀더멘털), FDR(KR 상장폐지·생존편향 보정).
 """

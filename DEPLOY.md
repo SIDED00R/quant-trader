@@ -174,7 +174,7 @@ infra/terraform/
   `gcloud compute instances add-metadata coin-trade-vm --zone us-central1-a --metadata-from-file startup-script=infra/trade-vm-startup.sh`
 - **배포 검증(필수)**: 매매 VM start 후 시리얼 콘솔로 실제 실행된 코드를 확인한다(데이터 VM은 재배포 후 대시보드 탭·신규 테이블 확인).
   `gcloud compute instances get-serial-port-output coin-trade-vm --zone us-central1-a | grep trade_once`
-- **주식 주간 모의 리밸런싱(KIS)**: `trade-vm-startup.sh`가 **월요일(UTC)에만** `stock-trade-once`(ML 챔피언 스코어→KIS 모의주문, batch 이미지/lightgbm)를 추가 실행 → 주 1회·KR 장중(10:00 KST) 체결. **기존 `trade-vm-daily` 스케줄러 재사용**(신규 잡 불요). ⚠ **VM `.env`에 KIS 자격증명 필요**(`KIS_APPKEY`/`KIS_APPSECRET`/`KIS_ACCOUNT_NO`/`KIS_MOCK=true`) — 비밀이라 `.env.example`에 없음, 메타데이터/시크릿으로 주입. 자본 제약상 `--top-n`은 자본/주가에 맞게(₩10M이면 top-10 내외). 검증: `... get-serial-port-output ... | grep stock-trade`.
+- **주식 주간 모의 리밸런싱(KIS)**: `trade-vm-startup.sh`가 **월요일(UTC)에만** `stock-trade-once`(ML 챔피언 스코어→KIS 모의주문, batch 이미지/lightgbm)를 추가 실행 → 주 1회·KR 장중(10:00 KST) 체결. **기존 `trade-vm-daily` 스케줄러 재사용**(신규 잡 불요). ⚠ **VM `.env`에 KIS 자격증명 필요**(`KIS_APPKEY`/`KIS_APPSECRET`/`KIS_ACCOUNT_NO`/`KIS_MOCK=true`) — `.env.example`엔 주석 placeholder만 있고 실제 비밀값은 없으므로 메타데이터/시크릿으로 주입. 자본 제약상 `--top-n`은 자본/주가에 맞게(₩10M이면 top-10 내외). 검증: `... get-serial-port-output ... | grep stock-trade`.
   → `[trade_once] done — decisions=N recorded` 가 보여야 최신 코드(구버전은 `[trade_once] done` 만 찍음). 매매 안 한 날도 `decisions=N`(HOLD 포함) 기록된다.
 
 ### 접속 (SSH 터널)

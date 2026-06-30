@@ -1,8 +1,8 @@
 """Colab GPU DL 비교 (자체완결: us_tabular/us_ohlcv parquet → GBDT vs MLP vs GRU).
 
 Colab T4에서 `colab exec -f` 또는 `colab run`으로 실행. ClickHouse·repo 불요(parquet 2개만).
-- GBDT(lambdarank): 확정 피처 70개(공학+펀더멘털+13F) — 로컬 챔피언(3.56%) 재현
-- MLP(GPU): 같은 70 피처 tabular DL
+- GBDT(lambdarank): 확정 챔피언 피처셋(OHLCV파생+펀더멘털+13F+섹터) — 로컬 챔피언 재현
+- MLP(GPU): 같은 피처 tabular DL
 - GRU(GPU): raw OHLCV 5채널×60일 시퀀스
 동일 purged/embargo walk-forward CV + Rank IC/ICIR/NW-t + 롱숏 Sharpe.
 

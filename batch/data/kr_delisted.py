@@ -18,9 +18,9 @@ import FinanceDataReader as fdr
 import pandas as pd
 
 from common.clickhouse_client import create_client
+from common.constants import COLUMNS_STOCK_CANDLES_1D
 
 _DELIST_COLS = ["symbol", "name", "market", "listing_date", "delisting_date", "reason"]
-_OHLCV_COLS = ["symbol", "window_start", "open", "high", "low", "close", "volume", "currency", "market"]
 
 
 def _date(x):
@@ -67,7 +67,7 @@ def store_prices(ch, symbols: list, log=print) -> int:
         rows = [[sym, datetime(idx.year, idx.month, idx.day, tzinfo=timezone.utc),
                  float(r.Open), float(r.High), float(r.Low), float(r.Close), float(r.Volume), "KRW", "KR"]
                 for idx, r in df.iterrows()]
-        ch.insert("stock_candles_1d", rows, column_names=_OHLCV_COLS)
+        ch.insert("stock_candles_1d", rows, column_names=COLUMNS_STOCK_CANDLES_1D)
         total += len(rows)
         if i % 100 == 0:
             log(f"[delisted] {i}/{len(symbols)}종목... {total:,}행 (실패 {failed})")

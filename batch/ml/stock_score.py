@@ -2,7 +2,7 @@
 
 OHLCV+DART 챔피언(LightGBM lambdarank, #158에서 미시구조 증분0 확인 → 제외)을 라벨있는
 전 이력으로 학습 → 최신 거래일 횡단면을 예측해 종목 랭킹 반환. build_dataset·_fit_predict 재사용.
-라이브 트레이더가 top-N long-only 타깃 구성에 사용한다. (macro 포함은 task3a 챔피언 확정 후 조정.)
+라이브 트레이더가 top-N long-only 타깃 구성에 사용한다.
 """
 from batch.ml.baseline_lgbm import _fit_predict
 from batch.ml.dataset import build_dataset

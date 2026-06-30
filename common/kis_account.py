@@ -24,6 +24,14 @@ from common.kis_client import get_access_token
 from common.rate_limit import acquire
 
 
+def to_float(x) -> float:
+    """KIS 응답의 콤마 포함 숫자 문자열 → float(파싱 실패 시 0.0). 잔고/현재가 정규화 공용."""
+    try:
+        return float(str(x).replace(",", ""))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _tr(real_id: str) -> str:
     """실전 TR ID → 모의 TR ID(첫 글자 T→V). 실전이면 그대로."""
     return ("V" + real_id[1:]) if KIS_MOCK else real_id

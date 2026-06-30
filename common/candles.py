@@ -13,10 +13,10 @@ def daily_candles(symbols):
     """candles_1d를 (symbol, close, ts) 전역 시간순(window_start, symbol)으로 yield(종가 기준)."""
     client = create_client()
     query = (
-        "SELECT symbol, close, toUnixTimestamp64Milli(toDateTime64(window_start, 3)) AS ts_ms "
+        "SELECT symbol, close, toUnixTimestamp(window_start) AS ts "
         "FROM candles_1d FINAL WHERE symbol IN {syms:Array(String)} ORDER BY window_start, symbol"
     )
     with client.query_row_block_stream(query, parameters={"syms": list(symbols)}) as stream:
         for block in stream:
             for row in block:
-                yield (row[0], Decimal(str(row[1])), row[2] / 1000.0)
+                yield (row[0], Decimal(str(row[1])), float(row[2]))
