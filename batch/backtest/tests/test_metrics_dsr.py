@@ -1,5 +1,4 @@
 """Deflated/Probabilistic Sharpe 검증 (Bailey & López de Prado 2014)."""
-import statistics
 import unittest
 
 from batch.backtest.metrics import deflated_sharpe, expected_max_sharpe, probabilistic_sharpe

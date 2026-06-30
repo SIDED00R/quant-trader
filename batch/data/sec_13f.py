@@ -22,9 +22,10 @@ from dotenv import load_dotenv
 load_dotenv()
 from common.cache import dump_json, load_json
 from common.clickhouse_client import create_client
+from common.constants import SEC_USER_AGENT
 from common.symbols import get_us_symbols
 
-_UA = {"User-Agent": "coin-auto-trader research jh.lee@kornukopia-ai.com"}
+_UA = {"User-Agent": SEC_USER_AGENT}
 _CACHE = os.path.join(os.path.dirname(__file__), ".13f_cache")
 _LIST = "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"
 _MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,

@@ -13,18 +13,12 @@ from common.kis_account import (
     fetch_domestic_balance,
     fetch_overseas_balance,
     split_account,
+    to_float as _f,
 )
 from common.config import KIS_REST_BASE
 from common.rate_limit import acquire
 
 _US_EXCHANGES = ("NASD", "NYSE", "AMEX")
-
-
-def _f(x) -> float:
-    try:
-        return float(str(x).replace(",", ""))
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def kr_balance() -> dict:

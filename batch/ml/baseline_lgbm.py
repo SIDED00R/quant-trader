@@ -1,7 +1,8 @@
 """LightGBM 베이스라인 (단일 책임: 시장별 purged walk-forward + 시드앙상블 → OOF 평가).
 
-모든 후속 모델(GRU/MASTER/HIST/TabPFN)의 **must-beat 게이트**. 회귀(라벨=횡단면 z-score) 후
-예측을 횡단면 Rank IC로 평가. 저SNR 과적합 통제: 강정규화 + 시드앙상블(예측 평균).
+모든 후속 모델(GRU/MASTER/HIST/TabPFN)의 **must-beat 게이트**. 기본 손실=lambdarank(랭킹;
+fwd_ret 버킷 라벨), `--objective regression`이면 횡단면 z-score 회귀. 예측을 횡단면 Rank IC로
+평가. 저SNR 과적합 통제: 강정규화 + 시드앙상블(예측 평균).
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.ml.baseline_lgbm [US KR] [--horizon 21] [--seeds 5] [--folds 6] [--macro] [--kr-micro]
 기본 = 챔피언(macro·KR미시 제외). US=OHLCV+펀더+13F+섹터, KR=OHLCV+DART.

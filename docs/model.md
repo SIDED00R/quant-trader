@@ -6,7 +6,7 @@
 - **모델명**: 일봉 추세 앙상블 (ensemble)
 - **확정·배포일**: **2026-06-20**
 - **종류**: ML 학습 모델 아님 — **규칙 기반 전략을 walk-forward로 선별/검증**한 것(가중치 학습 없음)
-- **코드**: `strategy/ensemble.py` · `strategy/trend_signal.py` (라이브: `strategy/live_ensemble.py` → `strategy/commander.py`)
+- **코드**: `trading/strategy/ensemble.py` · `trading/strategy/trend_signal.py` (라이브: `trading/strategy/live_ensemble.py` → `trading/strategy/commander.py`)
 
 ## 전략 사양
 - **타임프레임**: 일봉(daily), long-or-cash(공매도 없음)

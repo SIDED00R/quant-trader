@@ -1,7 +1,7 @@
 """한국투자증권 KIS 단건 주문 (단일 책임: KR/US 모의 주문 생성).
 
-주문은 시장별 엔드포인트/TR이 분리된다 — 국내 order-cash, 해외 order. 종목 market
-(KR=6자리 숫자 / US=티커)으로 라우팅한다. 주문 POST는 hashkey 헤더로 본문 무결성을
+주문은 시장별 엔드포인트/TR이 분리된다 — 국내 order-cash, 해외 order. 호출 측이 시장에
+맞는 place_domestic_order(국내)/place_overseas_order(해외)를 직접 호출한다. 주문 POST는 hashkey 헤더로 본문 무결성을
 보장하고 **재시도하지 않는다**(중복 주문 방지 — GET 조회와 다름). 모의/실전은 TR ID
 첫 글자(V↔T)로 토글. 인증헤더·계좌분해·TR토글은 kis_account의 헬퍼를 재사용한다.
 출처: KIS Developers — 국내 order-cash(매수 TTTC0802U/매도 TTTC0801U),
@@ -13,11 +13,6 @@ from common.config import KIS_APPKEY, KIS_APPSECRET, KIS_REST_BASE
 from common.constants import BROKER_TIMEOUT, KIS_DEFAULT_EXCHANGE
 from common.kis_account import _headers, _tr, split_account
 from common.rate_limit import acquire
-
-
-def _is_kr(symbol: str) -> bool:
-    """KR=6자 종목코드(숫자 포함, 영숫자 단축코드 0009K0 등 포함), US=영문 티커."""
-    return len(symbol) == 6 and any(c.isdigit() for c in symbol)
 
 
 def _validate(side: str, qty: int) -> None:
@@ -79,12 +74,3 @@ def place_overseas_order(symbol: str, side: str, qty: int, price, exchange: str 
         "ORD_SVR_DVSN_CD": "0", "ORD_DVSN": "00",
     }
     return _post_order("/uapi/overseas-stock/v1/trading/order", tr, body)
-
-
-def place_order(symbol: str, side: str, qty: int, price=None, exchange: str = KIS_DEFAULT_EXCHANGE) -> dict:
-    """종목 market으로 자동 라우팅 — KR=국내(지정/시장), US=해외(지정가, price 필수)."""
-    if _is_kr(symbol):
-        return place_domestic_order(symbol, side, qty, price)
-    if price is None:
-        raise ValueError("해외(US) 주문은 지정가만 지원 — price 필수")
-    return place_overseas_order(symbol, side, qty, price, exchange)

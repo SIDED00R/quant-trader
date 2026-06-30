@@ -7,7 +7,18 @@ from decimal import ROUND_DOWN, Decimal
 
 from common.config import FEE_RATE, MIN_ORDER_KRW
 
-_FEE_QUANT = Decimal("0.0001")
+_FEE_QUANT = Decimal("0.0001")  # 체결 수수료 양자화 단위(fills.QUANT_FEE와 동일) — 사이징 시 올림 여유분 예약
+
+
+def affordable_qty(budget: Decimal, price: Decimal) -> Decimal:
+    """예산 내 매수 가능 수량 — 수수료 포함 비용 + 양자화 올림 여유분(_FEE_QUANT) 예약 후 내림.
+
+    budget==cash(전액 진입)에서도 체결가 반올림으로 잔고 거부되는 경우를 차단한다. budget·price<=0이면 0.
+    추세 진입 사이징(trend)·앙상블/commander 재조정 매수가 공유하는 정본.
+    """
+    if budget <= 0 or price <= 0:
+        return Decimal(0)
+    return ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
 
 
 def bar_key(ts: float, bar_sec: float) -> int:
@@ -52,7 +63,7 @@ def decide(qty: Decimal, price: Decimal, cash: Decimal, equity: Decimal,
         budget = min(target_val - cur_val, cash)
         if budget < MIN_ORDER_KRW:
             return None
-        qbuy = ((budget - _FEE_QUANT) / (price * (1 + FEE_RATE))).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+        qbuy = affordable_qty(budget, price)
         return ("BUY", qbuy) if qbuy > 0 else None
     sell_val = cur_val - target_val                   # 축소 → 차액 매도(최소주문 이상만)
     if sell_val < MIN_ORDER_KRW:

@@ -4,11 +4,11 @@
 합성 목표비중을 만들고, 보유 비중을 그 목표로 (밴드 초과 시) 재조정한다. 단일 속도의 파라미터 리스크·
 whipsaw를 분산한다(부하 다수가 동의할수록 비중↑). config/base/trend/trend_signal에만 의존(Kafka/DB 비의존).
 """
-from decimal import ROUND_DOWN, Decimal
+from decimal import Decimal
 
-from common.config import ENSEMBLE_REBALANCE_BAND, MIN_ORDER_KRW
+from common.config import ENSEMBLE_REBALANCE_BAND
 from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.trend import affordable_qty
+from trading.strategy.rebalance import decide
 from trading.strategy.trend_signal import TrendSignal
 
 # 빠름/중간/느림 — 단일 5/40의 속도 편중을 분산(파라미터 리스크↓). BTC/ETH 6.6년 교차검증 채택 구성.
@@ -52,7 +52,10 @@ class EnsembleStrategy(Strategy):
         self._order_to_target(tick.symbol, tick.price, combined, tick.ts, broker)
 
     def _order_to_target(self, sym, price, target_w: Decimal, now, broker):
-        """보유 비중을 합성 목표비중으로 조정. 목표 0이면 전량 청산, 밴드 이내 드리프트는 무시(저회전)."""
+        """보유 비중을 합성 목표비중으로 조정. 목표 0이면 전량 청산, 밴드 이내 드리프트는 무시(저회전).
+
+        재조정 산술(밴드·확대/축소·수수료 양자화)은 공용 정본 rebalance.decide와 동일(commander와 동일 규칙).
+        """
         if price is None or price <= 0:
             return
         qty = broker.position_qty(sym)
@@ -60,21 +63,11 @@ class EnsembleStrategy(Strategy):
             if qty > 0:
                 broker.sell(sym, qty, "SIGNAL", now)
             return
-        equity = broker.equity()
-        if equity <= 0:
-            return
-        cur_val = qty * price
-        target_val = equity * target_w
-        drift = abs(cur_val - target_val) / equity
-        if qty > 0 and drift < Decimal(str(self.rebalance_band)) * target_w:
-            return                              # 밴드 이내 → 유지(저회전)
-        if target_val > cur_val:                # 확대 → 차액 매수(현금 한도 내, 최소주문 충족 시)
-            budget = min(target_val - cur_val, broker.cash())
-            if budget >= MIN_ORDER_KRW:
-                add = affordable_qty(budget, price)
-                if add > 0:
-                    broker.buy(sym, add, now)
-        elif cur_val - target_val >= MIN_ORDER_KRW:   # 축소 → 차액만큼 매도(최소주문 미달 미세매도 churn 차단)
-            sell_qty = ((cur_val - target_val) / price).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
-            if sell_qty > 0:
-                broker.sell(sym, min(sell_qty, qty), "REBAL", now)
+        order = decide(qty, price, broker.cash(), broker.equity(), float(target_w), self.rebalance_band)
+        if order is None:
+            return                              # 밴드 이내 또는 최소주문 미달 → 유지(저회전)
+        side, quantity = order
+        if side == "BUY":                       # 확대 → 차액 매수
+            broker.buy(sym, quantity, now)
+        else:                                   # 목표비중>0에서의 SELL = 차액 축소
+            broker.sell(sym, quantity, "REBAL", now)

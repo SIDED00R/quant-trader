@@ -7,42 +7,18 @@ KR판(stock_trade_once)의 US 대응. 차이: USD 통화·해외 잔고(us_balan
 """
 import argparse
 import sys
-import time
 
-from batch.ml.stock_score import score_latest
 from common import kis_balance
-from common.clickhouse_client import create_client
 from common.kis_order import place_overseas_order
 from common.kis_overseas_price import price_and_exchange
+from trading.strategy.stock_trade_common import build_plan, confirm_fills, latest_closes
 
 _BUFFER = 1.02   # 지정가 매수 buffer(체결 보장)
 
 
-def _latest_us_closes(symbols: list) -> dict:
-    """US 최신 일봉 종가(symbol→close, USD). KIS 현재가 미가용 시 폴백."""
-    if not symbols:
-        return {}
-    rows = create_client().query(
-        "SELECT symbol, argMax(close, window_start) FROM stock_candles_1d "
-        "WHERE market='US' AND symbol IN {syms:Array(String)} GROUP BY symbol",
-        parameters={"syms": list(symbols)}).result_rows
-    return {r[0]: float(r[1]) for r in rows}
-
-
 def plan(top_n: int = 20, macro: bool = False) -> dict:
-    """매매계획(주문 없음). US 챔피언 top-N, buys=신규편입, sells=이탈."""
-    latest, ranked = score_latest("US", top_n=top_n, macro=macro)
-    bal = kis_balance.us_balance()
-    held = {p["symbol"] for p in bal["positions"]}
-    targets = list(ranked["symbol"])
-    ts = set(targets)
-    return {
-        "bar": str(latest), "cash": bal["cash"], "n_held": len(held),
-        "targets": targets,
-        "buys": [s for s in targets if s not in held],
-        "sells": [s for s in held if s not in ts],
-        "ranked": ranked,
-    }
+    """매매계획(주문 없음). US 챔피언 top-N long-or-cash — build_plan 공용 정본."""
+    return build_plan("US", kis_balance.us_balance, top_n, macro)
 
 
 def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders: int = 5) -> dict:
@@ -55,7 +31,7 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
     per = equity / max(1, top_n)
     buys = p["buys"][:max_orders]
-    closes = _latest_us_closes(buys)
+    closes = latest_closes("US", buys)
     placed = []
     for sym in buys:
         px, exch = price_and_exchange(sym)
@@ -74,17 +50,7 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
                            "accepted": str(r.get("rt_cd")) == "0", "msg": r.get("msg1")})
         except Exception as e:
             placed.append({"symbol": sym, "accepted": False, "error": f"{type(e).__name__}: {e}"})
-    syms = [o["symbol"] for o in placed]
-    filled: dict = {}
-    for _ in range(6):
-        time.sleep(2)
-        after = {x["symbol"]: x["qty"] for x in kis_balance.us_balance()["positions"]}
-        filled = {s: after.get(s, 0) - before.get(s, 0) for s in syms if after.get(s, 0) > before.get(s, 0)}
-        if len(filled) >= sum(1 for o in placed if o.get("accepted")):
-            break
-    for o in placed:
-        o["filled_qty"] = filled.get(o["symbol"], 0)
-        o["filled"] = o["symbol"] in filled
+    confirm_fills(kis_balance.us_balance, before, placed)   # 잔고 폴링 체결확인(접수≠체결)
     return {**p, "placed": placed}
 
 

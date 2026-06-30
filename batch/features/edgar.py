@@ -2,8 +2,9 @@
 
 배선된 진입점은 저장소 파생: fundamentals_quarterly·institutional_13f → 일별 피처
 (daily_fundamentals_from_store·daily_13f_from_store, JSON 재파싱 없이 빠름).
-원본 적재용 companyfacts 페치·태그 정의(ticker_cik_map·fetch_companyfacts·_entries·_SHARES 등)는
-batch.data.fundamentals 가 사용. JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
+원본 적재용 companyfacts 페치·태그 정의(fetch_companyfacts·_entries·_SHARES 등)는
+batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector가
+공유한다. JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
 
 **point-in-time**: 각 거래일 d는 filed_date ≤ d 인 공시값만 사용(as-of backward) → look-ahead 차단.
 - instant 계정(상장주식수·자본·자산): 최신 filed≤d 값.
@@ -15,10 +16,11 @@ import time
 
 import httpx
 from common.cache import dump_json, load_json
+from common.constants import SEC_USER_AGENT
 import numpy as np
 import pandas as pd
 
-_UA = {"User-Agent": "coin-auto-trader research jh.lee@kornukopia-ai.com"}
+_UA = {"User-Agent": SEC_USER_AGENT}
 _CACHE = os.path.join(os.path.dirname(__file__), ".edgar_cache")
 EPS = 1e-12
 

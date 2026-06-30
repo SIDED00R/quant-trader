@@ -2,7 +2,7 @@
 
 문헌(docs/ml_features_research.md)의 즉시 계산 가능(computable_now) 피처를 구현한다.
 입력: 패널 DataFrame[symbol, date, open, high, low, close, volume] (정렬 불요, 내부 정렬).
-출력: DataFrame[symbol, date, <피처...>] (raw 값 — 횡단면 rank/z는 transforms.py에서 별도).
+출력: DataFrame[symbol, date, <피처...>] (raw 값 — 횡단면 rank/z 정규화는 학습 시점 batch.ml.dataset(`_xs_rank`)에서 별도 적용).
 
 모든 피처는 시점 t까지의 정보만 사용(look-ahead 없음). 미래수익(라벨)은 ic.py에서 생성.
 """

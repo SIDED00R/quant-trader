@@ -19,7 +19,7 @@
 - [x] `strategy/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
 - [x] SMA 로직을 `strategy/sma.py`의 `SMAStrategy`로 추출 (sma_trader 순수 함수 재사용, Kafka/DB 비의존)
 - [x] 백테스트 회귀: 추출 전 골든 동일 재현 + 청산 4경로(STOP/TAKE/TRAIL/DEADCROSS) 가드 (무행동 변경 증명)
-- [x] 전략 레지스트리(`strategy/registry.py`) + `ACTIVE_STRATEGIES` env + 백테스트 `--strategy`
+- [x] 전략 레지스트리(`strategy/registry.py`) + 백테스트 `--strategy`(레지스트리·`--strategy`는 백테스트 전용 — 라이브는 고정 앙상블 `LiveEnsemble`(부하 specs 하드코딩 `_DEFAULT_SPECS`), `ENSEMBLE_SYMBOLS`는 종목 유니버스)
 - 참고: 라이브 `sma_trader.py`는 무수정(채택은 4~5단계). 백테스트는 `SMAStrategy` 채택 → `backtest/strategy.py` 삭제(중복 제거).
 
 ## 1.5단계 — 거래빈도·수수료 제어 (baseline 진단 반영)  (#52)
@@ -121,7 +121,7 @@
 - [~] 주식용 알고리즘 백테스트·기준치 선별 (주식 데이터 기준) — 하니스 지원 완료(#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계). 기준치 선별·유니버스 확정은 잔여(ClickHouse 주식 일봉 적재 후 실행). *후속: `TREND_BARS_PER_YEAR`/연율화를 주식 거래일 ~252로 분기(현 코인 365 공용).*
 - [ ] 주식 모의매매 라이브 + 성과 검증
 
-### 8.1 인트라데이(분봉) 매매 연구·검증 (신규 트랙 — 플랜 `.claude/plans/rustling-sleeping-lovelace.md`)
+### 8.1 인트라데이(분봉) 매매 연구·검증 (신규 트랙 — `docs/intraday_research.md`)
 > 일 1회 → 분 단위(1~60분) 고빈도 탐색. 유니버스 KOSPI200+KOSDAQ150+S&P500+NASDAQ(~950, long-or-cash). 연구→검증→조건부배포, ML/DL 포함(GPU는 DL/RL 학습 시에만).
 - [x] **단계1 전수조사 (#126)** → `docs/intraday_research.md`. shortlist: ①변동성 타게팅 ②횡단면 종가직전 리버설(롱) ③횡단면 모멘텀/상대강도(롱) ④필터링 돌파(ORB) ⑤트리 ML(LightGBM). 제외: 단기반전 단독·페어(long-only破)·마이크로구조(호가 필요)·DL/RL 배포(연구트랙). 핵심: 비용(KR 매도세 0.20%)·생존편향·다중검정이 방법보다 중요.
 - [x] 단계0 분봉 데이터(#128 스키마·#130 토스 분봉 수집기·게이트 통과 1m KR+US 3년+) + 정합성 하니스(#132 US세션/연율화/정규장필터)

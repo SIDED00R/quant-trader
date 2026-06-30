@@ -8,18 +8,11 @@
 from common.config import KIS_REST_BASE
 from common.constants import BROKER_TIMEOUT
 from common.http_client import get_json
-from common.kis_account import _headers
+from common.kis_account import _headers, to_float as _f
 from common.rate_limit import acquire
 
 # 시세 거래소코드(NAS/NYS/AMS) → 주문 거래소코드(NASD/NYSE/AMEX)
 _EXCD_TO_ORDER = {"NAS": "NASD", "NYS": "NYSE", "AMS": "AMEX"}
-
-
-def _f(x) -> float:
-    try:
-        return float(str(x).replace(",", ""))
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def price_and_exchange(symbol: str):
