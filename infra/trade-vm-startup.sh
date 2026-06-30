@@ -42,6 +42,13 @@ sleep 5
 #          낡은 이미지의 옛 코드가 실행되는 것을 막는다(없으면 #94 결정 기록 코드가 영영 안 돌았음).
 docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
 
+# ── 주식 주간 모의 리밸런싱 (월요일만; ML 이미지로 챔피언 스코어→KIS 모의주문) ──
+# date -u +%u: 1=월요일. 매매 VM은 매일 01:00 UTC(=KR 10:00 장중) 기동 → 월요일에만 주식 실행 = 주 1회.
+# stock-trade-once는 batch 이미지(lightgbm). KIS 자격증명은 VM .env에 있어야 함(메타데이터/시크릿 주입).
+if [ "$(date -u +%u)" = "1" ]; then
+  docker compose --profile trade run --build --rm stock-trade-once 2>&1 | tee /var/log/stock-trade.log
+fi
+
 # ── 정리 + self-stop ──
 pkill -f "ssh.*tunnel@" 2>/dev/null || true
 sync
