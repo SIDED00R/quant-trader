@@ -60,13 +60,13 @@ sleep 5
 BOOT_HOUR=$(date -u +%H)
 BOOT_DOW=$(date -u +%u)   # 1=월요일
 if [ "$BOOT_HOUR" = "19" ] || [ "$BOOT_HOUR" = "20" ] || [ "$BOOT_HOUR" = "21" ]; then
-  # 미국장 막바지 기동 → US 해외 모의 리밸런싱만. 주간 주기는 스케줄러 cron(0 15 * * 1)이 보장
-  # (스크립트엔 요일 게이트 없음 — 이 시각대 수동 부팅은 요일 무관 US 매매 발생). batch 이미지(lightgbm).
+  # 미국장 막바지 기동 → US 해외 모의 리밸런싱. 스케줄러 cron(0 15 * * 1-5)이 평일마다 발화하고,
+  # us_trade_once의 주간 마커가 주 1회만 실제 매매하도록 보장(휴장·실패면 다음 평일 재시도). batch 이미지(lightgbm).
   docker compose --profile trade run --build --rm us-trade-once 2>&1 | tee /var/log/us-trade.log
 else
-  # 데일리 기동(01:00 UTC=KR 10:00 장중) → 코인 매매(매일) + KR 주식(월요일만).
+  # 데일리 기동(01:00 UTC=KR 10:00 장중) → 코인 매매(매일) + KR 주식(평일마다 시도, 주간 마커가 주 1회 보장).
   docker compose --profile trade run --build --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee /var/log/trade-once.log
-  if [ "$BOOT_DOW" = "1" ]; then
+  if [ "$BOOT_DOW" -ge 1 ] && [ "$BOOT_DOW" -le 5 ]; then
     docker compose --profile trade run --build --rm stock-trade-once 2>&1 | tee /var/log/stock-trade.log
   fi
 fi

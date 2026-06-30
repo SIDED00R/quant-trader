@@ -79,6 +79,15 @@ CREATE TABLE IF NOT EXISTS trade_decisions (
 
 CREATE INDEX IF NOT EXISTS idx_decisions_run ON trade_decisions (account_id, run_ts DESC);
 
+-- 주간 리밸런싱 멱등 마커: 평일 스케줄(휴장·실패 재시도)에서 한 주 1회만 실제 매매하도록 보장.
+-- 그 주 완료 시 1행 기록 → 같은 주 후속 평일 부팅은 skip. (market, iso_week)로 중복 차단.
+CREATE TABLE IF NOT EXISTS weekly_rebalance (
+    market    TEXT NOT NULL,                          -- 'US' | 'KR'
+    iso_week  TEXT NOT NULL,                           -- ISO 주차 'YYYY-Www'(거래소 로컬 날짜 기준)
+    done_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (market, iso_week)
+);
+
 INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;
