@@ -3,7 +3,8 @@
 모든 후속 모델(GRU/MASTER/HIST/TabPFN)의 **must-beat 게이트**. 회귀(라벨=횡단면 z-score) 후
 예측을 횡단면 Rank IC로 평가. 저SNR 과적합 통제: 강정규화 + 시드앙상블(예측 평균).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.ml.baseline_lgbm [US KR] [--horizon 21] [--seeds 5] [--folds 6] [--no-kr-micro]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.ml.baseline_lgbm [US KR] [--horizon 21] [--seeds 5] [--folds 6] [--macro] [--kr-micro]
+기본 = 챔피언(macro·KR미시 제외). US=OHLCV+펀더+13F+섹터, KR=OHLCV+DART.
 """
 import argparse
 import sys
@@ -59,8 +60,9 @@ def _fit_predict(tr: pd.DataFrame, te: pd.DataFrame, cols: list, seeds: int, obj
 
 
 def run_market(market: str, horizon: int, seeds: int, folds: int, objective: str,
-               fundamentals: bool = True, macro: bool = True, inst13f: bool = True, sector: bool = True,
-               kr_micro: bool = True) -> dict:
+               fundamentals: bool = True, macro: bool = False, inst13f: bool = True, sector: bool = True,
+               kr_micro: bool = False) -> dict:
+    # 기본 = 챔피언: macro 제외(시장수준 과적합)·KR미시 제외(증분0, #158). US=OHLCV+펀더+13F+섹터, KR=OHLCV+DART.
     feats, cols = build_dataset(market, horizon, fundamentals=fundamentals, macro=macro, inst13f=inst13f,
                                 sector=sector, kr_micro=kr_micro)
     feats = feats.dropna(subset=["label"])               # 라벨 결측(말미 horizon) 제거
@@ -96,14 +98,14 @@ def main(argv=None) -> int:
     p.add_argument("--folds", type=int, default=6)
     p.add_argument("--objective", default="lambdarank", choices=["regression", "lambdarank"])
     p.add_argument("--no-fund", action="store_true", help="US 펀더멘털 제외")
-    p.add_argument("--no-macro", action="store_true", help="매크로 제외")
+    p.add_argument("--macro", action="store_true", help="매크로 포함(기본 제외 — 챔피언은 시장수준 과적합으로 제외)")
     p.add_argument("--no-13f", dest="no_13f", action="store_true", help="US 13F 기관보유 제외")
     p.add_argument("--no-sector", action="store_true", help="섹터/산업모멘텀 제외")
-    p.add_argument("--no-kr-micro", dest="no_kr_micro", action="store_true", help="KR 미시구조(수급·공매도·외국인보유) 제외")
+    p.add_argument("--kr-micro", dest="kr_micro", action="store_true", help="KR 미시구조 포함(기본 제외 — 증분 0, #158)")
     a = p.parse_args(argv)
     rows = [run_market(mk, a.horizon, a.seeds, a.folds, a.objective,
-                       fundamentals=not a.no_fund, macro=not a.no_macro, inst13f=not a.no_13f,
-                       sector=not a.no_sector, kr_micro=not a.no_kr_micro) for mk in a.markets]
+                       fundamentals=not a.no_fund, macro=a.macro, inst13f=not a.no_13f,
+                       sector=not a.no_sector, kr_micro=a.kr_micro) for mk in a.markets]
     print(f"\n===== LightGBM 베이스라인 (OOF, purged walk-forward) =====")
     print_summary(rows)
     return 0
