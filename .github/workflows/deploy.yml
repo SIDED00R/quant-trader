@@ -19,7 +19,7 @@ env:
   PROJECT: coin-auto-trader-jvfhgq
   ZONE: us-central1-a
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
-  SITE_URL: https://jh-coinlab.duckdns.org
+  SITE_URL: https://jh-quantlab.duckdns.org
 
 jobs:
   build:

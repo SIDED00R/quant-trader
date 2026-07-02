@@ -1,4 +1,4 @@
-# 프로젝트 지침 — coin-auto-trader
+# 프로젝트 지침 — quant-trader
 
 이 파일은 **이 저장소에서 작업할 때의 규칙**이다. 전역 지침(`~/.claude/CLAUDE.md`)에 더해 적용한다.
 프로젝트 전체 구조·모듈 역할·동작 흐름은 [README.md](README.md), 설계 배경은 [DESIGN.md](DESIGN.md) 참조(여기에 중복 기술하지 않는다).

@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     close_pool()
 
 
-app = FastAPI(title="coin-auto-trader API", lifespan=lifespan)
+app = FastAPI(title="quant-trader API", lifespan=lifespan)
 
 # 인증 게이트(내부) → 세션(외부) 순으로 추가: 세션이 먼저 실행돼 request.session 을 채운 뒤 게이트가 검사.
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_gate)
