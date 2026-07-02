@@ -11,4 +11,5 @@ _INDEX = Path(__file__).resolve().parent.parent / "web" / "index.html"
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard():
-    return _INDEX.read_text(encoding="utf-8")
+    # no-cache = 매 방문 재검증(배포 직후 구 HTML 방지) — gzip 미들웨어가 전송량은 줄임
+    return HTMLResponse(_INDEX.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache"})

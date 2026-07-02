@@ -2,11 +2,14 @@
 
 executions를 FIFO로 매칭해 라운드트립 실현손익과 승률을 산출한다(라이브 모의매매 성과 패널용).
 미실현은 대시보드가 포지션×현재가로 별도 계산. 순손익(평가자산−초기자본)은 /account가 제공.
+2초 폴링 대응: **체결 count 기반 증분 캐시** — executions는 append-only라 count가 그대로면
+전체 FIFO 재계산을 생략한다(count 조회는 (account_id, executed_at) 인덱스 온리 스캔).
 """
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends
 
+from api.cache import cache_get_stale, cache_set
 from api.security import current_account_id
 from common.postgres_client import pool
 
@@ -15,7 +18,14 @@ router = APIRouter()
 
 @router.get("/performance")
 def performance(account_id: str = Depends(current_account_id)):
+    key = f"performance:{account_id}"
     with pool.connection() as conn:
+        n = conn.execute(
+            "SELECT count(*) FROM executions WHERE account_id=%s", (account_id,)
+        ).fetchone()[0]
+        cached = cache_get_stale(key)
+        if cached is not None and cached["n"] == n:
+            return cached["payload"]
         rows = conn.execute(
             "SELECT symbol, side, price, quantity, fee FROM executions "
             "WHERE account_id=%s ORDER BY executed_at, execution_id",
@@ -54,7 +64,7 @@ def performance(account_id: str = Depends(current_account_id)):
                 losses += 1
 
     closed = wins + losses
-    return {
+    payload = {
         "realized_pnl": realized,
         "total_fees": fees,
         "num_trades": n_buy + n_sell,
@@ -64,3 +74,5 @@ def performance(account_id: str = Depends(current_account_id)):
         "wins": wins,
         "win_rate": (wins / closed) if closed else None,
     }
+    cache_set(key, {"n": n, "payload": payload})
+    return payload
