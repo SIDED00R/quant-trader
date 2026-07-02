@@ -1,5 +1,5 @@
 """시세 조회 라우트 (단일 책임: ClickHouse 시세/캔들 조회)."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from common.clickhouse_client import create_client
 from common.symbols import resolve_symbols
@@ -17,7 +17,8 @@ def _ch():
 
 
 @router.get("/symbols")
-def symbols():
+def symbols(response: Response):
+    response.headers["Cache-Control"] = "private, max-age=300"   # 정적에 가까움 — 브라우저 캐시 허용
     return resolve_symbols()
 
 

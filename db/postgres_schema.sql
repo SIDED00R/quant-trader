@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS executions (
     fee           NUMERIC(20,4) NOT NULL DEFAULT 0,
     executed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- /performance·/history 계정별 조회용(count 인덱스 온리 스캔 포함)
+CREATE INDEX IF NOT EXISTS idx_executions_account ON executions (account_id, executed_at);
 
 -- 전략 부하 가중치(5단계): 재평가 잡이 갱신, commander가 읽어 신호 합성. 없으면 commander는 동일가중.
 CREATE TABLE IF NOT EXISTS strategy_weights (

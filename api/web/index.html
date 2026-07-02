@@ -560,11 +560,12 @@ async function loadStocks(){
 
 async function boot(){
   applyTheme(localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
-  initForm(); await loadMe(); await loadAuto();
-  const syms = await api("/market/symbols");
+  initForm();
+  // 2웨이브 병렬 로딩: 독립 호출은 동시에(첫 페인트 = 순차 6 라운드트립 → 2 라운드트립)
+  const [, , syms] = await Promise.all([loadMe(), loadAuto(), api("/market/symbols")]);
   document.getElementById("oSymbol").innerHTML = syms.map(s => `<option>${s}</option>`).join("");
   chartSym = syms[0]; document.getElementById("chartSym").textContent = chartSym;
-  await refresh(); await loadChart(); await loadStrategy();
+  await Promise.all([refresh(), loadChart(), loadStrategy()]);
   setInterval(refresh, 2000);
   setInterval(loadChart, 15000);
   setInterval(loadStrategy, 60000);   // 일봉 신호 — 저빈도 폴링

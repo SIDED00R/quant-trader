@@ -1,11 +1,13 @@
 """FastAPI 앱 진입점 (단일 책임: 앱 조립 + 수명주기)."""
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from api import auth_google
+from api import auth_google, warmup
 from api.routes import account, autotrade, decisions, health, history, market, orders, performance, stocks, strategy, web
 from api.security import auth_gate
 from common.config import SESSION_SECRET, SITE_ADDRESS
@@ -15,7 +17,10 @@ from common.postgres_client import close_pool, open_pool
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     open_pool()
+    warm = asyncio.create_task(warmup.warm_caches())   # 캐시 예열 — 기동 비차단
     yield
+    if not warm.done():
+        warm.cancel()
     close_pool()
 
 
@@ -29,6 +34,7 @@ app.add_middleware(
     https_only=bool(SITE_ADDRESS),  # 공개(HTTPS) 배포 시 Secure 쿠키
     same_site="lax",
 )
+app.add_middleware(GZipMiddleware, minimum_size=500)   # 최외곽 — HTML/JSON 응답 압축
 
 app.include_router(auth_google.router)
 app.include_router(health.router)
