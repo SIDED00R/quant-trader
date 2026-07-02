@@ -36,8 +36,11 @@ def _hashkey(body: dict) -> str:
     return r.json()["HASH"]
 
 
-def _post_order(path: str, tr_id: str, body: dict) -> dict:
-    """주문 POST(재시도 없음). rt_cd!=0이면 사유와 함께 예외. output(ODNO 등) 포함 응답 반환."""
+def post_order(path: str, tr_id: str, body: dict) -> dict:
+    """주문 POST(재시도 없음). rt_cd!=0이면 사유와 함께 예외. output(ODNO 등) 포함 응답 반환.
+
+    취소(kis_cancel)도 같은 자금경로라 이 헬퍼를 재사용한다.
+    """
     headers = _headers(tr_id)
     headers["hashkey"] = _hashkey(body)
     acquire("kis", "rest")
@@ -60,7 +63,7 @@ def place_domestic_order(symbol: str, side: str, qty: int, price: int | None = N
         "ORD_QTY": str(qty),
         "ORD_UNPR": str(price) if price is not None else "0",
     }
-    return _post_order("/uapi/domestic-stock/v1/trading/order-cash", tr, body)
+    return post_order("/uapi/domestic-stock/v1/trading/order-cash", tr, body)
 
 
 def place_overseas_order(symbol: str, side: str, qty: int, price, exchange: str = KIS_DEFAULT_EXCHANGE) -> dict:
@@ -73,4 +76,4 @@ def place_overseas_order(symbol: str, side: str, qty: int, price, exchange: str 
         "ORD_QTY": str(qty), "OVRS_ORD_UNPR": str(price),
         "ORD_SVR_DVSN_CD": "0", "ORD_DVSN": "00",
     }
-    return _post_order("/uapi/overseas-stock/v1/trading/order", tr, body)
+    return post_order("/uapi/overseas-stock/v1/trading/order", tr, body)
