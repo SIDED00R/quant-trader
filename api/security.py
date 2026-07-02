@@ -10,9 +10,9 @@ from common.config import ALLOWED_EMAILS, AUTH_ENABLED
 
 
 def _is_public(path: str) -> bool:
-    """인증 없이 접근 가능한 경로(로그인 흐름 + favicon)."""
+    """인증 없이 접근 가능한 경로(로그인 흐름 + favicon + CI 헬스체크)."""
     return (
-        path in ("/login", "/logout", "/favicon.ico")
+        path in ("/login", "/logout", "/favicon.ico", "/healthz")
         or path.startswith("/auth/")
     )
 
