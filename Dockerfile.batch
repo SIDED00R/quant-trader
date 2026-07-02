@@ -4,6 +4,10 @@
 # 온디맨드 실행 전용(profile=batch|trade). 라이브 서비스는 이 이미지를 쓰지 않는다(이중 매매·의존 격리).
 FROM python:3.13-slim
 
+# lightgbm 런타임 의존 OpenMP — slim 이미지에 없어 미설치 시 import에서 libgomp.so.1 OSError
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt requirements-ml.txt ./
