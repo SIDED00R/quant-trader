@@ -42,6 +42,25 @@ CREATE TABLE IF NOT EXISTS executions (
 -- /performance·/history 계정별 조회용(count 인덱스 온리 스캔 포함)
 CREATE INDEX IF NOT EXISTS idx_executions_account ON executions (account_id, executed_at);
 
+-- 수동 주식 주문(즉시/예약) — api 상시 컨테이너의 실행기(api/stock_order_executor)가 도래분을 집행.
+-- qty XOR amount: 수량 직접 지정 또는 금액(₩/$, 실행 시점 현재가로 수량 환산) 중 하나만.
+CREATE TABLE IF NOT EXISTS manual_stock_orders (
+    id            BIGSERIAL PRIMARY KEY,
+    account_id    TEXT NOT NULL REFERENCES accounts(account_id),
+    market        TEXT NOT NULL CHECK (market IN ('KR','US')),
+    symbol        TEXT NOT NULL,
+    side          TEXT NOT NULL CHECK (side IN ('BUY','SELL')),
+    qty           INTEGER CHECK (qty > 0),
+    amount        NUMERIC(20,4) CHECK (amount > 0),
+    scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    status        TEXT NOT NULL DEFAULT 'PENDING',   -- PENDING|PLACED|FILLED|FAILED|CANCELED
+    detail        JSONB,                             -- 체결/거부/추격(attempts) 기록
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK ((qty IS NULL) <> (amount IS NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_manual_orders_due ON manual_stock_orders (scheduled_at) WHERE status = 'PENDING';
+
 -- 전략 부하 가중치(5단계): 재평가 잡이 갱신, commander가 읽어 신호 합성. 없으면 commander는 동일가중.
 CREATE TABLE IF NOT EXISTS strategy_weights (
     strategy    TEXT PRIMARY KEY,
