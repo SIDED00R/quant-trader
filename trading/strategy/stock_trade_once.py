@@ -12,7 +12,8 @@ from common import kis_balance
 from common.kis_order import place_domestic_order
 from common.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
-from trading.strategy.stock_trade_common import build_plan, confirm_fills, latest_closes
+from common.stock_price import latest_closes
+from trading.strategy.stock_trade_common import build_plan, confirm_fills
 from trading.strategy.weekly_marker import completed, mark_week_done, week_done
 
 

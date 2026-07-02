@@ -1,25 +1,13 @@
-"""주식 모의 일일매매 공용 헬퍼 (단일 책임: KR/US trade-once 공통부 — 시세·계획·체결확인).
+"""주식 모의 일일매매 공용 헬퍼 (단일 책임: KR/US trade-once 공통부 — 계획·체결확인).
 
 stock_trade_once(KR)·us_trade_once(US)가 시장 파라미터만 다른 동일 로직을 공유한다:
-최신 일봉 종가 조회·top-N long-or-cash 매매계획·잔고 폴링 체결확인. 시장별로 다른 부분
-(주문 종류: KR 시장가 vs US 해외 지정가·거래소 라우팅·USD 버퍼)은 각 모듈에 남긴다.
-batch.ml.stock_score(ML 챔피언 스코어러)에 의존 → Dockerfile.batch(profile: trade) 전용.
+top-N long-or-cash 매매계획·잔고 폴링 체결확인. 시장별로 다른 부분(주문 종류: KR 시장가 vs
+US 해외 지정가+체결추격(kis_chase)·거래소 라우팅)은 각 모듈에 남긴다. 최신 종가 조회는
+common/stock_price.py로 이동(app 이미지 공용). batch.ml.stock_score 의존 → Dockerfile.batch(trade) 전용.
 """
 import time
 
 from batch.ml.stock_score import score_latest
-from common.clickhouse_client import create_client
-
-
-def latest_closes(market: str, symbols: list) -> dict:
-    """해당 시장의 최신 일봉 종가(symbol→close). 동일가중 수량 산정용."""
-    if not symbols:
-        return {}
-    rows = create_client().query(
-        "SELECT symbol, argMax(close, window_start) FROM stock_candles_1d "
-        "WHERE market={mkt:String} AND symbol IN {syms:Array(String)} GROUP BY symbol",
-        parameters={"mkt": market, "syms": list(symbols)}).result_rows
-    return {r[0]: float(r[1]) for r in rows}
 
 
 def build_plan(market: str, balance_fn, top_n: int, macro: bool) -> dict:

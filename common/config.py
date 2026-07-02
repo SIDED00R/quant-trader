@@ -72,6 +72,7 @@ KIS_REST_BASE = (
     if KIS_MOCK
     else "https://openapi.koreainvestment.com:9443"  # 실전
 )
+KIS_CONFIRM_WINDOW_SEC = int(os.getenv("KIS_CONFIRM_WINDOW_SEC", "90"))  # 체결확인(잔고 diff 폴링) 최대 대기(초)
 
 # ── 웹 대시보드 인증 (Basic Auth) ──
 # WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.

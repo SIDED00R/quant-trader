@@ -2,21 +2,23 @@
 
 KR판(stock_trade_once)의 US 대응. 차이: USD 통화·해외 잔고(us_balance)·해외 지정가주문(시장가 불가)·
 거래소 라우팅(price_and_exchange)·미국장 시간(22:30~05:00 KST). 챔피언=OHLCV+펀더+13F+섹터(macro 제외),
-스코어러 score_latest('US'). 지정가=현재가(없으면 직전 종가)×1.02(체결 buffer). 동일가중 USD 사이징.
+스코어러 score_latest('US'). 체결 보장 = kis_chase.place_and_chase(지정가 buffer 1.02→1.04 추격 —
+잔고 diff 폴링으로 확인, 미체결 잔여는 취소 후 가격 재조회·재주문). 동일가중 USD 사이징.
 ⚠ 라이브 해외주문/시세는 미국장 시간 + KIS 모의 해외 시세도메인 실측 검증 필요(US장 마감 중엔 미검증).
 """
 import argparse
 import sys
 
 from common import kis_balance
-from common.kis_order import place_overseas_order
+from common.kis_chase import place_and_chase
 from common.kis_overseas_price import price_and_exchange
 from common.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
-from trading.strategy.stock_trade_common import build_plan, confirm_fills, latest_closes
+from common.stock_price import latest_closes
+from trading.strategy.stock_trade_common import build_plan
 from trading.strategy.weekly_marker import completed, mark_week_done, week_done
 
-_BUFFER = 1.02   # 지정가 매수 buffer(체결 보장)
+_BUFFER = 1.02   # 동일가중 수량 산정용 1차 지정가 버퍼(kis_chase의 1차 BUY 버퍼와 동일)
 
 
 def plan(top_n: int = 20, macro: bool = False) -> dict:
@@ -25,7 +27,7 @@ def plan(top_n: int = 20, macro: bool = False) -> dict:
 
 
 def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders: int = 5) -> dict:
-    """live=True면 buys 상위 max_orders개 KIS 해외 모의 지정가매수. 동일가중 USD 사이징·체결확인=잔고diff."""
+    """live=True면 buys 상위 max_orders개 KIS 해외 모의 매수. 동일가중 USD 사이징·체결보장=place_and_chase."""
     p = plan(top_n=top_n, macro=macro)
     if not live:
         return {**p, "placed": [], "skipped": None}
@@ -36,7 +38,6 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
     if is_market_holiday("US", today):               # 휴장일 → 주문 미발주, 다음 평일 재시도
         return {**p, "placed": [], "skipped": f"US 휴장일({today}) — 다음 평일 재시도"}
     bal = kis_balance.us_balance()
-    before = {x["symbol"]: x["qty"] for x in bal["positions"]}
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
     per = equity / max(1, top_n)
     buys = p["buys"][:max_orders]
@@ -46,20 +47,19 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
         px, exch = price_and_exchange(sym)
         ref = px or closes.get(sym)            # KIS 현재가 우선, 없으면 저장 종가
         if not ref:
-            placed.append({"symbol": sym, "accepted": False, "msg": "시세/거래소 미확인"})
+            placed.append({"symbol": sym, "accepted": False, "filled": False, "filled_qty": 0,
+                           "msg": "시세/거래소 미확인"})
             continue
         limit = round(ref * _BUFFER, 2)
         qty = int(per // limit)
         if qty < 1:
-            placed.append({"symbol": sym, "accepted": False, "msg": f"수량<1 (가격 {limit} > 목표 {per:,.0f})"})
+            placed.append({"symbol": sym, "accepted": False, "filled": False, "filled_qty": 0,
+                           "msg": f"수량<1 (가격 {limit} > 목표 {per:,.0f})"})
             continue
-        try:
-            r = place_overseas_order(sym, "BUY", qty, limit, exch or "NASD")
-            placed.append({"symbol": sym, "qty": qty, "limit": limit, "exch": exch or "NASD",
-                           "accepted": str(r.get("rt_cd")) == "0", "msg": r.get("msg1")})
-        except Exception as e:
-            placed.append({"symbol": sym, "accepted": False, "error": f"{type(e).__name__}: {e}"})
-    confirm_fills(kis_balance.us_balance, before, placed)   # 잔고 폴링 체결확인(접수≠체결)
+        r = place_and_chase("US", sym, "BUY", qty, ref_price=ref, exchange=exch or "NASD")
+        placed.append({"symbol": sym, "qty": qty, "status": r["status"], "attempts": r["attempts"],
+                       "accepted": r["status"] != "REJECTED",
+                       "filled_qty": r["filled_qty"], "filled": r["filled_qty"] > 0})
     if completed(p, placed):                                # 체결됨(또는 매수할 것 없음) → 그 주 완료 기록
         mark_week_done("US", today)
     return {**p, "placed": placed, "skipped": None}
