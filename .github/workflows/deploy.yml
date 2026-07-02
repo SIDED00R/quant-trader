@@ -1,0 +1,112 @@
+# main 푸시 → 이미지 병렬 빌드(레지스트리 캐시) → Artifact Registry → 데이터 VM 배포 + 매매 VM 메타데이터 갱신 → 헬스체크.
+# 인증 = Workload Identity Federation(시크릿 저장 없음). 1회 인프라 셋업 = infra/setup-cicd.sh.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy          # 연속 머지 직렬화(최신 대기 런만 유지) — :latest 태그 경합 방지
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write        # WIF OIDC 토큰 발급
+
+env:
+  PROJECT: coin-auto-trader-jvfhgq
+  ZONE: us-central1-a
+  AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
+  SITE_URL: https://jh-coinlab.duckdns.org
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: quant-trader-app
+            dockerfile: Dockerfile
+          - name: quant-trader-batch
+            dockerfile: Dockerfile.batch
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: coin-auto-trader-jvfhgq
+          workload_identity_provider: projects/689150179824/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
+          token_format: access_token
+      - uses: docker/login-action@v3
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.AR }}/${{ matrix.name }}:latest
+            ${{ env.AR }}/${{ matrix.name }}:${{ github.sha }}
+          # revision 라벨 = VM들의 신선도 검증 기준(startup build_flag / deploy-data-vm.sh)
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          build-args: GIT_SHA=${{ github.sha }}
+          # 레지스트리 캐시(GHA 캐시 10GB 쿼터·축출 무관) — pip 레이어 재사용으로 빌드 60~120s
+          cache-from: type=registry,ref=${{ env.AR }}/${{ matrix.name }}:buildcache
+          cache-to: type=registry,ref=${{ env.AR }}/${{ matrix.name }}:buildcache,mode=max
+
+  # 데이터 VM: git reset 후 pull+up (deploy-data-vm.sh가 sha 라벨 검증까지 수행)
+  deploy-data-vm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: coin-auto-trader-jvfhgq
+          workload_identity_provider: projects/689150179824/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: SSH deploy
+        run: |
+          for i in 1 2 3; do
+            gcloud compute ssh coin-trader-vm --project "$PROJECT" --zone "$ZONE" --quiet --ssh-key-expire-after=10m \
+              --command "sudo bash -c 'export GIT_SSH_COMMAND=\"ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; git -C /opt/coin-auto-trader fetch origin main && git -C /opt/coin-auto-trader reset --hard origin/main && bash /opt/coin-auto-trader/infra/deploy-data-vm.sh ${{ github.sha }}'" && exit 0
+            echo "ssh 배포 재시도 $i"; sleep 20
+          done
+          exit 1
+
+  # 매매 VM: 메타데이터 startup-script 갱신(TERMINATED/RUNNING 무관) — 다음 부팅부터 적용
+  update-trade-vm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: coin-auto-trader-jvfhgq
+          workload_identity_provider: projects/689150179824/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: |
+          gcloud compute instances add-metadata coin-trade-vm --project "$PROJECT" --zone "$ZONE" \
+            --metadata-from-file startup-script=infra/trade-vm-startup.sh
+
+  # 배포 검증: /healthz 의 sha가 방금 배포한 커밋과 일치할 때까지 대기(최대 2분)
+  healthcheck:
+    needs: deploy-data-vm
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for i in $(seq 1 12); do
+            got=$(curl -fsS "$SITE_URL/healthz" | jq -r .sha || true)
+            if [ "$got" = "${{ github.sha }}" ]; then echo "healthz OK ($got)"; exit 0; fi
+            echo "대기($i): sha=$got"; sleep 10
+          done
+          echo "healthz sha 불일치"; exit 1

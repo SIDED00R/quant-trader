@@ -33,10 +33,10 @@ chmod 600 /root/.ssh/id_ed25519 2>/dev/null || true
 export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 cd /opt
 if [ ! -d coin-auto-trader ]; then
-  git clone git@github.com:SIDED00R/coin-auto-trader.git
+  git clone git@github.com:SIDED00R/quant-trader.git coin-auto-trader   # 디렉터리명은 기존 경로 유지(.env 등 보존)
 fi
 cd coin-auto-trader
-git remote set-url origin git@github.com:SIDED00R/coin-auto-trader.git   # https(익명) → SSH deploy key(private repo)
+git remote set-url origin git@github.com:SIDED00R/quant-trader.git   # https(익명) → SSH deploy key(private repo)
 git fetch origin main && git reset --hard origin/main   # 부팅 시 최신 main 반영(.env는 gitignore라 보존)
 cp -n .env.example .env || true
 
@@ -47,11 +47,16 @@ if [ -n "${KIS_TOKEN:-}" ]; then
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/kis-env 2>/dev/null || true
   if [ -s /tmp/kis-env ]; then grep -v '^KIS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/kis-env > .env 2>/dev/null || true; rm -f /tmp/env.nok /tmp/kis-env; fi
 fi
+# ── Artifact Registry 로그인 (CI 프리빌드 이미지 pull용 — 실패 시 아래 --build 폴백) ──
+echo "${DK_TOKEN:-}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev || true
+
 # 데이터 VM = 수집·저장·대시보드 서브셋만 상시(2-VM 분리). 매매는 온디맨드 매매 VM의 trade_once 담당.
 # 이전 세션 컨테이너 전체 정리 후 data 서브셋만 기동(restart:unless-stopped 매매 컨테이너의 부팅 자동재시작 방지).
 # down은 명시한 프로파일 컨테이너만 내리므로 매매(app)·배치까지 전부 나열해야 함(미명시 시 app 컨테이너 잔존).
 docker compose --profile app --profile data --profile batch --profile trade down --remove-orphans || true  # 볼륨 보존
-docker compose --profile data up -d --build             # db-init(스키마, candles_1d 포함)은 의존성으로 자동 실행
+# CI 프리빌드 이미지 pull(빠름) — pull 실패(레지스트리 미가용 등) 시 로컬 빌드 폴백
+if docker compose --profile data pull -q; then B=""; else B="--build"; fi
+docker compose --profile data up -d $B                  # db-init(스키마, candles_1d 포함)은 의존성으로 자동 실행
 
 # 일봉(candles_1d)은 디스크 볼륨에 영속 → 최초 1회만 백필 필요(부팅마다 X). 미적재 시:
 #   docker compose run --rm commander python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
