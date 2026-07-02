@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>coin-auto-trader</title>
+<title>quant-trader</title>
 <style>
   :root{                                   /* 다크(기본) — 시스테매틱 트레이딩 터미널 */
     --ink:#0b0e14; --panel:#12161f; --raise:#181d28; --line:#222a38; --line2:#2c3546;
@@ -179,11 +179,11 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot"></span><b>coin·<span>auto</span>·trader</b></div>
+  <div class="brand"><span class="dot"></span><b>quant·<span>trader</span></b></div>
   <div class="kpi"><span class="lbl">계정</span><span class="v num" id="acctId">-</span></div>
-  <div class="kpi"><span class="lbl">평가자산</span><span class="v big num" id="equity">-</span></div>
-  <div class="kpi"><span class="lbl">현금</span><span class="v num" id="krw">-</span></div>
-  <div class="kpi"><span class="lbl">순손익 (수수료 반영)</span><span class="v big num" id="totalPnl">-</span></div>
+  <div class="kpi"><span class="lbl">코인 평가자산</span><span class="v big num" id="equity">-</span></div>
+  <div class="kpi"><span class="lbl">코인 현금</span><span class="v num" id="krw">-</span></div>
+  <div class="kpi"><span class="lbl">코인 순손익 (수수료 반영)</span><span class="v big num" id="totalPnl">-</span></div>
   <div class="kpi"><span class="lbl">누적 수수료</span><span class="v num" id="fees">-</span></div>
   <div class="sp"></div>
   <div class="live" id="status">연결 중…</div>
@@ -193,12 +193,12 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab on" data-view="dashboard">대시보드</button>
+  <button class="tab on" data-view="stocks">주식</button>
+  <button class="tab" data-view="dashboard">코인</button>
   <button class="tab" data-view="decisions">매매 결정 기록</button>
-  <button class="tab" data-view="stocks">주식</button>
 </nav>
 
-<div id="view-dashboard">
+<div id="view-dashboard" hidden>
 <section class="stance">
   <div class="stance-head"><span class="lbl">앙상블 스탠스</span>
     <span class="sub num" id="stanceSub">모델 2026-06-20(데이터 2019-11~2026-06) · 일봉 3속도 · band 0.5</span></div>
@@ -269,7 +269,7 @@
   </div>
 </div>
 
-<div id="view-stocks" hidden>
+<div id="view-stocks">
   <section class="stance">
     <div class="stance-head"><span class="lbl">주식 모의계좌</span>
       <span class="sub" id="stocksSub">KIS 모의계좌 · 자동 리밸런싱 주 1회(KR 15:00 · US 15:30 ET)</span>
@@ -696,6 +696,7 @@ async function boot(){
   const [, , syms] = await Promise.all([loadMe(), loadAuto(), api("/market/symbols")]);
   document.getElementById("oSymbol").innerHTML = syms.map(s => `<option>${s}</option>`).join("");
   chartSym = syms[0]; document.getElementById("chartSym").textContent = chartSym;
+  showView("stocks");   // 기본 탭 = 주식 — 잔고·주문이력·리밸런싱 칩 로딩 시작(비대기)
   await Promise.all([refresh(), loadChart(), loadStrategy()]);
   setInterval(refresh, 2000);
   setInterval(loadChart, 15000);

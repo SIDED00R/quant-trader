@@ -17,7 +17,7 @@
 >   - **스위퍼 = 기동실패 재시도**: 존 용량 부족(`ZONE_RESOURCE_POOL_EXHAUSTED`, 실사례 2026-06-30~07-01 3연속) 시 수 분 뒤 재기동. 이중 실행은 멱등(코인=목표 수렴, 주식=주간 마커). 기동 실패는 이메일 알림(아래 §11).
 >   - **주 1회 멱등(휴장·실패 재시도)**: 주식은 평일마다 부팅·시도하지만 `weekly_rebalance` 마커가 **주 1회만 실제 매매**를 보장. 휴장일(US=NYSE 게이트, KR=체결기반)·일시적 실패면 그 주 마커를 남기지 않아 **다음 평일 자동 재시도**. 체결 자체는 `kis_chase`(미체결 취소·재주문 추격)가 보장.
 >   - SSH 터널로 데이터 VM DB 접근, 동기 매매. 가동시간만 과금(~$1/월).
-> - **공개 대시보드**: `https://jh-coinlab.duckdns.org` (Caddy 자동 HTTPS, Basic Auth).
+> - **공개 대시보드**: `https://jh-quantlab.duckdns.org` (Caddy 자동 HTTPS, Basic Auth).
 > - **라이브 매매 경로**: `trade_once`(동기 배치). 스트리밍 `commander`/`engine`/`portfolio`는 코드로만 존재(로컬 dev). **Kafka는 데이터 팬아웃만**(매매 미사용).
 > - **데이터**: ClickHouse candles_1d(BTC/ETH 2019-11~) + 전 KRW 마켓 틱 상시 수집. **모의 거래**(실거래 API 없음) — 코인 가상잔고 ₩10M, 주식 KIS 모의계좌(KR ₩10M·US $100k). 모델 출처 = `docs/model.md`.
 > - **상시 비용 ~$66 → ~$25/월** (16GB 단일 → 4GB 데이터 + 온디맨드 매매로 분리).

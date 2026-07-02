@@ -5,7 +5,7 @@
 
 > **📌 현재 운영/배포 상태 (2026-06-20)**: **앙상블 라이브 배포 완료(모의) — 2-VM 온디맨드**.
 > - **아키텍처**: 데이터 VM(상시, e2-medium 4GB, `--profile data` 수집·저장·대시보드) + **매매 VM(온디맨드, Cloud Scheduler 매일 01:00 UTC 기동→`trade_once` 동기 배치→자가종료)**. 라이브 매매 = trade_once(스트리밍 commander 아님). Kafka는 데이터 팬아웃만. **상시 비용 ~$66→~$25/월**.
-> - 공개 대시보드 `https://jh-coinlab.duckdns.org`(Basic Auth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
+> - 공개 대시보드 `https://jh-quantlab.duckdns.org`(Basic Auth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
 > - 계정 초기화 완료(본인 2계정 → ₩10M). 현재 앙상블 CASH(추세 미진입).
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
