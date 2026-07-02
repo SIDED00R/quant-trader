@@ -7,8 +7,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from api import auth_google, warmup
-from api.routes import account, autotrade, decisions, health, history, market, orders, performance, stocks, strategy, web
+from api import auth_google, stock_order_executor, warmup
+from api.routes import account, autotrade, decisions, health, history, market, orders, performance, rebalance, stock_orders, stocks, strategy, web
 from api.security import auth_gate
 from common.config import SESSION_SECRET, SITE_ADDRESS
 from common.postgres_client import close_pool, open_pool
@@ -17,8 +17,10 @@ from common.postgres_client import close_pool, open_pool
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     open_pool()
-    warm = asyncio.create_task(warmup.warm_caches())   # 캐시 예열 — 기동 비차단
+    warm = asyncio.create_task(warmup.warm_caches())              # 캐시 예열 — 기동 비차단
+    executor = asyncio.create_task(stock_order_executor.run())    # 수동주문 실행기(상시)
     yield
+    executor.cancel()
     if not warm.done():
         warm.cancel()
     close_pool()
@@ -48,3 +50,5 @@ app.include_router(strategy.router)
 app.include_router(performance.router)
 app.include_router(decisions.router)
 app.include_router(stocks.router)
+app.include_router(stock_orders.router)
+app.include_router(rebalance.router)
