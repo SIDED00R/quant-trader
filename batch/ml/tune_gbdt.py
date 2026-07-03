@@ -5,6 +5,8 @@
 다중검정 정직성: 탐색한 조합 수(grid_size)를 결과에 기록(DSR n_trials 반영용).
 
 입력: {DATA}/us_tabular.parquet (DATA = DL_DATA env 또는 argv1, 기본 colab_data).
+⚠ 입력 parquet 생성기(batch/ml/export_for_colab.py)는 #196에서 삭제 — 재생성하려면
+`git show 8b51e53^:batch/ml/export_for_colab.py`로 복원해 1회 실행(colab_data엔 과거 스냅샷만 남음).
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.ml.tune_gbdt [DATA]
 """
 import functools

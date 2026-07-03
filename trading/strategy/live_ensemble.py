@@ -157,4 +157,4 @@ if __name__ == "__main__":
     try:
         run()
     except KeyboardInterrupt:
-        print("[ensemble] stopped")
+        print("[loads] stopped")

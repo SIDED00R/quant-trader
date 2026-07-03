@@ -55,7 +55,7 @@ class BacktestAccount:
             self.positions[symbol] = Position(
                 qty=qty, avg=unit_cost, entry_ts=ts, entry_price=price, entry_fee=fee
             )
-        else:  # 추가 매수(전략상 미발생하나 평단 수학은 portfolio와 동일하게 유지)
+        else:  # 추가 매수(앙상블·횡단면 재조정이 목표비중 확대 시 발생 — 평단=수수료 포함 가중평균, portfolio.updater와 동일)
             new_qty = p.qty + qty
             p.avg = _q((p.qty * p.avg + qty * unit_cost) / new_qty)
             p.qty = new_qty

@@ -31,7 +31,7 @@
 - **KR**: 외국인수급·공매도·KR펀더멘털 수집·검증 완료 → §7.
 
 ## 4. DL 비교 (완료, Issue#148) — 트리 압승, DL 미달
-- **무엇**: GBDT(lambdarank) vs MLP vs GRU(raw OHLCV 5채널×60일) head-to-head. 동일 데이터·purged CV·자체완결 스크립트(`batch/ml/colab_train.py`)로 같은 파이프라인 비교.
+- **무엇**: GBDT(lambdarank) vs MLP vs GRU(raw OHLCV 5채널×60일) head-to-head. 동일 데이터·purged CV·자체완결 스크립트(`batch/ml/colab_train.py` — 보류 확정 후 #196에서 코드 삭제, git 히스토리 보존)로 같은 파이프라인 비교.
 - **왜**: 시퀀스 DL이 트리(공학피처)와 직교 정보원일 수 있나? 단 tabular는 GBDT가 강하다는 prior.
 - **결과(최종, 동일 파이프라인)**:
   | 모델 | 입력 | Rank IC | NW_t | LS_Sharpe | 판정 |
