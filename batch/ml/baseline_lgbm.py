@@ -1,8 +1,8 @@
 """LightGBM 베이스라인 (단일 책임: 시장별 purged walk-forward + 시드앙상블 → OOF 평가).
 
-모든 후속 모델(GRU/MASTER/HIST/TabPFN)의 **must-beat 게이트**. 기본 손실=lambdarank(랭킹;
-fwd_ret 버킷 라벨), `--objective regression`이면 횡단면 z-score 회귀. 예측을 횡단면 Rank IC로
-평가. 저SNR 과적합 통제: 강정규화 + 시드앙상블(예측 평균).
+후속 모델 도입 시 **must-beat 게이트**(DL/시퀀스 계열은 #148 비교에서 미달로 보류·코드 삭제 — 기록은
+docs/ml_progress.md §4). 기본 손실=lambdarank(랭킹; fwd_ret 버킷 라벨), `--objective regression`이면
+횡단면 z-score 회귀. 예측을 횡단면 Rank IC로 평가. 저SNR 과적합 통제: 강정규화 + 시드앙상블(예측 평균).
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.ml.baseline_lgbm [US KR] [--horizon 21] [--seeds 5] [--folds 6] [--macro] [--kr-micro]
 기본 = 챔피언(macro·KR미시 제외). US=OHLCV+펀더+13F+섹터, KR=OHLCV+DART.
@@ -43,12 +43,13 @@ def _fit_predict(tr: pd.DataFrame, te: pd.DataFrame, cols: list, seeds: int, obj
     """시드앙상블 예측 평균 + 평균 피처중요도. objective: regression | lambdarank."""
     preds = np.zeros(len(te))
     imp = np.zeros(len(cols))
+    if objective == "lambdarank":    # 정렬·라벨·그룹은 시드 불변 — 루프 밖 1회 산출(시드는 모델 초기화에만 관여)
+        t = tr.sort_values("date").dropna(subset=["fwd_ret"]).copy()
+        y = _rank_labels(t)
+        t = t[y.notna()]; y = y[y.notna()].astype(int)
+        grp = t.groupby("date").size().to_numpy()
     for s in range(seeds):
         if objective == "lambdarank":
-            t = tr.sort_values("date").dropna(subset=["fwd_ret"]).copy()
-            y = _rank_labels(t)
-            t = t[y.notna()]; y = y[y.notna()].astype(int)
-            grp = t.groupby("date").size().to_numpy()
             m = lgb.LGBMRanker(objective="lambdarank", label_gain=list(range(_BUCKETS)),
                                random_state=s, **_PARAMS)
             m.fit(t[cols], y, group=grp)

@@ -9,8 +9,6 @@ backtest 이미지/배치로 실행한다(라이브 commander는 strategy_weight
 잡이 테이블을 갱신해도 commander는 ENSEMBLE_ADAPTIVE를 켜야 반영하므로, 적응 활성 전 A/B·검증 단계에서 안전하게 돌릴 수 있다.
 """
 import argparse
-import math
-import statistics
 import sys
 from decimal import Decimal
 
@@ -30,17 +28,9 @@ from trading.strategy.weight_policy import compute_weights
 _DAY = 86400.0
 
 
-def _sharpe(rets, ppy: float) -> float:
-    """봉별 수익률 → 연율화 Sharpe(스코어). 표본<2 또는 무변동이면 0."""
-    if len(rets) < 2:
-        return 0.0
-    sd = statistics.pstdev(rets)
-    return statistics.mean(rets) / sd * math.sqrt(ppy) if sd > 0 else 0.0
-
-
 def score_loads(bars, loads, initial, fills, sample_sec, is_sec, oos_sec, step_sec):
     """각 부하의 walk-forward OOS 성과 → {load: (score, gate)}. score=연율 Sharpe, gate=DSR(N=1→PSR)."""
-    from batch.backtest.metrics import SECONDS_PER_YEAR, deflated_sharpe
+    from batch.backtest.metrics import SECONDS_PER_YEAR, _sharpe_from_returns, deflated_sharpe
     from batch.backtest.walkforward import oos_returns
     from trading.strategy.trend import TrendStrategy
 
@@ -52,7 +42,7 @@ def score_loads(bars, loads, initial, fills, sample_sec, is_sec, oos_sec, step_s
         rets = oos_returns(bars, lambda s=short, l=long: TrendStrategy(short=s, long=l),
                            prime_bars, initial, fills, sample_sec, is_sec, oos_sec, step_sec)
         gate = deflated_sharpe(rets, 0.0, 1)        # 고정구성 → N=1 → benchmark 0의 PSR(=엣지 유의확률)
-        out[name] = (_sharpe(rets, ppy), gate if gate is not None else 0.0)
+        out[name] = (_sharpe_from_returns(rets, ppy), gate if gate is not None else 0.0)
     return out
 
 
