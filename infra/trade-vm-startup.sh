@@ -60,6 +60,11 @@ fi
 # ── Artifact Registry 로그인 (gcloud 불요 — VM 메타데이터 토큰. 실패해도 진행: 아래 --build 폴백) ──
 echo "${DK_TOKEN:-}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev || true
 
+# ── 디스크 위생 (20GB 디스크 — --build 폴백이 남긴 빌드캐시·dangling 이미지가 pull을 막았던 2026-07-03 사고 재발 방지.
+#    태그된 이미지는 유지해 증분 pull 보존) ──
+docker builder prune -af >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true
+
 # ── 데이터 VM SSH 터널(loopback DB를 매매 VM 호스트로 포워딩) ──
 pkill -f "ssh.*tunnel@" 2>/dev/null || true
 ssh -i "$TUNNEL_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ExitOnForwardFailure=yes \
@@ -100,6 +105,7 @@ case "$BOOT_HOUR" in
 esac
 
 # ── 정리 + self-stop ──
+docker image prune -f >/dev/null 2>&1 || true   # 새 pull로 방금 dangling 된 직전 :latest 회수
 pkill -f "ssh.*tunnel@" 2>/dev/null || true
 sync
 sleep 3
