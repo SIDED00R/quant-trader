@@ -181,6 +181,7 @@ infra/terraform/
   `gcloud compute instances get-serial-port-output coin-trade-vm --zone us-central1-a | grep -E "boot |trade_once|stock-trade|us-trade"`
 - **주식 주간 모의 리밸런싱(KIS)**: `trade-vm-startup.sh`가 부팅시각 분기로 `stock-trade-once`(KR, 15:00 KST 평일)·`us-trade-once`(US, 15:30 ET 평일)를 실행 — 주간 마커가 주 1회 보장. ⚠ **VM `.env`에 KIS 자격증명 필요**(`KIS_APPKEY`/`KIS_APPSECRET`/`KIS_ACCOUNT_NO`/`KIS_MOCK=true`) — Secret Manager `kis-env`로 주입. 자본 제약상 `--top-n`은 자본/주가에 맞게(₩10M이면 top-10 내외).
   → 코인 로그는 `[trade_once] done — decisions=N recorded` 가 보여야 최신 코드. 매매 안 한 날도 `decisions=N`(HOLD 포함) 기록된다.
+- **텔레그램 매매 알림**: 매 잡 실행이 결과·오류를 텔레그램으로 발송(`common/notify_telegram`, MTProto 사용자 세션). 자격증명은 Secret Manager **`telegram-env`**(`TELEGRAM_API_ID/API_HASH/SESSION/TARGET` — 발급은 로컬에서 `python -m scripts.telegram_login`)로 `.env`에 주입되며, VM SA에 해당 시크릿 `secretAccessor` 바인딩 필요. 미설정이면 발송만 조용히 스킵(매매 무영향). 잡이 뜨기 전 실패(빌드 등)는 startup `notify_fail`이 앱 이미지 CLI로 폴백 발송.
 
 ### 접속 (SSH 터널)
 ```bash

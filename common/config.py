@@ -74,6 +74,14 @@ KIS_REST_BASE = (
 )
 KIS_CONFIRM_WINDOW_SEC = int(os.getenv("KIS_CONFIRM_WINDOW_SEC", "90"))  # 체결확인(잔고 diff 폴링) 최대 대기(초)
 
+# ── 텔레그램 매매 알림 (MTProto 사용자 계정 — Telethon StringSession) ──
+# my.telegram.org에서 api_id/api_hash 발급 → scripts/telegram_login.py 1회 실행으로 세션 발급.
+# 운영(매매 VM)은 Secret Manager `telegram-env`로 주입. 미설정이면 발송이 조용히 스킵된다.
+TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "")        # 숫자 문자열
+TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
+TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "")      # StringSession(비밀)
+TELEGRAM_TARGET = os.getenv("TELEGRAM_TARGET", "me")      # 수신 대상(기본 me=나에게 보내기)
+
 # ── 웹 대시보드 인증 (Basic Auth) ──
 # WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.
 WEB_USER = os.getenv("WEB_USER", "admin")
