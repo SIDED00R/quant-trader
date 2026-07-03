@@ -42,7 +42,6 @@ STOCK_SYMBOLS = [
 KIWOOM_MOCK = os.getenv("KIWOOM_MOCK", "true").strip().lower() in ("1", "true", "yes")
 KIWOOM_APP_KEY = os.getenv("KIWOOM_APP_KEY", "")       # 키움 Open API appkey
 KIWOOM_APP_SECRET = os.getenv("KIWOOM_APP_SECRET", "")  # 키움 Open API secretkey
-KIWOOM_ACCOUNT_NO = os.getenv("KIWOOM_ACCOUNT_NO", "")  # 모의 계좌번호(단건주문용, 7단계 #5)
 KIWOOM_REST_BASE = "https://mockapi.kiwoom.com" if KIWOOM_MOCK else "https://api.kiwoom.com"
 KIWOOM_WS_URL = (
     "wss://mockapi.kiwoom.com:10000/api/dostk/websocket"
@@ -81,11 +80,6 @@ TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "")        # 숫자 문자열
 TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "")      # StringSession(비밀)
 TELEGRAM_TARGET = os.getenv("TELEGRAM_TARGET", "me")      # 수신 대상(기본 me=나에게 보내기)
-
-# ── 웹 대시보드 인증 (Basic Auth) ──
-# WEB_PASSWORD 가 비어 있으면 인증 비활성(로컬 개발용). 운영(VM)에서는 반드시 설정.
-WEB_USER = os.getenv("WEB_USER", "admin")
-WEB_PASSWORD = os.getenv("WEB_PASSWORD", "")
 
 # ── 구글 OAuth / 세션 인증 ──
 # GOOGLE_CLIENT_ID/SECRET 가 모두 설정되면 OAuth 인증 활성. 미설정 시 비활성(로컬 개발).
@@ -131,7 +125,7 @@ STRATEGY_MIN_EDGE_PCT = Decimal(os.getenv("STRATEGY_MIN_EDGE_PCT", "0.005"))
 # 데드크로스 청산 사용 여부(1.5단계). baseline에서 데드크로스가 최대 출혈원(−22.5M)이라 기본 비활성(청산은 STOP/TAKE/TRAIL만).
 STRATEGY_DEADCROSS_EXIT = os.getenv("STRATEGY_DEADCROSS_EXIT", "false").strip().lower() in ("1", "true", "yes")
 
-# 업비트 최소 주문 금액(이 금액 미만 매수는 스킵). 정본 위치는 여기(config) — sma_trader의 동명 상수는 통합 대기(코드리뷰 D1/D2 deferred).
+# 업비트 최소 주문 금액(이 금액 미만 매수는 스킵). 정본은 여기(config) — sma_trader가 재-export하고 sma/disciplined가 경유 import.
 MIN_ORDER_KRW = Decimal(os.getenv("MIN_ORDER_KRW", "5000"))
 
 # ── 저회전 추세추종 전략 (3단계, strategy/trend.py) ──

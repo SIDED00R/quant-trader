@@ -206,7 +206,10 @@ def run(dry_run: bool = False) -> int:
         if rejected:
             print(f"[trade_once] ⚠ {rejected}/{len(trades)} 주문 거부(잔고/보유 부족) — 확인 필요")
         print(f"[trade_once] done — decisions={len(decisions)} recorded")
-        balances = {a: {"cash": cash(a), "equity": equity(cash(a), positions(a), prices)} for a in accts}
+        balances = {}
+        for a in accts:
+            c = cash(a)
+            balances[a] = {"cash": c, "equity": equity(c, positions(a), prices)}
         notify_telegram.send(coin_message(decisions, rejected, shown, dry_run=False, balances=balances))
         return 70 if rejected else 0
     except Exception as e:

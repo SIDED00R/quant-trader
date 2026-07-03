@@ -24,23 +24,21 @@ from trading.strategy.base import Broker, MarketTick, Strategy
 
 class _Session:
     """한 종목·한 거래일의 세션 상태(개장 레인지·개장 N봉 종가·진입 여부)."""
-    __slots__ = ("date", "first", "n", "or_hi", "or_lo", "window_close", "window_done", "entered")
+    __slots__ = ("date", "first", "n", "or_hi", "window_close", "window_done", "entered")
 
     def __init__(self, d, first_price):
         self.date = d
         self.first = first_price
         self.n = 0
         self.or_hi = None
-        self.or_lo = None
         self.window_close = None
         self.window_done = False
         self.entered = False
 
     def update(self, price, opening_bars: int) -> None:
         self.n += 1
-        if self.n <= opening_bars:                 # 개장 레인지 구간
+        if self.n <= opening_bars:                 # 개장 레인지 구간(롱온리라 상단만 추적)
             self.or_hi = price if self.or_hi is None else max(self.or_hi, price)
-            self.or_lo = price if self.or_lo is None else min(self.or_lo, price)
             if self.n == opening_bars:
                 self.window_close = price
                 self.window_done = True

@@ -1,10 +1,10 @@
 """SMAStrategy 추출 회귀(동일성) + 청산 4경로 가드.
 
-원본(TAKE+TRAIL) 골든은 추출 *직전* 코드(backtest/strategy.py:SmaBaselineStrategy)로 캡처한 값 →
-SMAStrategy가 이를 정확히 재현하면 추출이 무행동 변경임이 증명된다.
+원본(TAKE+TRAIL) 골든은 추출 *직전* 코드(당시 backtest/strategy.py:SmaBaselineStrategy — f516071에서 삭제)로
+캡처한 값 → SMAStrategy가 이를 정확히 재현하면 추출이 무행동 변경임이 증명된다.
 STOP/DEADCROSS 골든은 AST 동일성이 증명된 SMAStrategy로 캡처(추출 전과 등가)해, on_tick이 위임하는
 청산 4경로(STOP>TAKE>TRAIL>DEADCROSS)를 모두 회귀로 고정한다(향후 재리팩터 가드 완성).
-각 시계열은 결정적이며 `git show main:backtest/strategy.py`로 동일 재현 가능.
+각 시계열은 결정적이며 `git show f516071^:backtest/strategy.py`(삭제 직전 스냅샷)로 동일 재현 가능.
 """
 import unittest
 from decimal import Decimal

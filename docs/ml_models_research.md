@@ -1,5 +1,7 @@
 # 횡단면 수익예측 모델 SOTA 전수조사 — 숏리스트 + 테스트 계획
 
+> **상태(2026-07): DL 트랙 보류** — #148 비교에서 GBDT 압승([ml_progress.md](ml_progress.md) §4), DL 코드는 #196에서 삭제(git 히스토리 보존). 이하 조사·로드맵은 재개 시 참고자료.
+>
 > 7개 모델군 73개 모델 조사. 자매 문서: 피처 [ml_features_research.md](ml_features_research.md), 데이터 [ml_data_acquisition.md](ml_data_acquisition.md).
 >
 > **과제 정의**: 단일 시계열 forecasting이 아니라 **매 거래일 종목을 미래 h일 상대수익으로 줄세우는 횡단면 alpha 랭킹**. 라벨·손실·평가지표·아키텍처 귀납편향이 forecasting과 전부 다름.
@@ -145,7 +147,7 @@
 - KR: 외국인 수급(KRX 키 후)은 펀더멘털처럼 종목별 직접 신호라 유망. DART 펀더멘털도 동일 검증 예정.
 
 ### DL 1차 비교 — GRU(raw 시퀀스) vs GBDT (US)
-`batch/ml/dl_gru.py`, raw OHLCV 5채널×60일(당일종가 정규화), 동일 purged CV.
+`batch/ml/dl_gru.py`(#196에서 삭제 — git 히스토리 보존), raw OHLCV 5채널×60일(당일종가 정규화), 동일 purged CV.
 
 | 모델 | 입력 | Rank IC | ICIR | NW_t | LS Sharpe |
 |---|---|---|---|---|---|
