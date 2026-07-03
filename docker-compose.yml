@@ -75,6 +75,10 @@ x-batch-trade: &batch-trade
     KIS_APPSECRET: ${KIS_APPSECRET:-}
     KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
     KIS_MOCK: ${KIS_MOCK:-true}
+    TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+    TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+    TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+    TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
 
 services:
   # ── Kafka (KRaft 단일 노드, Zookeeper 없음) ─────────────────────────
@@ -312,6 +316,10 @@ services:
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
       INITIAL_BALANCE: ${INITIAL_BALANCE:-10000000}
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+      TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
     command: python -m trading.strategy.trade_once
 
   # ── 온디맨드 주식 주간 모의 리밸런싱 (평일 15:00 KST, 마감 30분 전) — ML 챔피언 스코어→KIS 모의주문 ──

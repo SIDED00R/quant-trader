@@ -7,12 +7,14 @@ KR 유니버스. 잔고/포지션 소스 = KIS(kis_balance). 동일가중 top-N.
 """
 import argparse
 import sys
+import traceback
 
-from common import kis_balance
+from common import kis_balance, notify_telegram
 from common.kis_order import place_domestic_order
 from common.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
 from common.stock_price import latest_closes
+from trading.strategy.notify_messages import error_message, stock_message
 from trading.strategy.stock_trade_common import build_plan, confirm_fills
 from trading.strategy.weekly_marker import completed, mark_week_done, week_done
 
@@ -63,7 +65,10 @@ def execute(top_n: int = 30, macro: bool = False, live: bool = False, max_orders
 
 
 def main(argv=None) -> int:
-    """주간 모의 리밸런싱 진입점(스케줄러가 호출). --live 없으면 dry-run."""
+    """주간 모의 리밸런싱 진입점(스케줄러가 호출). --live 없으면 dry-run.
+
+    종료코드: 0=정상 / 70=오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
+    """
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -73,13 +78,19 @@ def main(argv=None) -> int:
     ap.add_argument("--max-orders", type=int, default=5, help="1회 주문 수 상한(안전)")
     ap.add_argument("--live", action="store_true", help="실제 KIS 모의주문(미지정=dry-run)")
     a = ap.parse_args(argv)
-    r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
+    try:
+        r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
+    except Exception as e:
+        traceback.print_exc()
+        sent = notify_telegram.send(error_message("KR 주식", e))
+        return 70 if sent else 1
     print(f"[stock-trade] bar={r['bar']} cash={r['cash']:,.0f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):
         print(f"  skip: {r['skipped']}")
     for o in r.get("placed", []):
         print("  ", o)
+    notify_telegram.send(stock_message("KR 주식", r, live=a.live))
     return 0
 
 

@@ -18,8 +18,9 @@
 | Toss | 주식 데이터 | MARKET_DATA 외 | 응답 헤더로 확인 | — | client | 동적 |
 | Kiwoom | 데이터/정보 | REST (TR별) | **≈1** (버스트 2) | — | TR/계정 | 추정 |
 | Kiwoom | 데이터/정보 | WebSocket | 등록 제한 | — | 세션 | 보조 |
+| Telegram | 매매 알림 발송 | send(MTProto) | **1** | ~20(채팅당) | 계정/채팅 | 공식(보수) |
 
-> 통합 레이트리미터 기본값은 위 "초당" 열을 보수적으로 채택했다. KIS는 모의(5) 기준이며 실전 전환 시 `acquire("kis","rest", rate=20)`.
+> 통합 레이트리미터 기본값은 위 "초당" 열을 보수적으로 채택했다. KIS는 모의(5) 기준이며 실전 전환 시 `acquire("kis","rest", rate=20)`. Telegram은 매매 잡당 1건(하루 수 건)이라 1/s로 충분하며, 초과 시 서버가 FloodWait을 주고 `notify_telegram`이 흡수한다.
 
 ## 제공자별 상세
 

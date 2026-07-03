@@ -9,12 +9,14 @@ portfolio.apply_execution을 재사용한다. 매 실행의 결정은 trade_deci
 재사용: commander.decide·combined_for_bar, decision_record.classify, live_ensemble.prime/signals_for,
 ensemble.default_loads, load_weights, apply_execution. 계정/시세 읽기 헬퍼는 commander와 일시 중복(스트리밍 commander 은퇴 시 정리).
 """
+import traceback
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from psycopg.types.json import Jsonb
 
+from common import notify_telegram
 from common.candles import daily_candles
 from common.clickhouse_client import create_client
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
@@ -25,6 +27,7 @@ from trading.strategy.commander import combined_for_bar, decide
 from trading.strategy.decision_record import classify
 from trading.strategy.ensemble import default_loads
 from trading.strategy.live_ensemble import LiveEnsemble
+from trading.strategy.notify_messages import coin_message, error_message
 
 _FEE_QUANT = Decimal("0.0001")
 
@@ -164,7 +167,10 @@ def _record_decision(conn, run_ts, d: dict, executed: bool) -> None:
 
 
 def run(dry_run: bool = False) -> int:
-    """1회 매매 실행. dry_run이면 목표·계획만 출력(주문·기록 미발생). 거부 시 비정상 종료코드(스케줄러 감지)."""
+    """1회 매매 실행. dry_run이면 목표·계획만 출력(주문·기록 미발생).
+
+    종료코드: 0=정상 / 70=거부 발생 또는 오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
+    """
     open_pool()
     ch = create_client()
     rejected = 0
@@ -184,6 +190,7 @@ def run(dry_run: bool = False) -> int:
             for d in trades:
                 print(f"[trade_once] (dry-run) would {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
             print("[trade_once] dry-run done")
+            notify_telegram.send(coin_message(decisions, 0, shown, dry_run=True))
             return 0
         for d in decisions:
             with pool.connection() as conn:    # 체결+기록을 한 트랜잭션에 묶어 '체결됐는데 기록 없음' 갭 제거
@@ -194,11 +201,18 @@ def run(dry_run: bool = False) -> int:
                     if result == "rejected":
                         rejected += 1
                     print(f"[trade_once] {result} {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
+                d["executed"] = executed          # 알림 문안용 체결 여부 주석
                 _record_decision(conn, run_ts, d, executed)
         if rejected:
             print(f"[trade_once] ⚠ {rejected}/{len(trades)} 주문 거부(잔고/보유 부족) — 확인 필요")
         print(f"[trade_once] done — decisions={len(decisions)} recorded")
-        return 1 if rejected else 0
+        balances = {a: {"cash": cash(a), "equity": equity(cash(a), positions(a), prices)} for a in accts}
+        notify_telegram.send(coin_message(decisions, rejected, shown, dry_run=False, balances=balances))
+        return 70 if rejected else 0
+    except Exception as e:
+        traceback.print_exc()
+        sent = notify_telegram.send(error_message("코인", e))
+        return 70 if sent else 1
     finally:
         close_pool()
 

@@ -26,6 +26,8 @@ _DEFAULT_RATES: dict[str, float] = {
     "toss:MARKET_DATA_CHART": 5,
     # Kiwoom (커뮤니티 추정): TR별 ~1/s. 보수적.
     "kiwoom:tr": 1,
+    # Telegram (공식: 개별 채팅 ~1 msg/s): 매매 알림은 하루 수 건이라 보수값으로 충분.
+    "telegram:send": 1,
 }
 
 

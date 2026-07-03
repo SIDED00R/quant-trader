@@ -8,13 +8,15 @@ KR판(stock_trade_once)의 US 대응. 차이: USD 통화·해외 잔고(us_balan
 """
 import argparse
 import sys
+import traceback
 
-from common import kis_balance
+from common import kis_balance, notify_telegram
 from common.kis_chase import place_and_chase
 from common.kis_overseas_price import price_and_exchange
 from common.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
 from common.stock_price import latest_closes
+from trading.strategy.notify_messages import error_message, stock_message
 from trading.strategy.stock_trade_common import build_plan
 from trading.strategy.weekly_marker import completed, mark_week_done, week_done
 
@@ -66,7 +68,10 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
 
 
 def main(argv=None) -> int:
-    """US 주간 모의 리밸런싱 진입점. --live 없으면 dry-run. 미국장 시간(22:30~05:00 KST)에 실행."""
+    """US 주간 모의 리밸런싱 진입점. --live 없으면 dry-run. 미국장 시간(22:30~05:00 KST)에 실행.
+
+    종료코드: 0=정상 / 70=오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
+    """
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -76,13 +81,19 @@ def main(argv=None) -> int:
     ap.add_argument("--max-orders", type=int, default=5, help="1회 주문 수 상한(안전)")
     ap.add_argument("--live", action="store_true", help="실제 KIS 해외 모의주문(미지정=dry-run)")
     a = ap.parse_args(argv)
-    r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
+    try:
+        r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
+    except Exception as e:
+        traceback.print_exc()
+        sent = notify_telegram.send(error_message("US 주식", e))
+        return 70 if sent else 1
     print(f"[us-trade] bar={r['bar']} cash={r['cash']:,.2f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):
         print(f"  skip: {r['skipped']}")
     for o in r.get("placed", []):
         print("  ", o)
+    notify_telegram.send(stock_message("US 주식", r, live=a.live))
     return 0
 
 
