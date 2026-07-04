@@ -74,6 +74,7 @@ x-batch-trade: &batch-trade
     KIS_MOCK: ${KIS_MOCK:-true}
     TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}
     TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
+    DART_API_KEY: ${DART_API_KEY:-}
     TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
     TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
     TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
@@ -332,6 +333,11 @@ services:
   us-trade-once:
     <<: *batch-trade
     command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
+
+  # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 풀 재백필+분기 수집기, #204) ──
+  maintenance-once:
+    <<: *batch-trade
+    command: python -m batch.data.maintenance_once
 
   api:
     <<: *app

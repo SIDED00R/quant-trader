@@ -48,8 +48,8 @@ class TestMarketHoliday(unittest.TestCase):
         self.assertFalse(is_market_holiday("US", date(2026, 7, 6)))
 
     def test_kr_unset_defaults_open(self):
-        # KR 휴장 셋은 비어 있음 — 체결기반 재시도에 위임(개장 취급)
-        self.assertFalse(is_market_holiday("KR", date(2026, 1, 1)))
+        # KR 휴장 셋은 공표된 연도(2026)만 수록 — 미수록 연도(2028)는 체결기반 재시도에 위임(개장 취급)
+        self.assertFalse(is_market_holiday("KR", date(2028, 1, 1)))
 
 
 if __name__ == "__main__":

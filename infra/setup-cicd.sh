@@ -2,7 +2,7 @@
 # CI/CD·스케줄러 1회 셋업 (멱등 — 재실행 안전). 소유자 gcloud 자격증명으로 로컬에서 실행:
 #   bash infra/setup-cicd.sh
 # 구성: API 활성화 → Artifact Registry(+정리정책) → WIF(github-pool/provider) → 배포 SA+최소권한
-#       → VM SA에 AR reader → 모니터링(이메일 채널+기동실패 알림) → 매매 스케줄러 6잡 upsert
+#       → VM SA에 AR reader → 모니터링(이메일 채널+기동실패 알림) → 매매 스케줄러 8잡 upsert
 #       → 매매 VM 메타데이터 즉시 반영.
 set -euo pipefail
 
@@ -93,7 +93,7 @@ EOF
   gcloud alpha monitoring policies create --project $P --policy-from-file=/tmp/vm-start-fail-policy.json --quiet
 fi
 
-echo "── 8. 매매 스케줄러 6잡 upsert (메인 3 + 스위퍼 3 — 스위퍼=기동실패 재시도, 이중실행은 멱등)"
+echo "── 8. 매매 스케줄러 8잡 upsert (메인 4 + 스위퍼 4 — 스위퍼=기동실패 재시도, 이중실행은 멱등)"
 upsert() {  # $1=잡 $2=cron $3=tz
   gcloud scheduler jobs update http "$1" --project $P --location=$R --schedule="$2" --time-zone="$3" \
     --uri="$URI" --http-method=POST --oauth-service-account-email="$VMSA" --quiet 2>/dev/null \
@@ -106,6 +106,8 @@ upsert trade-vm-kr-close       "0 15 * * 1-5"  "Asia/Seoul"         # KR 마감 
 upsert trade-vm-kr-close-sweep "10 15 * * 1-5" "Asia/Seoul"
 upsert trade-vm-us-close       "30 15 * * 1-5" "America/New_York"   # US 마감 30분 전(DST 자동)
 upsert trade-vm-us-close-sweep "45 15 * * 1-5" "America/New_York"
+upsert trade-vm-maintenance       "0 4 * * 6"     "Etc/UTC"            # 데이터 유지보수(매주 토 발화, 첫 주 가드는 startup이 담당)
+upsert trade-vm-maintenance-sweep "0 5 * * 6"     "Etc/UTC"
 
 echo "── 9. 매매 VM 메타데이터 즉시 반영 (새 KR 잡이 구 분기표로 발화하는 일 방지)"
 gcloud compute instances add-metadata coin-trade-vm --project $P --zone=$Z \
