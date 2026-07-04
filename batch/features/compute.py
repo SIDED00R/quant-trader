@@ -26,6 +26,9 @@ def load_ohlcv(market: str) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=["symbol", "date", *_COLS])
     for c in _COLS:
         df[c] = df[c].astype(float)
+    if df.empty:
+        raise RuntimeError(f"stock_candles_1d(market={market}) 0행 — 백필 필요: "
+                           "python -m batch.backtest.backfill_stock_daily")
     return df
 
 

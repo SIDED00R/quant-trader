@@ -10,15 +10,15 @@ import argparse
 import sys
 import traceback
 
+from batch.backtest.refresh_stock_daily import refresh
 from common import kis_balance, notify_telegram
 from common.kis_chase import place_and_chase
 from common.kis_overseas_price import price_and_exchange
-from common.market_holidays import is_market_holiday, market_today
-from common.postgres_client import open_pool
+from common.market_holidays import market_today
 from common.stock_price import latest_closes
 from trading.strategy.notify_messages import error_message, stock_message
-from trading.strategy.stock_trade_common import build_plan
-from trading.strategy.weekly_marker import completed, mark_week_done, week_done
+from trading.strategy.stock_trade_common import build_plan, skip_result, weekly_guard
+from trading.strategy.weekly_marker import completed, mark_week_done
 
 _BUFFER = 1.02   # 동일가중 수량 산정용 1차 지정가 버퍼(kis_chase의 1차 BUY 버퍼와 동일)
 
@@ -30,15 +30,14 @@ def plan(top_n: int = 20, macro: bool = False) -> dict:
 
 def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders: int = 5) -> dict:
     """live=True면 buys 상위 max_orders개 KIS 해외 모의 매수. 동일가중 USD 사이징·체결보장=place_and_chase."""
-    p = plan(top_n=top_n, macro=macro)
     if not live:
-        return {**p, "placed": [], "skipped": None}
-    open_pool()
+        return {**plan(top_n=top_n, macro=macro), "placed": [], "skipped": None}
+    reason = weekly_guard("US")                  # 가드 먼저 — 휴장·완료 주엔 스코어링·토스 호출 안 함
+    if reason:
+        return skip_result(reason)
+    refresh(["US"], log=print)                   # 일봉 증분 갱신(종목별 격리 — 부분 실패는 신선도 게이트가 방어)
+    p = plan(top_n=top_n, macro=macro)
     today = market_today("US")
-    if week_done("US", today):                       # 그 주 이미 매매함 → 평일 재부팅 skip
-        return {**p, "placed": [], "skipped": f"이미 이번주 리밸런싱 완료({today})"}
-    if is_market_holiday("US", today):               # 휴장일 → 주문 미발주, 다음 평일 재시도
-        return {**p, "placed": [], "skipped": f"US 휴장일({today}) — 다음 평일 재시도"}
     bal = kis_balance.us_balance()
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
     per = equity / max(1, top_n)
