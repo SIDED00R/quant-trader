@@ -8,6 +8,18 @@ from batch.ml.baseline_lgbm import _fit_predict
 from batch.ml.dataset import build_dataset
 
 
+def _latest_covered(feats):
+    """스코어 기준일 = 횡단면 커버리지가 최근 정상치의 50% 이상인 최신 날짜.
+
+    증분 갱신이 일부 종목만 성공한 날(얇은 횡단면)로 top-N을 뽑는 것을 방지 — 그런 날은
+    직전 완전한 날짜로 후퇴한다. 기준 = 최근 15개 거래일 횡단면 크기의 최대값.
+    """
+    sizes = feats.groupby("date").size().sort_index()
+    recent = sizes.tail(15)
+    ok = recent[recent >= recent.max() * 0.5]
+    return ok.index.max()
+
+
 def score_latest(market: str = "KR", horizon: int = 21, seeds: int = 5,
                  top_n: int = 30, macro: bool = False):
     """(최신봉 날짜, 상위 top_n DataFrame[symbol,date,score]) 반환.
@@ -16,7 +28,7 @@ def score_latest(market: str = "KR", horizon: int = 21, seeds: int = 5,
     """
     feats, cols = build_dataset(market, horizon, fundamentals=True, macro=macro,
                                 inst13f=True, sector=True, kr_micro=False)
-    latest = feats["date"].max()
+    latest = _latest_covered(feats)
     train = feats[feats["label"].notna()]
     today = feats[feats["date"] == latest].copy()
     if train.empty or today.empty:

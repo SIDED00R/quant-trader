@@ -182,6 +182,16 @@ infra/terraform/
 - **주식 주간 모의 리밸런싱(KIS)**: `trade-vm-startup.sh`가 부팅시각 분기로 `stock-trade-once`(KR, 15:00 KST 평일)·`us-trade-once`(US, 15:30 ET 평일)를 실행 — 주간 마커가 주 1회 보장. ⚠ **VM `.env`에 KIS 자격증명 필요**(`KIS_APPKEY`/`KIS_APPSECRET`/`KIS_ACCOUNT_NO`/`KIS_MOCK=true`) — Secret Manager `kis-env`로 주입. 자본 제약상 `--top-n`은 자본/주가에 맞게(₩10M이면 top-10 내외).
   → 코인 로그는 `[trade_once] done — decisions=N recorded` 가 보여야 최신 코드. 매매 안 한 날도 `decisions=N`(HOLD 포함) 기록된다.
 - **텔레그램 매매 알림**: 매 잡 실행이 결과·오류를 텔레그램으로 발송(`common/notify_telegram`, MTProto 사용자 세션). 자격증명은 Secret Manager **`telegram-env`**(`TELEGRAM_API_ID/API_HASH/SESSION/TARGET` — 발급은 로컬에서 `python -m scripts.telegram_login`)로 `.env`에 주입되며, VM SA에 해당 시크릿 `secretAccessor` 바인딩 필요. 미설정이면 발송만 조용히 스킵(매매 무영향). 잡이 뜨기 전 실패(빌드 등)는 startup `notify_fail`이 앱 이미지 CLI로 폴백 발송.
+- **토스 시크릿(`toss-env`)**: 매매 전 일봉 증분 갱신(`refresh_stock_daily`)이 토스 API를 호출하므로 kis-env·telegram-env와 동일 패턴으로 생성한다.
+  ```bash
+  printf 'TOSS_CLIENT_ID=...\nTOSS_CLIENT_SECRET=...\n' | gcloud secrets create toss-env --data-file=-
+  gcloud secrets add-iam-policy-binding toss-env --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"
+  ```
+- **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
+  1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.
+  2. 활성 유니버스 전체 재백필(수정주가 기준 통일):
+     `python -m batch.backtest.backfill_stock_daily --symbols-file <kospi200+kosdaq150+sp500+nasdaq100 결합 파일> --days 2600`
+     신규 종목 편입도 이 CLI로 수행한다(`refresh_stock_daily`는 이미 활성인 종목의 증분만 갱신, 신규 편입은 다루지 않음).
 
 ### 접속 (SSH 터널)
 ```bash

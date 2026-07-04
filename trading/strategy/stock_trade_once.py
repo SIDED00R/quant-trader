@@ -9,14 +9,14 @@ import argparse
 import sys
 import traceback
 
+from batch.backtest.refresh_stock_daily import refresh
 from common import kis_balance, notify_telegram
 from common.kis_order import place_domestic_order
-from common.market_holidays import is_market_holiday, market_today
-from common.postgres_client import open_pool
+from common.market_holidays import market_today
 from common.stock_price import latest_closes
 from trading.strategy.notify_messages import error_message, stock_message
-from trading.strategy.stock_trade_common import build_plan, confirm_fills
-from trading.strategy.weekly_marker import completed, mark_week_done, week_done
+from trading.strategy.stock_trade_common import build_plan, confirm_fills, skip_result, weekly_guard
+from trading.strategy.weekly_marker import completed, mark_week_done
 
 
 def plan(top_n: int = 30, macro: bool = False) -> dict:
@@ -30,15 +30,14 @@ def execute(top_n: int = 30, macro: bool = False, live: bool = False, max_orders
     동일가중: 목표금액 = 평가자산/top_n, 수량 = floor(목표금액/현재가)(정수주). 가격>목표면 건너뜀.
     안전: max_orders로 1회 주문 수 제한(검증 단계).
     """
-    p = plan(top_n=top_n, macro=macro)
     if not live:
-        return {**p, "placed": [], "skipped": None}
-    open_pool()
+        return {**plan(top_n=top_n, macro=macro), "placed": [], "skipped": None}
+    reason = weekly_guard("KR")                  # 가드 먼저 — 휴장·완료 주엔 스코어링·토스 호출 안 함
+    if reason:
+        return skip_result(reason)
+    refresh(["KR", "US"], log=print)              # KR 모델이 US 컨텍스트 피처를 쓰므로 둘 다 갱신
+    p = plan(top_n=top_n, macro=macro)
     today = market_today("KR")
-    if week_done("KR", today):                       # 그 주 이미 매매함 → 평일 재부팅 skip
-        return {**p, "placed": [], "skipped": f"이미 이번주 리밸런싱 완료({today})"}
-    if is_market_holiday("KR", today):               # KR 휴장 셋은 빈 채 — 보통 체결기반 재시도로 처리
-        return {**p, "placed": [], "skipped": f"KR 휴장일({today}) — 다음 평일 재시도"}
     bal = kis_balance.kr_balance()
     before = {x["symbol"]: x["qty"] for x in bal["positions"]}   # 체결확인 기준선(모의는 일별체결조회 미지원)
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])

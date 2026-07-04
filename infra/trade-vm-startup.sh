@@ -10,7 +10,7 @@
 # 스위퍼 = 존 용량 부족(ZONE_RESOURCE_POOL_EXHAUSTED) 등 기동 실패 재시도. 이중 실행은 멱등:
 #   코인=목표 수렴(재실행 시 주문 0), 주식=주간 마커(week_done)가 skip.
 # 알림: 잡 결과는 파이썬(common/notify_telegram)이 텔레그램 발송. 파이썬이 통보 못한 실패(exit∉{0,70})는
-#   notify_fail()이 앱 이미지 CLI로 폴백 발송. 시크릿은 kis-env·telegram-env(Secret Manager)로 주입.
+#   notify_fail()이 앱 이미지 CLI로 폴백 발송. 시크릿은 kis-env·telegram-env·toss-env(Secret Manager)로 주입.
 # DB는 데이터 VM에서 loopback 유지, 매매 VM이 터널(-L 5432/8123)로 접속(network_mode:host).
 # 터널 개인키는 /etc/tunnel_key(600), 공개키는 데이터 VM 메타데이터(tunnel 사용자)에 등록돼 있어야 한다.
 # 루트로 실행. -e 제외(어떤 실패에도 마지막 poweroff까지 도달하도록).
@@ -51,7 +51,7 @@ export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
 cd "$REPO" && git remote set-url origin git@github.com:SIDED00R/quant-trader.git && git fetch origin main && git reset --hard origin/main
 cp -n .env.example .env || true
 
-# ── 자격증명 주입 (Secret Manager kis-env·telegram-env → .env, VM 토큰으로 REST 접근; 실패해도 진행) ──
+# ── 자격증명 주입 (Secret Manager kis-env·telegram-env·toss-env → .env, VM 토큰으로 REST 접근; 실패해도 진행) ──
 # .env는 부팅 간 영속 — prefix 필터(grep -vE)로 지난 부팅의 주입 라인을 걷어내 중복 누적을 방지한다.
 KIS_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
 if [ -n "${KIS_TOKEN:-}" ]; then
@@ -59,10 +59,13 @@ if [ -n "${KIS_TOKEN:-}" ]; then
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/kis-env 2>/dev/null || true
   curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/telegram-env/versions/latest:access" 2>/dev/null \
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/telegram-env 2>/dev/null || true
+  curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/toss-env/versions/latest:access" 2>/dev/null \
+    | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/toss-env 2>/dev/null || true
   # 시크릿별 독립 병합 — 자기 fetch가 성공했을 때만 자기 prefix 라인을 교체(한쪽 실패가 다른 쪽을 지우지 않게)
   if [ -s /tmp/kis-env ]; then grep -v '^KIS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/kis-env > .env 2>/dev/null || true; fi
   if [ -s /tmp/telegram-env ]; then grep -v '^TELEGRAM_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/telegram-env > .env 2>/dev/null || true; fi
-  rm -f /tmp/env.nok /tmp/kis-env /tmp/telegram-env
+  if [ -s /tmp/toss-env ]; then grep -v '^TOSS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/toss-env > .env 2>/dev/null || true; fi
+  rm -f /tmp/env.nok /tmp/kis-env /tmp/telegram-env /tmp/toss-env
 fi
 
 # ── Artifact Registry 로그인 (gcloud 불요 — VM 메타데이터 토큰. 실패해도 진행: 아래 --build 폴백) ──
