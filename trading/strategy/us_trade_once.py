@@ -38,7 +38,7 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
     refresh(["US"], log=print)                   # 일봉 증분 갱신(종목별 격리 — 부분 실패는 신선도 게이트가 방어)
     p = plan(top_n=top_n, macro=macro)
     today = market_today("US")
-    bal = kis_balance.us_balance()
+    bal = p["bal"]                                            # build_plan이 이미 조회 — us_balance 4콜 재조회 방지(#218 C3)
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
     per = equity / max(1, top_n)
     buys = p["buys"][:max_orders]

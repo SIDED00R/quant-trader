@@ -44,7 +44,7 @@ def build_plan(market: str, balance_fn, top_n: int, macro: bool) -> dict:
     targets = list(ranked["symbol"])
     target_set = set(targets)
     return {
-        "bar": str(latest), "cash": bal["cash"], "n_held": len(held),
+        "bar": str(latest), "cash": bal["cash"], "n_held": len(held), "bal": bal,   # bal 재사용(execute 재조회 방지)
         "targets": targets,
         "buys": [s for s in targets if s not in held],     # 신규 편입
         "sells": [s for s in held if s not in target_set],  # top-N 이탈 → 청산

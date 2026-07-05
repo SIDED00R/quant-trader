@@ -38,7 +38,7 @@ def execute(top_n: int = 30, macro: bool = False, live: bool = False, max_orders
     refresh(["KR", "US"], log=print)              # KR 모델이 US 컨텍스트 피처를 쓰므로 둘 다 갱신
     p = plan(top_n=top_n, macro=macro)
     today = market_today("KR")
-    bal = kis_balance.kr_balance()
+    bal = p["bal"]                                              # build_plan이 이미 조회 — 재조회 방지(#218 C3)
     before = {x["symbol"]: x["qty"] for x in bal["positions"]}   # 체결확인 기준선(모의는 일별체결조회 미지원)
     equity = bal["cash"] + sum(x["eval"] for x in bal["positions"])
     per_name = equity / max(1, top_n)                            # 동일가중 목표금액
