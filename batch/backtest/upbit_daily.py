@@ -28,7 +28,8 @@ def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: flo
     """market의 최근 days일 일봉 rows([symbol, window_start, o,h,l,c,v])를 반환(시간 오름차순).
 
     complete_until 이상(미마감 당일)인 봉은 제외한다. cutoff(=now-days)보다 과거에 닿으면 종료.
-    since 지정 시 그 이후 봉만 받는다(이미 저장된 과거 재수신 회피 — 증분).
+    since 지정 시 cutoff를 since로 올려 과거 심층 페이지네이션을 생략한다(최근 1페이지는 그대로 받아
+    재삽입하나 ReplacingMergeTree라 멱등 — 실제 절감은 딥 페이지 제거).
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     if since is not None and since > cutoff:

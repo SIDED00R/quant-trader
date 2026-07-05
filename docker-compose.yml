@@ -340,7 +340,7 @@ services:
     <<: *batch-trade
     command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
 
-  # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 풀 재백필+분기 수집기, #204) ──
+  # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기, #204) ──
   maintenance-once:
     <<: *batch-trade
     command: python -m batch.data.maintenance_once

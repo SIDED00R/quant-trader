@@ -195,7 +195,7 @@ infra/terraform/
   printf 'DART_API_KEY=...\n' | gcloud secrets create dart-env --data-file=-
   gcloud secrets add-iam-policy-binding dart-env --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"
   ```
-- **정기 데이터 유지보수(`maintenance-once`, #204)**: 매매 전 증분 갱신(14일)이 다루지 못하는 수정주가 기준 재조정·분기 공시 반영을 매월 첫 토요일 04:00 UTC에 1회 실행한다(활성 유니버스 일봉 풀 재백필 + EDGAR·13F·SIC·DART 수집기 재실행). 단계별 격리 + 텔레그램 통보.
+- **정기 데이터 유지보수(`maintenance-once`, #204)**: 매매 전 증분 갱신(14일)이 다루지 못하는 수정주가 기준 재조정·분기 공시 반영을 매월 첫 토요일 04:00 UTC에 1회 실행한다(활성 유니버스 일봉 선별 재백필(재조정/데이터갭 종목만) + EDGAR·13F·SIC·DART 수집기 재실행). 단계별 격리 + 텔레그램 통보.
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
   1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.
   2. 활성 유니버스 전체 재백필(수정주가 기준 통일):
