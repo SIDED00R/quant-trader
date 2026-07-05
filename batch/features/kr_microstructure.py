@@ -39,7 +39,7 @@ def daily_kr_microstructure_from_store(panel: pd.DataFrame, log=print) -> pd.Dat
     ch = create_client()
     flow = _query(ch, "SELECT date, symbol, investor, net_value FROM stock_investor_flow FINAL")
     hold = _query(ch, "SELECT date, symbol, holding_ratio FROM stock_foreign_holding FINAL")
-    short = _query(ch, "SELECT date, symbol, short_balance_ratio, short_volume_ratio FROM stock_short FINAL")
+    short = _query(ch, "SELECT date, symbol, short_balance_ratio, short_volume_ratio FROM stock_short FINAL WHERE market = 'KR'")
     if flow.empty and hold.empty and short.empty:
         log("[kr-micro] KRX 테이블 비어있음 — batch.data.krx 먼저 실행")
         return pd.DataFrame()

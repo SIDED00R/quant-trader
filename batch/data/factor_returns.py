@@ -11,6 +11,7 @@ import argparse
 import io
 import sys
 import zipfile
+from datetime import date
 
 import httpx
 
@@ -34,12 +35,14 @@ def _download_csv(url: str, client: httpx.Client) -> str:
     r = client.get(url)
     r.raise_for_status()
     zf = zipfile.ZipFile(io.BytesIO(r.content))
-    name = next(n for n in zf.namelist() if n.upper().endswith(".CSV"))
+    name = next((n for n in zf.namelist() if n.upper().endswith(".CSV")), None)
+    if name is None:
+        raise RuntimeError(f"[factor] zip 내 CSV 없음 — 포맷 변경 의심: {url}")
     return zf.read(name).decode("latin1")
 
 
 def _parse(csv_text: str) -> list:
-    """설명 헤더 스킵 → 컬럼헤더 탐지 → 8자리 날짜 행만 파싱. [(date_str, factor, ret_decimal)]."""
+    """설명 헤더 스킵 → 컬럼헤더 탐지 → 8자리 날짜 행만 파싱. [(date, factor, ret_decimal)]."""
     cols: list | None = None
     out: list = []
     for raw in csv_text.splitlines():
@@ -57,7 +60,7 @@ def _parse(csv_text: str) -> list:
             continue
         if not (len(head) == 8 and head.isdigit()):    # 데이터부 벗어남(연간/저작권) → 종료
             break
-        d = f"{head[:4]}-{head[4:6]}-{head[6:]}"
+        d = date(int(head[:4]), int(head[4:6]), int(head[6:]))
         for name, val in zip(cols, parts[1:]):
             factor = _FACTOR_MAP.get(name)
             if not factor or val == "":

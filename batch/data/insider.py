@@ -57,7 +57,7 @@ def _get(parts: list, idx: dict, key: str) -> str:
     return parts[i].strip() if i is not None and i < len(parts) else ""
 
 
-def _fetch_zip(year: int, q: int, client: httpx.Client, log=print):
+def _fetch_zip(year: int, q: int, client: httpx.Client):
     """분기 zip 다운로드(캐시, 손상 재다운로드). 미공개(404/403)는 None."""
     os.makedirs(_CACHE, exist_ok=True)
     url = f"{_BASE}/{year}q{q}_form345.zip"
@@ -88,7 +88,7 @@ def _relationship(parts: list, idx: dict) -> str:
     return "other"
 
 
-def _quarter_rows(zf: zipfile.ZipFile, universe: set, log=print) -> list:
+def _quarter_rows(zf: zipfile.ZipFile, universe: set) -> list:
     """한 분기 zip → 우리 유니버스 비파생 거래 행."""
     sidx, sf = _reader(zf, "SUBMISSION.TSV")
     if sidx is None:
@@ -158,10 +158,10 @@ def collect(start_year: int = 2019, log=print) -> int:
     with httpx.Client(timeout=180, headers=_UA, follow_redirects=True) as c:
         for year in range(start_year, this_year + 1):
             for q in (1, 2, 3, 4):
-                zf = _fetch_zip(year, q, c, log)
+                zf = _fetch_zip(year, q, c)
                 if zf is None:
                     continue
-                rows = _quarter_rows(zf, universe, log)
+                rows = _quarter_rows(zf, universe)
                 if rows:
                     ch.insert("insider_transactions", rows, column_names=_COLS)
                     total += len(rows)

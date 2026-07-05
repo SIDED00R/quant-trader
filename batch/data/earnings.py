@@ -39,7 +39,8 @@ def _earnings_rows(symbol: str, recent: dict) -> list:
     reports = recent.get("reportDate", [])
     out = []
     for i, form in enumerate(forms):
-        if form != "8-K" or "2.02" not in (items[i] if i < len(items) else ""):
+        item_str = items[i] if i < len(items) else ""
+        if form != "8-K" or "2.02" not in [x.strip() for x in item_str.split(",")]:   # 콤마 토큰 정확매칭
             continue
         ad = _date(dates[i] if i < len(dates) else "")
         if ad is None:
