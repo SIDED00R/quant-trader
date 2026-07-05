@@ -18,10 +18,10 @@ from psycopg.types.json import Jsonb
 
 from common import notify_telegram
 from common.candles import daily_candles
-from common.clickhouse_client import create_client
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
+from common.upbit_ticker import latest_prices
 from trading.portfolio.updater import apply_execution
 from trading.strategy.commander import combined_for_bar, decide
 from trading.strategy.decision_record import classify
@@ -58,12 +58,6 @@ def equity(cash_amt: Decimal, pos: dict, prices: dict) -> Decimal:
         if p:
             eq += qty * p
     return eq
-
-
-def latest_prices(ch_client) -> dict:
-    res = ch_client.query(
-        "SELECT symbol, argMax(price, seq) FROM ticks WHERE trade_ts > now() - INTERVAL 1 HOUR GROUP BY symbol")
-    return {r[0]: Decimal(str(r[1])) for r in res.result_rows}
 
 
 def compute_targets() -> dict:
@@ -172,10 +166,9 @@ def run(dry_run: bool = False) -> int:
     종료코드: 0=정상 / 70=거부 발생 또는 오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
     """
     open_pool()
-    ch = create_client()
     rejected = 0
     try:
-        prices = latest_prices(ch)
+        prices = latest_prices(ENSEMBLE_SYMBOLS)   # 업비트 REST 현재가(틱 DB 비의존 — 수집 VM과 디커플링)
         analysis = compute_targets()
         band = float(ENSEMBLE_REBALANCE_BAND)
         accts = enabled_accounts()

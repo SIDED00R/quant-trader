@@ -180,6 +180,7 @@ services:
     image: grafana/grafana:11.2.0
     container_name: grafana
     restart: unless-stopped
+    profiles: ["app", "data"]   # collector VM 제외(대시보드 불요 — 메모리 절약)
     depends_on:
       - clickhouse
       - postgres
@@ -205,7 +206,7 @@ services:
   db-init:
     <<: *app
     container_name: db-init
-    profiles: ["app", "data"]    # 데이터 VM도 스키마(pg/ch) 필요
+    profiles: ["app", "data", "collector"]    # 데이터 VM·수집 VM 모두 스키마(pg/ch) 필요
     command: python -m scripts.init_db
     restart: "no"
     depends_on:
@@ -217,38 +218,38 @@ services:
   ingester:
     <<: *app
     container_name: ingester
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.ingester.upbit_ws
 
   sink:
     <<: *app
     container_name: sink
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.sink.tick_clickhouse
 
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
     <<: *app
     container_name: stock-ingester
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.ingester.stock_kiwoom
 
   stock-sink:
     <<: *app
     container_name: stock-sink
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.sink.stock_tick_clickhouse
 
   candle:
     <<: *app
     container_name: candle
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.aggregator.candle
 
   daily-aggregator:
     <<: *app
     container_name: daily-aggregator
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
 
   engine:

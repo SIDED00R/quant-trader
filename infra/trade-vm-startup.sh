@@ -1,7 +1,7 @@
 #!/bin/bash
 # 온디맨드 매매 VM startup — Cloud Scheduler(메인 4잡 + 스위퍼 4잡, infra/setup-cicd.sh)가 start하면:
-#   docker/repo 준비(멱등) → AR 이미지 pull(revision 라벨 검증, 실패 시 --build 폴백) → 데이터 VM SSH 터널
-#   → UTC 부팅시각 분기로 1회 매매 → 터널 정리 → poweroff(self-stop).
+#   docker/repo 준비(멱등) → AR 이미지 pull(revision 라벨 검증, 실패 시 --build 폴백) → 로컬 DB(postgres/clickhouse) 기동+스키마
+#   → UTC 부팅시각 분기로 1회 매매 → poweroff(self-stop). (자기완결 — 수집 VM과 크로스VM 터널 없음)
 # 분기표(스케줄러와 정합):
 #   UTC 04·05    → 데이터 유지보수(maintenance-once) ← 매월 첫 토요일 04:00 UTC + 스위퍼 05:00(월간화는 startup이 날짜 가드)
 #   UTC 06·07    → KR 주식(stock-trade-once)  ← kr-close 15:00 KST + sweep 15:10 KST (06:00/06:10 UTC, 평일)
@@ -12,13 +12,11 @@
 #   코인=목표 수렴(재실행 시 주문 0), 주식=주간 마커(week_done)가 skip.
 # 알림: 잡 결과는 파이썬(common/notify_telegram)이 텔레그램 발송. 파이썬이 통보 못한 실패(exit∉{0,70})는
 #   notify_fail()이 앱 이미지 CLI로 폴백 발송. 시크릿은 kis-env·telegram-env·toss-env·dart-env(Secret Manager)로 주입.
-# DB는 데이터 VM에서 loopback 유지, 매매 VM이 터널(-L 5432/8123)로 접속(network_mode:host).
-# 터널 개인키는 /etc/tunnel_key(600), 공개키는 데이터 VM 메타데이터(tunnel 사용자)에 등록돼 있어야 한다.
+# DB는 이 VM 로컬 컨테이너(postgres/clickhouse, 127.0.0.1 loopback) — network_mode:host로 매매 컨테이너가 접속.
+# pgdata/chdata 볼륨은 poweroff(stop≠delete)에도 영속. 최초 시딩은 마이그레이션 시 1회(pg_dump 복원 + maintenance_once/backfill).
 # 루트로 실행. -e 제외(어떤 실패에도 마지막 poweroff까지 도달하도록).
 set -uxo pipefail
 
-DATA_VM_IP=10.128.0.2
-TUNNEL_KEY=/etc/tunnel_key
 REPO=/opt/coin-auto-trader   # 경로는 기존 VM 유지(.env 등 보존) — 레포명 quant-trader와 무관
 AR=us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 APP_IMG=$AR/quant-trader-app:latest
@@ -82,11 +80,11 @@ docker image prune -f >/dev/null 2>&1 || true
 # 알림 폴백 CLI용 앱 이미지(0.08GB) 선확보 — batch 이미지가 깨진 날에도 실패 통보는 나가게.
 docker compose --profile trade pull -q trade-once >/dev/null 2>&1 || true
 
-# ── 데이터 VM SSH 터널(loopback DB를 매매 VM 호스트로 포워딩) ──
-pkill -f "ssh.*tunnel@" 2>/dev/null || true
-ssh -i "$TUNNEL_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ExitOnForwardFailure=yes \
-    -fN -L 5432:localhost:5432 -L 8123:localhost:8123 tunnel@"$DATA_VM_IP" </dev/null >/dev/null 2>&1
-sleep 5
+# ── 로컬 DB 기동 + 스키마(자기완결 — 크로스VM 터널 없음). pgdata/chdata는 poweroff에도 영속 ──
+# db-init의 depends_on(postgres/clickhouse healthy)이 로컬 DB를 먼저 띄우고 헬스 대기 후 스키마 멱등 적용.
+# 시작된 postgres/clickhouse는 run 종료 후에도 유지(포트 127.0.0.1 게시) → 이후 매매 컨테이너(network_mode:host)가 접속.
+docker compose up -d postgres clickhouse
+docker compose run --rm db-init 2>&1 | tee -a /var/log/trade-boot.log || true
 
 # ── 이미지 신선도 (#94/#99 불변식의 계승) ──
 # CI가 org.opencontainers.image.revision=<sha> 라벨로 이미지를 굽는다. pull한 :latest의 라벨이
@@ -137,6 +135,9 @@ case "$BOOT_HOUR" in
     ;;
   *)
     # 데일리(01:00 UTC=KST 10:00) + 스위퍼(02:00 UTC) → 코인만(매일, 목표 수렴형이라 재실행 무해).
+    # 크립토 일봉을 로컬 CH에 REST 백필(틱 집계 대신 — 수집 VM과 디커플링). chdata 영속이라 최근분만 갱신.
+    SYMS=$(grep -E '^ENSEMBLE_SYMBOLS=' .env | cut -d= -f2- 2>/dev/null); SYMS="${SYMS:-KRW-BTC,KRW-ETH}"
+    docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log || true
     docker compose --profile trade run $(build_flag trade-once "$APP_IMG") --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인" "${PIPESTATUS[0]}" /var/log/trade-once.log
     ;;
@@ -144,7 +145,6 @@ esac
 
 # ── 정리 + self-stop ──
 docker image prune -f >/dev/null 2>&1 || true   # 새 pull로 방금 dangling 된 직전 :latest 회수
-pkill -f "ssh.*tunnel@" 2>/dev/null || true
 sync
 sleep 3
 poweroff
