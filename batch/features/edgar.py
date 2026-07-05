@@ -3,14 +3,15 @@
 배선된 진입점은 저장소 파생: fundamentals_quarterly·institutional_13f → 일별 피처
 (daily_fundamentals_from_store·daily_13f_from_store, JSON 재파싱 없이 빠름).
 원본 적재용 companyfacts 페치·태그 정의(fetch_companyfacts·_entries·_SHARES 등)는
-batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector가
-공유한다. JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
+batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector·
+batch.data.earnings가 공유한다(lru_cache로 실행 내 1회). JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
 
 **point-in-time**: 각 거래일 d는 filed_date ≤ d 인 공시값만 사용(as-of backward) → look-ahead 차단.
 - instant 계정(상장주식수·자본·자산): 최신 filed≤d 값.
 - flow 계정(순이익·매출): 단일분기 합으로 TTM 구성(최신분기 filed로 가용시점 결정), 분기별 YoY 성장.
 파생: 시가총액(mktcap=close×shares, GKX 중요도 2위)·회전율(turnover)·PBR·PER·PSR·ROE·ROA·매출성장.
 """
+import functools
 import os
 import time
 
@@ -34,6 +35,7 @@ _REV = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"]
 
 
+@functools.lru_cache(maxsize=1)   # 한 실행 내 1회만 다운로드(fundamentals·sec_sector·earnings 공유 — #218)
 def ticker_cik_map() -> dict:
     with httpx.Client(timeout=30, headers=_UA) as c:
         j = c.get("https://www.sec.gov/files/company_tickers.json").json()
@@ -41,6 +43,8 @@ def ticker_cik_map() -> dict:
 
 
 def fetch_companyfacts(cik: str, client: httpx.Client, req_sleep: float = 0.12) -> dict | None:
+    # companyfacts는 신규 공시로 갱신되는데 SEC data.sec.gov가 Last-Modified/ETag를 주지 않아(실측) 조건부 GET이
+    # 불가하다 → 캐시를 영속하면 신규 공시를 영영 못 받으므로 .edgar_cache는 볼륨에 안 붙이고 콜드로 둔다(#218).
     os.makedirs(_CACHE, exist_ok=True)
     fp = os.path.join(_CACHE, f"{cik}.json")
     if os.path.exists(fp):

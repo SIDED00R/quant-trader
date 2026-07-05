@@ -25,7 +25,7 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
-from common.cache import dump_json, load_json  # noqa: E402
+from common.cache import dump_json, load_json, refcache_path  # noqa: E402
 from common.clickhouse_client import create_client  # noqa: E402
 from common.symbols import get_kr_symbols  # noqa: E402
 
@@ -57,8 +57,8 @@ def _num(s):
 
 
 def corp_code_map(key: str, client: httpx.Client) -> dict:
-    """stock_code(6자리) → corp_code(8자리). corpCode.xml 다운로드 후 캐싱."""
-    fp = os.path.join(_CACHE, "corp_map.json")
+    """stock_code(6자리) → corp_code(8자리). corpCode.xml 다운로드 후 참조캐시(영속)에 저장."""
+    fp = refcache_path("corp_map.json")   # 참조캐시(영속 볼륨) — corp_code는 사실상 불변(#218)
     cached = load_json(fp)
     if cached:
         return cached
@@ -70,7 +70,6 @@ def corp_code_map(key: str, client: httpx.Client) -> dict:
         sc = (e.findtext("stock_code") or "").strip()
         if sc:
             m[sc] = e.findtext("corp_code").strip()
-    os.makedirs(_CACHE, exist_ok=True)
     dump_json(fp, m)
     return m
 

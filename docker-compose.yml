@@ -79,6 +79,11 @@ x-batch-trade: &batch-trade
     TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
     TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
     TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
+  volumes:                          # 참조캐시·분기 zip 영속 — 월간 콜드 스타트 방지(#218).
+    - refcache:/app/batch/.refcache             # cusip_map·corp_map·sic_map (불변 참조)
+    - cache13f:/app/batch/data/.13f_cache       # 13F 분기 zip (확정분기 불변)
+    - insidercache:/app/batch/data/.insider_cache
+    # .edgar_cache(companyfacts)·.dart_cache(보고서)는 콜드 — SEC 조건부GET 미지원·정정 반영 위해 매월 재수신
 
 services:
   # ── Kafka (KRaft 단일 노드, Zookeeper 없음) ─────────────────────────
@@ -372,6 +377,9 @@ volumes:
   kafkadata:
   pgdata:
   chdata:
+  refcache:        # #218 참조캐시(cusip_map·corp_map·sic_map) — 사실상 불변, 영속
+  cache13f:        #       13F 분기 zip
+  insidercache:    #       insider 분기 zip
   grafanadata:
   caddydata:
   caddyconfig:

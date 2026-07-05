@@ -14,11 +14,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from batch.features import edgar
-from common.cache import dump_json, load_json
+from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.symbols import get_us_symbols
 
-_CACHE = os.path.join(edgar._CACHE, "sic_map.json")
+_CACHE = refcache_path("sic_map.json")   # 참조캐시(영속 볼륨) — SIC는 사실상 불변(#218)
 
 
 def fetch_sic(symbols, client, log=print) -> dict:
