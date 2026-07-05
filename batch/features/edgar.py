@@ -3,8 +3,8 @@
 배선된 진입점은 저장소 파생: fundamentals_quarterly·institutional_13f → 일별 피처
 (daily_fundamentals_from_store·daily_13f_from_store, JSON 재파싱 없이 빠름).
 원본 적재용 companyfacts 페치·태그 정의(fetch_companyfacts·_entries·_SHARES 등)는
-batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector가
-공유한다. JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
+batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector·
+batch.data.earnings가 공유한다(lru_cache로 실행 내 1회). JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
 
 **point-in-time**: 각 거래일 d는 filed_date ≤ d 인 공시값만 사용(as-of backward) → look-ahead 차단.
 - instant 계정(상장주식수·자본·자산): 최신 filed≤d 값.
@@ -43,32 +43,21 @@ def ticker_cik_map() -> dict:
 
 
 def fetch_companyfacts(cik: str, client: httpx.Client, req_sleep: float = 0.12) -> dict | None:
-    # 캐시 영속(#218) — companyfacts는 신규 공시로 갱신되므로 조건부 GET(If-Modified-Since)으로 재검증한다:
-    # 304면 캐시 재사용(전송 0), 변경 시에만 재다운로드 → 매월 전량 재수신(~1GB) 회피 + 신규 공시 반영.
+    # companyfacts는 신규 공시로 갱신되는데 SEC data.sec.gov가 Last-Modified/ETag를 주지 않아(실측) 조건부 GET이
+    # 불가하다 → 캐시를 영속하면 신규 공시를 영영 못 받으므로 .edgar_cache는 볼륨에 안 붙이고 콜드로 둔다(#218).
     os.makedirs(_CACHE, exist_ok=True)
     fp = os.path.join(_CACHE, f"{cik}.json")
-    lm_fp = fp + ".lastmod"
-    headers = {}
-    if os.path.exists(fp) and os.path.exists(lm_fp):
+    if os.path.exists(fp):
         try:
-            with open(lm_fp, encoding="utf-8") as f:
-                headers["If-Modified-Since"] = f.read().strip()
-        except OSError:
+            return load_json(fp)
+        except Exception:
             pass
     time.sleep(req_sleep)
-    r = client.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
-    if r.status_code == 304:                        # 미변경 → 캐시 재사용
-        return load_json(fp)
-    if r.status_code != 200:                        # 실패 → 캐시 있으면 폴백
-        return load_json(fp) if os.path.exists(fp) else None
+    r = client.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
+    if r.status_code != 200:
+        return None
     j = r.json()
     dump_json(fp, j)
-    if r.headers.get("Last-Modified"):
-        try:
-            with open(lm_fp, "w", encoding="utf-8") as f:
-                f.write(r.headers["Last-Modified"])
-        except OSError:
-            pass
     return j
 
 

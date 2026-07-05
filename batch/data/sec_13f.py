@@ -20,7 +20,7 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
-from common.cache import dump_json, load_json
+from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.constants import SEC_USER_AGENT
 from common.symbols import get_us_symbols
@@ -35,8 +35,7 @@ _MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
 def _cusip_to_ticker(cusips: list, universe: set, client: httpx.Client, log=print) -> dict:
     """CUSIP→ticker (OpenFIGI ID_CUSIP, 검증됨·안정). 우리 유니버스 종목만 반환. 캐시.
     키없음 25/min·10/batch → 상위 CUSIP만 매핑."""
-    os.makedirs(_CACHE, exist_ok=True)
-    fp = os.path.join(_CACHE, "cusip_map.json")
+    fp = refcache_path("cusip_map.json")   # 참조캐시(영속 볼륨) — CUSIP→ticker는 사실상 불변(#218)
     cache = load_json(fp, {})
     todo = [c for c in cusips if c not in cache]
     for i in range(0, len(todo), 10):

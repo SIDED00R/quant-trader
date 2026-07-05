@@ -31,4 +31,5 @@ batch/features/.edgar_cache/
 batch/data/.13f_cache/
 batch/data/.dart_cache/
 batch/data/.insider_cache/
+batch/.refcache/
 colab_data/

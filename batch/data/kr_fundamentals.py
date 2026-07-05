@@ -25,7 +25,7 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
-from common.cache import dump_json, load_json  # noqa: E402
+from common.cache import dump_json, load_json, refcache_path  # noqa: E402
 from common.clickhouse_client import create_client  # noqa: E402
 from common.symbols import get_kr_symbols  # noqa: E402
 
@@ -57,8 +57,8 @@ def _num(s):
 
 
 def corp_code_map(key: str, client: httpx.Client) -> dict:
-    """stock_code(6자리) → corp_code(8자리). corpCode.xml 다운로드 후 캐싱."""
-    fp = os.path.join(_CACHE, "corp_map.json")
+    """stock_code(6자리) → corp_code(8자리). corpCode.xml 다운로드 후 참조캐시(영속)에 저장."""
+    fp = refcache_path("corp_map.json")   # 참조캐시(영속 볼륨) — corp_code는 사실상 불변(#218)
     cached = load_json(fp)
     if cached:
         return cached
@@ -70,7 +70,6 @@ def corp_code_map(key: str, client: httpx.Client) -> dict:
         sc = (e.findtext("stock_code") or "").strip()
         if sc:
             m[sc] = e.findtext("corp_code").strip()
-    os.makedirs(_CACHE, exist_ok=True)
     dump_json(fp, m)
     return m
 
@@ -91,8 +90,7 @@ def _fetch_report(key, client, corp, year, reprt, sleep) -> list:
         if j.get("status") == "000" and j.get("list"):
             out = j["list"]
             break
-    if out or year < date.today().year:   # 당해년도 빈 결과는 미확정 분기 → 미캐시(다음 실행 재시도, #218)
-        dump_json(fp, out)
+    dump_json(fp, out)
     return out
 
 
@@ -105,8 +103,7 @@ def _fetch_shares(key, client, corp, year, sleep):
             "crtfc_key": key, "corp_code": corp, "bsns_year": str(year), "reprt_code": "11011"})
         time.sleep(sleep)
         cached = r.json().get("list", []) if r.json().get("status") == "000" else []
-        if cached or year < date.today().year:   # 당해년도 빈 결과 미캐시(#218)
-            dump_json(fp, cached)
+        dump_json(fp, cached)
     for it in cached:
         if (it.get("se") or "").strip() == "보통주":
             val = _num(it.get("distb_stock_co"))
