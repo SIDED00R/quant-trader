@@ -72,3 +72,12 @@ def us_balance() -> dict:
                     "pnl": _f(p.get("frcr_evlu_pfls_amt")),
                 })
     return {"market": "US", "currency": "USD", "cash": us_buyable_usd(), "positions": positions}
+
+
+def us_held_qty(symbol: str, exchange: str) -> float:
+    """US 단일 종목 보유수량(단일 거래소 1콜 — 체결확인용, us_balance 전체 4콜 회피 #218 C1)."""
+    try:
+        pos, _ = fetch_overseas_balance(exchange, "USD")
+    except Exception:
+        return 0.0
+    return next((_f(p.get("ovrs_cblc_qty")) for p in pos if p.get("ovrs_pdno") == symbol), 0.0)

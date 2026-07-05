@@ -20,19 +20,22 @@ _SELL_BUFFERS = (0.98, 0.97, 0.96)   # SELL은 현재가 아래로
 _POLL_DELAYS = (2, 3, 4, 6, 8, 10)   # 잔고 폴링 백오프(초, 마지막 값 유지)
 
 
-def _held_qty(market: str, symbol: str) -> float:
-    """현재 보유수량(잔고 조회). 체결 판정 기준선/현재값."""
-    bal = kis_balance.kr_balance() if market == "KR" else kis_balance.us_balance()
-    return next((p["qty"] for p in bal["positions"] if p["symbol"] == symbol), 0.0)
+def _held_qty(market: str, symbol: str, exchange: str | None = None) -> float:
+    """현재 보유수량(잔고 조회). 체결 판정 기준선/현재값. US는 주문 거래소만 조회(us_balance 4콜 회피)."""
+    if market == "KR":
+        bal = kis_balance.kr_balance()
+        return next((p["qty"] for p in bal["positions"] if p["symbol"] == symbol), 0.0)
+    return kis_balance.us_held_qty(symbol, exchange or "NASD")
 
 
-def _filled_since(market: str, symbol: str, side: str, base: float) -> int:
+def _filled_since(market: str, symbol: str, side: str, base: float, exchange: str | None = None) -> int:
     """기준선(base) 대비 체결 수량. BUY=증가분, SELL=감소분(음수는 0)."""
-    now = _held_qty(market, symbol)
+    now = _held_qty(market, symbol, exchange)
     return int(max(0.0, (now - base) if side == "BUY" else (base - now)))
 
 
-def _poll_fill(market: str, symbol: str, side: str, base: float, want: int, window: int) -> int:
+def _poll_fill(market: str, symbol: str, side: str, base: float, want: int, window: int,
+               exchange: str | None = None) -> int:
     """잔고 diff 폴링 — want 수량 체결되거나 window(초) 소진까지. 누적 체결 수량 반환."""
     waited, i, filled = 0.0, 0, 0
     while waited < window:
@@ -40,7 +43,7 @@ def _poll_fill(market: str, symbol: str, side: str, base: float, want: int, wind
         time.sleep(d)
         waited += d
         i += 1
-        filled = _filled_since(market, symbol, side, base)
+        filled = _filled_since(market, symbol, side, base, exchange)
         if filled >= want:
             break
     return filled
@@ -57,7 +60,11 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
     """
     attempts: list[dict] = []
     remaining = qty
-    base = _held_qty(market, symbol)                 # 체결확인 기준선(주문 전 보유수량)
+    # US 체결확인을 단일 거래소 조회로 하려면 exchange를 먼저 확정한다(us_balance 4콜→1콜). KR은 불필요.
+    px0 = ref_price
+    if market == "US" and not exchange:
+        px0, exchange = price_and_exchange(symbol)
+    base = _held_qty(market, symbol, exchange)        # 체결확인 기준선(주문 전 보유수량, US=단일 거래소)
 
     for n in range(max_attempts if market == "US" else 1):
         att: dict = {"qty": remaining}
@@ -65,7 +72,7 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
             if market == "KR":
                 r = place_domestic_order(symbol, side, remaining)
             else:
-                px, exch = (ref_price, exchange) if n == 0 and ref_price else price_and_exchange(symbol)
+                px = px0 if (n == 0 and px0) else price_and_exchange(symbol)[0]   # 재시도는 현재가만 재조회(거래소 고정)
                 if not px:
                     att["error"] = "시세/거래소 미확인"
                     attempts.append(att)
@@ -73,7 +80,7 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
                 buffers = _BUY_BUFFERS if side == "BUY" else _SELL_BUFFERS
                 buf = buffers[min(n, len(buffers) - 1)]
                 att["limit"] = round(px * buf, 2)
-                att["exch"] = exch or "NASD"
+                att["exch"] = exchange or "NASD"
                 r = place_overseas_order(symbol, side, remaining, att["limit"], att["exch"])
             att["odno"] = (r.get("output") or {}).get("ODNO")
         except Exception as e:                       # 주문 자체 거부(장외·잔고부족 등) → 추격 종료
@@ -81,7 +88,7 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
             attempts.append(att)
             break
 
-        filled_total = _poll_fill(market, symbol, side, base, qty, confirm_window)
+        filled_total = _poll_fill(market, symbol, side, base, qty, confirm_window, exchange)
         att["filled_total"] = filled_total
         attempts.append(att)
         remaining = qty - filled_total
@@ -91,12 +98,12 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
         try:                                         # US 미체결 잔여 취소 → 다음 시도에서 재주문
             cancel_overseas_order(symbol, att["odno"], remaining, att["exch"])
             att["cancel"] = "ok"
-            remaining = qty - _filled_since(market, symbol, side, base)   # 취소 직전 막판 체결 반영(중복 주문 방지)
+            remaining = qty - _filled_since(market, symbol, side, base, exchange)   # 취소 직전 막판 체결 반영(중복 주문 방지)
             if remaining <= 0:
                 break
         except Exception as e:                       # 취소 미확인 — 재주문 금지, 잔고만 재확인 후 종료
             att["cancel"] = f"{type(e).__name__}: {e}"
-            remaining = qty - _filled_since(market, symbol, side, base)
+            remaining = qty - _filled_since(market, symbol, side, base, exchange)
             break
 
     filled = qty - remaining

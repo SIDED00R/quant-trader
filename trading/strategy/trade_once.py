@@ -160,12 +160,30 @@ def _record_decision(conn, run_ts, d: dict, executed: bool) -> None:
          Jsonb(d["signals"]), executed))
 
 
+def _already_ran_today(conn) -> bool:
+    """오늘(UTC) 이미 매매 결정이 기록됐는가 — 코인은 주간 마커가 없어 스위퍼(메인+1h)가 매일 이중 실행되므로
+    메인 성공 후 재기록·재알림을 막는다(#218 C2). 메인 실패(기록 0)면 스위퍼가 정상 재시도한다.
+    부분 실패(일부 기록 후 예외)면 스위퍼는 스킵 → 나머지는 익일 재시도(코인 밴드 일배치라 ≤1일 지연 수용).
+    run_ts는 timestamptz — 세션 TZ와 무관하게 UTC 벽시계로 비교한다(세션이 UTC가 아니어도 정확)."""
+    row = conn.execute(
+        "SELECT EXISTS(SELECT 1 FROM trade_decisions "
+        "WHERE (run_ts AT TIME ZONE 'UTC') >= date_trunc('day', now() AT TIME ZONE 'UTC'))").fetchone()
+    return bool(row and row[0])
+
+
 def run(dry_run: bool = False) -> int:
     """1회 매매 실행. dry_run이면 목표·계획만 출력(주문·기록 미발생).
 
     종료코드: 0=정상 / 70=거부 발생 또는 오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
     """
     open_pool()
+    if not dry_run:                              # 코인 스위퍼 이중 실행 방지(#218 C2) — 오늘 이미 기록됐으면 스킵
+        with pool.connection() as conn:
+            already = _already_ran_today(conn)   # 연결은 블록 안에서만 사용 후 반납
+        if already:
+            print("[trade_once] 오늘 이미 실행됨 — 스위퍼 이중 실행 스킵(주문·기록·알림 없음)")
+            close_pool()
+            return 0
     rejected = 0
     try:
         prices = latest_prices(ENSEMBLE_SYMBOLS)   # 업비트 REST 현재가(틱 DB 비의존 — 수집 VM과 디커플링)
