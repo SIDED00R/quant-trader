@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from common.config import FEE_RATE
-from trading.strategy.trade_once import plan_decisions, plan_orders
+from trading.strategy.trade_once import plan_decisions, plan_orders, stale_bar_reason
 
 _PX = Decimal("1000")
 _CASH = Decimal("1000000")
@@ -105,6 +105,35 @@ class TestPlanDecisions(unittest.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(len(trades), len(orders))     # 위임 일관성
         self.assertEqual(orders[0][1], "KRW-BTC")
+
+
+class TestStaleBarReason(unittest.TestCase):
+    """코인 일봉 신선도 게이트(stale_bar_reason) — 낡은 데이터 사이징 차단."""
+
+    _TODAY = date(2026, 7, 5)
+
+    def test_fresh_bar_passes(self):
+        # 어제 완료봉(지연 1일 ≤ 허용 3일) → 신선
+        a = {"KRW-BTC": _a(0.5, bar_date=date(2026, 7, 4))}
+        self.assertIsNone(stale_bar_reason(a, self._TODAY))
+
+    def test_stale_bar_blocked(self):
+        # 지연 4일 > 허용 3일 → 사유 반환(최신봉 날짜 포함)
+        a = {"KRW-BTC": _a(0.5, bar_date=date(2026, 7, 1))}
+        reason = stale_bar_reason(a, self._TODAY)
+        self.assertIsNotNone(reason)
+        self.assertIn("2026-07-01", reason)
+
+    def test_no_bars_blocked(self):
+        # bar_date 전부 None(이력 없음) → 차단
+        a = {"KRW-BTC": _a(None), "KRW-ETH": _a(None)}
+        self.assertIsNotNone(stale_bar_reason(a, self._TODAY))
+
+    def test_max_across_symbols(self):
+        # 종목별 지연이 달라도 '가장 최신 봉' 기준(한 종목만 신선해도 통과 — 백필은 전종목 일괄)
+        a = {"KRW-BTC": _a(0.5, bar_date=date(2026, 6, 20)),
+             "KRW-ETH": _a(0.5, bar_date=date(2026, 7, 4))}
+        self.assertIsNone(stale_bar_reason(a, self._TODAY))
 
 
 if __name__ == "__main__":

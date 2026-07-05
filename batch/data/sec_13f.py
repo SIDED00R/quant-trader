@@ -151,6 +151,8 @@ def collect(start_year: int = 2019, log=print) -> int:
                           column_names=["symbol", "period_end", "num_holders", "total_shares", "total_value"])
                 total += len(rows)
             log(f"[13f] {pe}: {len(rows)}종목 적재")
+    if total == 0:
+        raise RuntimeError("[13f] 적재 0행 — DERA zip 포맷/CUSIP 매핑 확인(전분기 실패의 조용한 성공 처리 방지)")
     log(f"[13f] 완료: {total}행 → institutional_13f")
     return total
 

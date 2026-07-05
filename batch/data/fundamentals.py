@@ -69,6 +69,8 @@ def store_us_fundamentals(symbols=None, fetch: bool = False, log=print):
                 nsym += 1; total += len(r)
                 if nsym % 100 == 0:
                     log(f"[fundamentals] {nsym}종목 {total:,}행...")
+    if total == 0:
+        raise RuntimeError("[fundamentals] 적재 0행 — SEC 캐시/--fetch/유니버스 확인(전종목 실패의 조용한 성공 처리 방지)")
     log(f"[fundamentals] 완료: {nsym}종목 {total:,}행 → fundamentals_quarterly")
     return nsym, total
 

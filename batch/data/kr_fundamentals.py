@@ -190,6 +190,8 @@ def store_kr_fundamentals(symbols=None, start_year=2018, sleep=0.1, log=print):
             except Exception as e:
                 failed.append(sym)
                 log(f"[kr-fund] {sym} 실패(건너뜀): {type(e).__name__}: {e}")
+    if total == 0:
+        raise RuntimeError("[kr-fund] 적재 0행 — DART 키/corp 매핑/유니버스 확인(전종목 실패의 조용한 성공 처리 방지)")
     log(f"[kr-fund] 완료: {nsym}/{len(symbols)}종목 {total:,}행 → fundamentals_quarterly(DART); "
         f"매핑실패/오류 {len(failed)}: {failed[:10]}")
     return nsym, total

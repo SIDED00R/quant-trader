@@ -30,6 +30,23 @@ from trading.strategy.live_ensemble import LiveEnsemble
 from trading.strategy.notify_messages import coin_message, error_message
 
 _FEE_QUANT = Decimal("0.0001")
+_MAX_STALE_DAYS = 3   # 최신 완료 일봉 허용 지연(일). 코인은 무휴장이라 3일이면 백필 고장 확정.
+
+
+def stale_bar_reason(analysis: dict, today) -> str | None:
+    """순수: 일봉이 없거나 _MAX_STALE_DAYS보다 낡았으면 사유 문자열, 신선하면 None.
+
+    startup의 backfill_daily 실패는 `|| true`로 잡을 죽이지 않으므로(1회 실패 + 신선한 기존
+    데이터 = 매매 지속), 실제로 낡은 데이터로 목표를 산출하는 순간만 여기서 크게 차단한다
+    (주식 경로 stock_trade_common의 MAX_STALE_DAYS 게이트와 동일 취지 — 위반 시 raise→텔레그램).
+    """
+    dates = [a["bar_date"] for a in analysis.values() if a.get("bar_date")]
+    if not dates:
+        return "코인 일봉 이력 없음 — candles_1d 백필(backfill_daily) 확인"
+    lag = (today - max(dates)).days
+    if lag > _MAX_STALE_DAYS:
+        return f"코인 일봉 신선도 위반 — 최신봉 {max(dates)}({lag}일 경과 > {_MAX_STALE_DAYS}일). 백필 확인"
+    return None
 
 
 # ── 계정/시세 읽기 (commander와 일시 중복 — 스트리밍 commander 은퇴 시 통합) ──
@@ -188,6 +205,9 @@ def run(dry_run: bool = False) -> int:
     try:
         prices = latest_prices(ENSEMBLE_SYMBOLS)   # 업비트 REST 현재가(틱 DB 비의존 — 수집 VM과 디커플링)
         analysis = compute_targets()
+        stale = stale_bar_reason(analysis, datetime.now(timezone.utc).date())
+        if stale:                                  # 낡은 일봉으로 사이징 금지 — raise→텔레그램(exit 70)
+            raise RuntimeError(stale)
         band = float(ENSEMBLE_REBALANCE_BAND)
         accts = enabled_accounts()
         snapshots = {a: {"cash": cash(a), "positions": positions(a), "prices": prices} for a in accts}

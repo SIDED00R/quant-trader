@@ -2,10 +2,12 @@
 import clickhouse_connect
 
 from common.config import (
+    CLICKHOUSE_CONNECT_TIMEOUT,
     CLICKHOUSE_DB,
     CLICKHOUSE_HOST,
     CLICKHOUSE_HTTP_PORT,
     CLICKHOUSE_PASSWORD,
+    CLICKHOUSE_SEND_RECEIVE_TIMEOUT,
     CLICKHOUSE_USER,
 )
 
@@ -17,4 +19,6 @@ def create_client():
         username=CLICKHOUSE_USER,
         password=CLICKHOUSE_PASSWORD,
         database=CLICKHOUSE_DB,
+        connect_timeout=CLICKHOUSE_CONNECT_TIMEOUT,
+        send_receive_timeout=CLICKHOUSE_SEND_RECEIVE_TIMEOUT,
     )

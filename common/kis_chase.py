@@ -4,8 +4,11 @@
 US 지정가가 미체결이면 잔여를 취소한 뒤 현재가를 재조회해 버퍼를 키운 지정가로 재주문한다
 (최대 max_attempts회). KR은 시장가라 미체결 잔존이 없다 — 폴링 후 종료(취소·재주문 없음).
 모의는 일별체결조회 미지원이라 체결 판정은 잔고 diff가 유일(stock_trade_common.confirm_fills와 동일 원리).
-안전 원칙: **취소 성공이 확인되기 전에는 재주문하지 않는다**(이중체결 방지) — 취소 실패 시
-잔고만 재확인하고 반환해, 주간 재시도(자동매매)·FAILED 기록(수동주문)에 위임한다.
+안전 원칙: **확인 불가 상태에서는 재주문하지 않는다**(이중체결 방지) —
+- 주문 전 기준선 조회 실패 = 아직 주문 없음 → 예외 전파(안전 중단, 콜러가 통보/재시도).
+- 폴링 중 잔고 조회 실패 = 크게 로그 + 마지막 관측값 유지(보수적 '미체결' 간주 — 취소→재주문은
+  취소 성공 확인이 선행되므로 이중체결은 불가).
+- 취소 후 재확인 실패 = 잔고 미확인 → 재주문 금지, 기록 후 종료(주간 재시도·FAILED 기록에 위임).
 """
 import time
 
@@ -36,14 +39,21 @@ def _filled_since(market: str, symbol: str, side: str, base: float, exchange: st
 
 def _poll_fill(market: str, symbol: str, side: str, base: float, want: int, window: int,
                exchange: str | None = None) -> int:
-    """잔고 diff 폴링 — want 수량 체결되거나 window(초) 소진까지. 누적 체결 수량 반환."""
+    """잔고 diff 폴링 — want 수량 체결되거나 window(초) 소진까지. 누적 체결 수량 반환.
+
+    조회 1회 실패는 크게 로그 후 폴링 지속(마지막 관측값 유지 = 보수적 '미체결' 간주).
+    """
     waited, i, filled = 0.0, 0, 0
     while waited < window:
         d = _POLL_DELAYS[min(i, len(_POLL_DELAYS) - 1)]
         time.sleep(d)
         waited += d
         i += 1
-        filled = _filled_since(market, symbol, side, base, exchange)
+        try:
+            filled = _filled_since(market, symbol, side, base, exchange)
+        except Exception as e:
+            print(f"[kis_chase] 체결확인 잔고조회 실패({type(e).__name__}: {e}) — 폴링 계속, 미체결 간주")
+            continue
         if filled >= want:
             break
     return filled
@@ -98,12 +108,21 @@ def place_and_chase(market: str, symbol: str, side: str, qty: int, *,
         try:                                         # US 미체결 잔여 취소 → 다음 시도에서 재주문
             cancel_overseas_order(symbol, att["odno"], remaining, att["exch"])
             att["cancel"] = "ok"
-            remaining = qty - _filled_since(market, symbol, side, base, exchange)   # 취소 직전 막판 체결 반영(중복 주문 방지)
+            try:
+                remaining = qty - _filled_since(market, symbol, side, base, exchange)   # 취소 직전 막판 체결 반영(중복 주문 방지)
+            except Exception as e:                   # 취소 후 재확인 실패 — 막판 체결 미확인이면 재주문 금지
+                att["recheck"] = f"{type(e).__name__}: {e}"
+                print(f"[kis_chase] 취소 후 잔고 재확인 실패({e}) — 재주문 금지, 종료")
+                break
             if remaining <= 0:
                 break
         except Exception as e:                       # 취소 미확인 — 재주문 금지, 잔고만 재확인 후 종료
             att["cancel"] = f"{type(e).__name__}: {e}"
-            remaining = qty - _filled_since(market, symbol, side, base, exchange)
+            try:
+                remaining = qty - _filled_since(market, symbol, side, base, exchange)
+            except Exception as e2:
+                att["recheck"] = f"{type(e2).__name__}: {e2}"
+                print(f"[kis_chase] 취소 미확인 + 잔고 재확인 실패({e2}) — 마지막 관측값으로 종료")
             break
 
     filled = qty - remaining

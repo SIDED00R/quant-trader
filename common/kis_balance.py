@@ -50,19 +50,22 @@ def us_buyable_usd() -> float:
         headers=_headers(_tr("TTTS3007R")), timeout=BROKER_TIMEOUT,
     )
     if str(body.get("rt_cd")) != "0":
-        return 0.0
+        # 0.0 반환은 인증/TR 오류를 '잔고 없음'으로 위장(사이징 0 → 조용한 무매매) — 크게 실패한다.
+        raise RuntimeError(f"KIS 매수가능조회 실패(TTTS3007R): {body.get('msg_cd')} {body.get('msg1')}")
     out = body.get("output") or {}
     return _f(out.get("ord_psbl_frcr_amt") or out.get("frcr_ord_psbl_amt1"))
 
 
 def us_balance() -> dict:
-    """미국(US) 모의 잔고 정규화(거래소 합산). cash=주문가능 외화금액(달러)."""
+    """미국(US) 모의 잔고 정규화(거래소 합산). cash=주문가능 외화금액(달러).
+
+    거래소 1곳이라도 조회 실패하면 예외 전파(부분 잔고 금지) — 누락된 거래소의 보유분이
+    build_plan에서 '미보유'로 보여 이미 든 종목을 재매수(이중 배분)하게 되기 때문.
+    콜러(트레이드 잡·API 라우트)는 전부 catch→통보/재시도 경로를 갖는다.
+    """
     positions = []
     for ex in _US_EXCHANGES:
-        try:
-            pos, _ = fetch_overseas_balance(ex, "USD")
-        except Exception:
-            continue
+        pos, _ = fetch_overseas_balance(ex, "USD")
         for p in pos:
             if _f(p.get("ovrs_cblc_qty")) > 0:
                 positions.append({
@@ -75,9 +78,10 @@ def us_balance() -> dict:
 
 
 def us_held_qty(symbol: str, exchange: str) -> float:
-    """US 단일 종목 보유수량(단일 거래소 1콜 — 체결확인용, us_balance 전체 4콜 회피 #218 C1)."""
-    try:
-        pos, _ = fetch_overseas_balance(exchange, "USD")
-    except Exception:
-        return 0.0
+    """US 단일 종목 보유수량(단일 거래소 1콜 — 체결확인용, us_balance 전체 4콜 회피 #218 C1).
+
+    조회 실패는 예외 전파(0.0 위장 금지 — '미체결'로 오판돼 취소/재주문을 유발).
+    체결확인 단계별 처리(주문 전=중단, 폴링 중=보수적 유지)는 콜러 kis_chase가 담당한다.
+    """
+    pos, _ = fetch_overseas_balance(exchange, "USD")
     return next((_f(p.get("ovrs_cblc_qty")) for p in pos if p.get("ovrs_pdno") == symbol), 0.0)

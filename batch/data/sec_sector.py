@@ -52,6 +52,8 @@ def main(argv=None) -> int:
     with httpx.Client(timeout=20, headers=edgar._UA) as c:
         sic = fetch_sic(us, c)
     rows = [[t, v["sic"], v["desc"], v["sic"][:2]] for t, v in sic.items() if v and v.get("sic")]
+    if not rows:
+        raise RuntimeError("[sector] 적재 0행 — SEC submissions/유니버스 확인(전종목 실패의 조용한 성공 처리 방지)")
     ch.insert("stock_meta", rows, column_names=["symbol", "sic", "sic_desc", "sector2"])
     print(f"[sector] {len(rows)}종목 SIC 적재. 고유 sector2={len(set(r[3] for r in rows))}")
     return 0

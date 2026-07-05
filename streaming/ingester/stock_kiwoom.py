@@ -28,6 +28,10 @@ from common.schemas import Tick
 
 MAX_BACKOFF = HTTP_MAX_BACKOFF
 REAL_TYPE_TRADE = "0B"  # 주식체결
+# 수신 무소식 상한(초). 키움 앱 PING은 이보다 훨씬 잦아, 초과 = 반개방(half-open) TCP로 판단하고
+# 재연결한다(프로토콜 ping은 끔 — 앱 PING echo 방식이라, 서버가 죽어도 소켓만 살아있으면
+# async 수신이 영원히 매달려 '조용한 수집 정지'가 되던 구멍을 막는다).
+_RECV_TIMEOUT_SEC = 150
 _KST = timezone(timedelta(hours=9))
 
 # 종목별 (체결초, 카운터): 동일 초 내 다중 체결에 단조 seq 부여
@@ -119,7 +123,12 @@ async def run() -> None:
                     backoff = 1
                     await ws.send(build_login(get_access_token(force=force_token)))
                     force_token = False
-                    async for raw in ws:
+                    while True:
+                        try:
+                            raw = await asyncio.wait_for(ws.recv(), _RECV_TIMEOUT_SEC)
+                        except TimeoutError:
+                            raise RuntimeError(
+                                f"수신 {_RECV_TIMEOUT_SEC}s 무소식 — 반개방 연결 의심, 재연결")
                         msg = json.loads(raw, parse_float=Decimal)
                         trnm = msg.get("trnm")
                         if trnm == "PING":
