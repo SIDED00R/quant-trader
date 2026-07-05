@@ -55,7 +55,7 @@ jobs:
           tags: |
             ${{ env.AR }}/${{ matrix.name }}:latest
             ${{ env.AR }}/${{ matrix.name }}:${{ github.sha }}
-          # revision 라벨 = VM들의 신선도 검증 기준(startup build_flag / deploy-data-vm.sh)
+          # revision 라벨 = VM들의 신선도 검증 기준(startup build_flag / deploy-collector-vm.sh)
           labels: org.opencontainers.image.revision=${{ github.sha }}
           build-args: GIT_SHA=${{ github.sha }}
           # 레지스트리 캐시(GHA 캐시 10GB 쿼터·축출 무관) — pip 레이어 재사용으로 빌드 60~120s
