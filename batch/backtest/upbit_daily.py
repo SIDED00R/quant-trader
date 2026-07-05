@@ -23,12 +23,17 @@ def _get(client: httpx.Client, params: dict, req_sleep: float) -> list:
     return get_json(_URL, params, client=client, req_sleep=req_sleep)
 
 
-def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: float = 0.12, log=print) -> list:
+def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: float = 0.12, log=print,
+                since: datetime | None = None) -> list:
     """market의 최근 days일 일봉 rows([symbol, window_start, o,h,l,c,v])를 반환(시간 오름차순).
 
     complete_until 이상(미마감 당일)인 봉은 제외한다. cutoff(=now-days)보다 과거에 닿으면 종료.
+    since 지정 시 cutoff를 since로 올려 과거 심층 페이지네이션을 생략한다(최근 1페이지는 그대로 받아
+    재삽입하나 ReplacingMergeTree라 멱등 — 실제 절감은 딥 페이지 제거).
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    if since is not None and since > cutoff:
+        cutoff = since                          # 증분: 최신 저장일 이후만
     rows: list = []
     to = None
     with httpx.Client(timeout=20) as client:

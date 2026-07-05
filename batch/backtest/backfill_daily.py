@@ -47,7 +47,9 @@ def main(argv=None) -> int:
     total, failed = 0, []
     for market in markets:   # 종목별 격리 — 일시적 429/오류 1종목이 나머지(수백) 종목을 막지 않게
         try:
-            rows = fetch_daily(market, a.days, complete_until)
+            latest = client.query(f"SELECT max(window_start) FROM {a.table} WHERE symbol={{m:String}}",
+                                   parameters={"m": market}).result_rows[0][0]
+            rows = fetch_daily(market, a.days, complete_until, since=latest)   # 증분: 저장된 과거 재수신 회피
             total += upsert_clickhouse(client, rows, a.table)
             print(f"[daily] {market}: {len(rows)}봉 적재")
         except Exception as e:
