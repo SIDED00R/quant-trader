@@ -250,7 +250,7 @@ ORDER BY symbol;
 -- 롱 포맷(팩터 차원) — region으로 US/글로벌/KR(추후) 확장. batch/data/factor_returns.py 적재. 재실행 멱등.
 -- ret = 일간 수익률(소수). 원본 CSV는 %표기 → /100 저장. RF도 동일 축에 factor='rf'로 보관.
 CREATE TABLE IF NOT EXISTS factor_returns_daily (
-    date        Date,
+    date        Date32,                                -- Date32(1900~): Ken French 팩터는 1926년부터 → Date(1970~) 범위 밖 방지
     region      LowCardinality(String) DEFAULT 'US',   -- US(KenFrench). 글로벌/KR은 추후 확장
     factor      LowCardinality(String),                -- mkt_rf|smb|hml|rmw|cma|rf|umd
     ret         Float64,                               -- 일간 수익률(소수 = 원본%/100)
