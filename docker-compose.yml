@@ -87,6 +87,10 @@ x-batch-trade: &batch-trade
     TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}
     TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
     DART_API_KEY: ${DART_API_KEY:-}
+    # 연구 데이터 지속 수집(maintenance_once의 KRX·FRED 스텝)용 — 미설정 시 해당 스텝만 🔴
+    KRX_ID: ${KRX_ID:-}
+    KRX_PW: ${KRX_PW:-}
+    FRED_API_KEY: ${FRED_API_KEY:-}
     TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
     TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
     TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
@@ -360,7 +364,7 @@ services:
     <<: *batch-trade
     command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
 
-  # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기, #204) ──
+  # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기+연구 수집기(KRX 증분·FRED·PIT 멤버십·상폐 메타), #204) ──
   maintenance-once:
     <<: *batch-trade
     command: python -m batch.data.maintenance_once

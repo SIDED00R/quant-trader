@@ -76,6 +76,8 @@ def store_kr_membership(start="2018-01-01", freq="BMS", sleep=0.3, log=print):
                       column_names=["date", "symbol", "index_name", "action", "source"])
         n_mem += len(intervals); n_chg += len(changes)
         log(f"[kr-membership] {name}: 스냅샷 {len(snaps)} → 멤버십 {len(intervals)}구간, 이벤트 {len(changes)}건")
+    if n_mem == 0:
+        raise RuntimeError("[kr-membership] 적재 0구간 — KRX 로그인/지수 응답 확인(전체 실패의 조용한 성공 처리 방지)")
     log(f"[kr-membership] 완료: 멤버십 {n_mem}구간, 이벤트 {n_chg}건")
     return n_mem, n_chg
 

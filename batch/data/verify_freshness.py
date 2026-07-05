@@ -15,14 +15,18 @@ from common.clickhouse_client import create_client
 
 # (라벨, FROM식, 날짜컬럼, 허용지연일, critical) — critical 위반 시 종료코드 1(유지보수 🔴).
 # **maintenance_once가 자동 갱신하는 테이블만** 감시한다(안 그러면 상시 위반으로 알람이 무력화됨).
-# 제외: macro_daily·stock_investor_flow·stock_foreign_holding — fred/krx 수집기가 스케줄러·유지보수
-#   어디에도 배선돼 있지 않다(수동/연구용). 감시하려면 먼저 해당 수집기를 maintenance에 배선할 것.
-# stock_short는 US(FINRA)만 자동 갱신 → market='US'로 스코프(KR 최신일이 US를 가리지 않게).
+# 제외: index_membership·index_changes·stock_delisting(비정기 이벤트 — 지연일 판정 무의미),
+#   stock_meta(정적·날짜컬럼 없음). 그 외 수집 테이블은 전부 감시(krx/fred도 월간 배선됨).
+# stock_short는 시장별 수집기가 달라(US=FINRA, KR=KRX) 시장 스코프로 각각 감시.
 _CHECKS = [
     ("stock_candles_1d",       "stock_candles_1d",              "window_start", 7,   True),   # 매매 입력 — 가장 중요
     ("fundamentals_quarterly", "fundamentals_quarterly",        "filed_date",   150, True),   # EDGAR+DART 월간
     ("institutional_13f",      "institutional_13f",             "period_end",   210, False),  # 분기말+45d+월간수집
     ("stock_short(US)",        "stock_short WHERE market='US'", "date",         45,  False),  # FINRA 격주+월간수집
+    ("stock_short(KR)",        "stock_short WHERE market='KR'", "date",         45,  False),  # KRX 월간(krx.py 증분)
+    ("stock_investor_flow",    "stock_investor_flow",           "date",         45,  False),  # KRX 수급 월간
+    ("stock_foreign_holding",  "stock_foreign_holding",         "date",         45,  False),  # KRX 외국인보유 월간
+    ("macro_daily",            "macro_daily",                   "date",         45,  False),  # FRED 월간
     ("factor_returns_daily",   "factor_returns_daily",          "date",         45,  False),  # Ken French 발표 지연
     ("insider_transactions",   "insider_transactions",          "filed_date",   150, False),  # SEC 분기 데이터셋
     ("earnings_calendar",      "earnings_calendar",             "announce_date", 150, False),  # 8-K recent(월간 누적)
