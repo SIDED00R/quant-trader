@@ -44,10 +44,8 @@ def _attach_sector(feats: pd.DataFrame) -> pd.DataFrame:
 
 
 def _xs_rank(df: pd.DataFrame, cols: list) -> pd.DataFrame:
-    """종목별 피처를 일별 횡단면 rank[-1,1]로 정규화(NaN 보존)."""
-    g = df.groupby("date")
-    for c in cols:
-        df[c] = g[c].transform(lambda s: 2 * s.rank(pct=True) - 1)
+    """종목별 피처를 일별 횡단면 rank[-1,1]로 정규화(NaN 보존). 컬럼 일괄 rank(벡터화 — 컬럼별 람다 루프 대체)."""
+    df[cols] = 2 * df.groupby("date")[cols].rank(pct=True) - 1
     return df
 
 

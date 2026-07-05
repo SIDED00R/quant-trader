@@ -170,7 +170,7 @@ infra/terraform/
 
 - 프로젝트: `coin-auto-trader-jvfhgq`, 존: `us-central1-a` (최저가 리전)
 - VM: `coin-trader-vm`, `e2-medium`(2vCPU/4GB), `pd-standard` 30GB, Ubuntu 22.04
-- 부팅 스크립트(데이터 VM): [infra/gce-startup.sh](infra/gce-startup.sh) — Docker 설치 → 레포 클론 → AR 이미지 pull(실패 시 `--build` 폴백) → `docker compose --profile data up -d` (+ 4GB 스왑). 매매 VM은 [infra/trade-vm-startup.sh](infra/trade-vm-startup.sh)(터널→부팅시각 분기 매매→poweroff).
+- 부팅 스크립트: [infra/collector-vm-startup.sh](infra/collector-vm-startup.sh)(수집 VM — Docker 설치 → 레포 클론 → AR pull(`--build` 폴백) → `docker compose --profile collector up -d`, 24/7 틱 수집 + 4GB 스왑) · [infra/trade-vm-startup.sh](infra/trade-vm-startup.sh)(매매 VM — 부팅시각 분기 매매/유지보수 → poweroff, 대시보드 모드 지원).
 - 컨테이너 이미지: Artifact Registry `us-central1/docker`의 `quant-trader-app`/`quant-trader-batch` — CI가 빌드·푸시(`:latest`+`:<sha>`+`:buildcache`), VM은 pull.
 - 예산 알림: 결제계정에 30,000 (50/90/100%) 설정됨
 - 포트는 VM 루프백에만 바인딩 → 외부 비노출, 접속은 SSH 터널
