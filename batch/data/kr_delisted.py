@@ -45,8 +45,9 @@ def store_delisting(ch, log=print) -> list:
         rows.append([sym, str(r.get("Name") or ""), str(r.get("Market") or ""),
                      ld or dd, dd, str(r.get("Reason") or "")])
         syms.append(sym)
-    if rows:
-        ch.insert("stock_delisting", rows, column_names=_DELIST_COLS)
+    if not rows:
+        raise RuntimeError("[delisted] 적재 0행 — FDR KRX-DELISTING 스크레이핑 확인(전체 실패의 조용한 성공 처리 방지)")
+    ch.insert("stock_delisting", rows, column_names=_DELIST_COLS)
     log(f"[delisted] 상폐 메타 {len(rows)}종목 → stock_delisting")
     return syms
 

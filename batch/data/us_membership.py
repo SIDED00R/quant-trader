@@ -34,6 +34,8 @@ def store_sp500(client: httpx.Client, ch, log=print) -> tuple:
             date.fromisoformat(r["start_date"]),
             date.fromisoformat(r["end_date"]) if r.get("end_date") else _FAR]
            for r in rows if r.get("start_date")]
+    if not mem:
+        raise RuntimeError("[membership] 적재 0구간 — fja05680/sp500 CSV 포맷 확인(전체 실패의 조용한 성공 처리 방지)")
     ch.insert("index_membership", mem, column_names=["symbol", "index_name", "start_date", "end_date"])
     # 편입편출 이벤트
     ev = []

@@ -46,6 +46,8 @@ def build_macro(start: str = "2018-01-01") -> pd.DataFrame:
 def store(start: str = "2018-01-01", log=print) -> int:
     df = build_macro(start)
     rows = [[d.date(), *(float(v) for v in df.loc[d])] for d in df.index]
+    if not rows:
+        raise RuntimeError("[fred] 적재 0행 — FRED 응답/시리즈 확인(전체 실패의 조용한 성공 처리 방지)")
     create_client().insert("macro_daily", rows, column_names=_COLS)
     log(f"[fred] {len(rows):,}일 ({df.index[0].date()}~{df.index[-1].date()}) → macro_daily")
     return len(rows)
