@@ -143,7 +143,7 @@ services:
     container_name: postgres
     restart: unless-stopped
     ports:
-      # 기본 loopback(로컬 개발). 데이터 VM은 .env DB_BIND=<사설IP>로 온디맨드 매매 VM에 노출(VPC 내부만).
+      # 기본 loopback 고정 — 매매 VM은 자기완결(로컬 DB)이라 크로스 VM 노출 없음. DB_BIND는 로컬 개발 오버라이드용.
       - "${DB_BIND:-127.0.0.1}:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trader}
@@ -163,7 +163,7 @@ services:
     container_name: clickhouse
     restart: unless-stopped
     ports:
-      - "${DB_BIND:-127.0.0.1}:8123:8123"   # HTTP. 기본 loopback; 데이터 VM은 DB_BIND=<사설IP>(VPC 내부만). native 9000 비노출
+      - "${DB_BIND:-127.0.0.1}:8123:8123"   # HTTP. 기본 loopback 고정(매매 VM 자기완결 — 크로스 VM 노출 없음). native 9000 비노출
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
@@ -285,7 +285,8 @@ services:
 
   # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
   # 라이브와 분리: `docker compose run --rm reeval python -m batch.backtest.reeval_weights [--dry-run]`.
-  # Cloud Scheduler가 온디맨드 VM을 기동해 주기 실행한다(Airflow 미도입). kafka 불요(postgres+clickhouse만).
+  # 스케줄 미배선(수동 전용) — trade-vm-startup은 이 서비스를 backfill_daily 러너로만 재사용한다.
+  # ENSEMBLE_ADAPTIVE=false 기본이라 라이브는 균등가중 운용(적응 루프는 휴면 설계 자산). kafka 불요(postgres+clickhouse만).
   reeval:
     build:
       context: .

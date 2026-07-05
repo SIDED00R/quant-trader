@@ -1,12 +1,11 @@
 """SMA 전략 (단일 책임: 규율 기반 SMA 의사결정).
 
-라이브 strategy.sma_trader.run()의 매 틱 로직을 단일 계좌·동기 체결로 수행하는 Strategy 구현.
-신호/사이징/청산 임계값은 sma_trader의 순수 함수·상수를 그대로 import해 라이브와 발산을 없앤다.
-(지연=0 이상화에서 라이브의 async 보류 가드 _entry_pending/_reserved는 no-op이라 생략된다.)
+과거 라이브 SMA 틱봇(앙상블 경로로 대체·제거됨)의 매 틱 로직을 단일 계좌·동기 체결로
+수행하는 Strategy 구현. 신호/사이징/청산 임계값은 sma_trader의 순수 함수·상수를 그대로
+import해 발산을 없앤다.
 
 1.5단계(거래빈도·수수료 제어): 봉 단위 가드(config 재튜닝) + 수수료 인지 진입 필터
 (STRATEGY_MIN_EDGE_PCT) + 데드크로스 청산 토글(STRATEGY_DEADCROSS_EXIT, 기본 off)을 적용한다.
-이 두 게이트는 라이브 sma_trader에 아직 미반영(라이브 채택은 4~5단계) — 의도된 일시적 발산.
 """
 from collections import deque
 from decimal import Decimal

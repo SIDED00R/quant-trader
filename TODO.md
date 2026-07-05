@@ -3,10 +3,10 @@
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
-> **📌 현재 운영/배포 상태 (2026-06-20)**: **앙상블 라이브 배포 완료(모의) — 2-VM 온디맨드**.
-> - **아키텍처**: 데이터 VM(상시, e2-medium 4GB, `--profile data` 수집·저장·대시보드) + **매매 VM(온디맨드, Cloud Scheduler 매일 01:00 UTC 기동→`trade_once` 동기 배치→자가종료)**. 라이브 매매 = trade_once(스트리밍 commander 아님). Kafka는 데이터 팬아웃만. **상시 비용 ~$66→~$25/월**.
-> - 공개 대시보드 `https://jh-quantlab.duckdns.org`(Basic Auth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
-> - 계정 초기화 완료(본인 2계정 → ₩10M). 현재 앙상블 CASH(추세 미진입).
+> **📌 현재 운영/배포 상태 (2026-07-05)**: **코인 앙상블 + KR/US 주식 ML 라이브 배포(모의) — 2-VM 온디맨드**.
+> - **아키텍처**: 수집 VM(상시, e2-small, `--profile collector` 수집·저장만) + **매매 VM(온디맨드·자기완결 로컬 DB, Cloud Scheduler 8잡: 코인 매일 01:00 UTC·KR 15:00 KST·US 15:30 ET 장마감 전·월간 유지보수 첫 토요일, 기동→동기 배치→자가종료)**. 라이브 매매 = trade_once/stock_trade_once/us_trade_once. Kafka는 데이터 팬아웃만. **상시 비용 ~$13/월**.
+> - 대시보드 = 매매 VM 온디맨드 모드(SSH 터널 `gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000` + 구글 OAuth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
+> - 계정 초기화 완료(본인 2계정 → ₩10M). 주식은 KIS 모의계좌(KR+US 통합).
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
 - [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
@@ -147,6 +147,6 @@
   - [x] 데이터 적재: KR 미시구조 **2019-05~2026-06 (7년)·344종목**(수급 157만행), DART 펀더 344종목
   - **견고 결론**: KR OHLCV 0.26% → +펀더+미시 **1.21% OOF Rank IC, LS_Sharpe 1.03→1.34**. 방향 일관 양(+)이나 **NW_t~1.0(강≥2 미달)** — KR은 구조적 약신호(US 3.4~3.8% 대비). 공매도 단변량 −7.4%는 full-sample·금지레짐 효과.
 - [x] **PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼(`_krx_session.py`)로 중복 통합 ②README `batch/data` 목록 reconcile(#200에서 완료).
-- [ ] **(내일) 공매도 금지 레짐 분리 검증** — 금지구간(2020-03~2021-05, 2023-11~2025-03) 더미/제외로 공매도 신호 진위 최종 확인.
-- [ ] (후속) KR 챔피언 피처셋 확정 + `baseline_lgbm` 기본 반영, 추가 ablation(매크로 등 선별).
+- [x] **공매도 금지 레짐 분리 검증** — 신호 실재하나 챔피언(OHLCV+DART)에 흡수·증분 0 → **보류 확정** (`docs/ml_progress.md` §7 task2).
+- [x] KR 챔피언 피처셋 확정 = **OHLCV+DART**(macro·미시 제외, 1.34%/NW_t 1.1) + `baseline_lgbm KR` 기본 반영(플래그 없음=챔피언) (`docs/ml_progress.md` task3a).
 - [ ] (후속) **생존편향 통제**(탈락·상폐 종목 가격 적재) — 절대 IC 과대의 본질, 별도 트랙.

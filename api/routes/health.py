@@ -1,7 +1,8 @@
-"""헬스체크 (단일 책임: 배포 검증용 liveness + 배포 sha 노출).
+"""헬스체크 (단일 책임: liveness + 배포 sha 노출 — 수동 디버깅용).
 
-CI(deploy.yml healthcheck 잡)가 배포 직후 sha 일치를 확인한다. DB 무의존 —
-앱 liveness만 본다(의존성 장애는 각 기능 엔드포인트가 드러냄). 인증 예외(security._is_public).
+과거 CI healthcheck 잡이 폴링했으나 그 잡은 제거됨(배포 검증은 이미지 revision 라벨 대조).
+현재는 수동 curl 확인용으로 유지. DB 무의존 — 앱 liveness만 본다(의존성 장애는 각 기능
+엔드포인트가 드러냄). 인증 예외(security._is_public).
 """
 import os
 

@@ -4,7 +4,7 @@
 #   - 공개 도메인 지정(예: jh-quantlab.duckdns.org) → Caddy가 인증서를 자동 발급/갱신, 443 서비스 + 80→443 리다이렉트
 #   - 미설정 시 기본값 ":80" → 로컬 개발용 평문 HTTP
 #
-# 대시보드 자체 인증(Basic Auth)은 api 앱이 그대로 처리한다. Caddy는 Authorization 헤더를
+# 대시보드 인증(구글 OAuth + 세션 쿠키)은 api 앱이 그대로 처리한다. Caddy는 요청을
 # 그대로 통과시키므로, HTTPS 종단만 추가될 뿐 앱의 인증 로직은 바뀌지 않는다.
 {$SITE_ADDRESS::80} {
 	reverse_proxy api:8000
