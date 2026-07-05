@@ -44,7 +44,8 @@ def fetch_minute(symbol: str, days: int, req_sleep: float = 0.0, log=print) -> l
     cutoff(=지금 UTC - days) 이전에 닿으면 종료. 미완료(현재 분) 봉은 제외(종가 미확정).
     rate limit(5/s)로 페이싱하므로 종목·기간이 크면 시간이 오래 걸린다(subset-first 권장).
     """
-    headers = {"Authorization": f"Bearer {get_access_token()}"}
+    # Accept-Encoding=identity: zstd 협상 차단(toss_daily와 동일 — httpx ZStandardDecoder 멀티청크 버그 우회).
+    headers = {"Authorization": f"Bearer {get_access_token()}", "Accept-Encoding": "identity"}
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     now_minute = now.replace(second=0, microsecond=0)
