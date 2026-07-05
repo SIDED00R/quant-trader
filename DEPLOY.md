@@ -207,7 +207,7 @@ infra/terraform/
 - **원시 틱 TTL 180일 — 기존(라이브) 테이블 1회 ALTER 런북**: 스키마의 TTL은 신규 설치 전용(`db/clickhouse_schema.sql` 주석 — init_db가 매 부팅 재실행하므로 ALTER를 스키마에 넣으면 매번 재물질화). 수집 VM에 1회 적용:
   ```bash
   gcloud compute ssh coin-trader-vm --zone=us-central1-a --command \
-   "cd /opt/coin-auto-trader && P=\$(sudo grep -E '^CLICKHOUSE_PASSWORD=' .env | cut -d= -f2-); \
+   "cd /opt/coin-auto-trader && P=\$(sudo grep -E '^CLICKHOUSE_PASSWORD=' .env | cut -d= -f2- | sed 's/[[:space:]]*#.*//; s/[[:space:]]*\$//'); \
     for T in ticks stock_ticks; do sudo docker exec clickhouse clickhouse-client --password \"\${P:-ch_pw}\" \
       -q \"ALTER TABLE coin_analytics.\$T MODIFY TTL toDateTime(trade_ts) + INTERVAL 180 DAY\"; done"
   # 확인: SELECT name, engine_full FROM system.tables WHERE database='coin_analytics' AND name IN ('ticks','stock_ticks')
