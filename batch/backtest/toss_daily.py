@@ -33,7 +33,9 @@ def fetch_daily(symbol: str, days: int, req_sleep: float = 0.25, log=print) -> l
     미마감 당일(KST) 봉은 제외한다. cutoff(=오늘 KST - days)보다 과거에 닿으면 종료.
     토큰은 발급 시점 1회 사용 — 백필은 단일 프로세스·24h 미만이라 만료 전 완료된다.
     """
-    headers = {"Authorization": f"Bearer {get_access_token()}"}
+    # Accept-Encoding=identity: zstd 협상 차단 — httpx 0.27.2 ZStandardDecoder가 멀티청크 응답에서
+    # 프레임 eof 후 재디코드하며 "cannot use a decompressobj multiple times"로 실패하는 버그 우회.
+    headers = {"Authorization": f"Bearer {get_access_token()}", "Accept-Encoding": "identity"}
     today_kst = datetime.now(_KST).date()
     cutoff = today_kst - timedelta(days=days)
     rows: list = []
