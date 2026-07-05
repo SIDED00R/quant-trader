@@ -14,7 +14,8 @@ from pathlib import Path
 
 from batch.backtest import backfill_stock_daily
 from batch.backtest.refresh_stock_daily import alive_symbols
-from batch.data import fundamentals, kr_fundamentals, sec_13f, sec_sector
+from batch.data import (earnings, factor_returns, finra_short, fundamentals,
+                        insider, kr_fundamentals, sec_13f, sec_sector)
 from common import notify_telegram
 
 _UNIVERSE_DIR = Path(__file__).resolve().parents[1] / "backtest" / "universe"
@@ -47,6 +48,10 @@ def main(argv=None) -> int:
         ("13F 기관보유", lambda: sec_13f.main(["--start-year", str(year)])),
         ("SIC 섹터", lambda: sec_sector.main([])),
         ("DART 펀더멘털", lambda: kr_fundamentals.main(["--start-year", str(year), "--symbols", ",".join(alive_symbols("KR"))])),
+        ("팩터 수익률", lambda: factor_returns.main([])),
+        ("내부자 거래", lambda: insider.main(["--start-year", str(year)])),
+        ("US 공매도", lambda: finra_short.main([])),
+        ("실적 캘린더", lambda: earnings.main([])),
     ]
     lines, failed = [], 0
     for name, fn in steps:                      # 단계별 격리 — 실패해도 다음 단계 진행
