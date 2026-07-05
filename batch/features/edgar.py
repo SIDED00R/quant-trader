@@ -11,6 +11,7 @@ batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundament
 - flow 계정(순이익·매출): 단일분기 합으로 TTM 구성(최신분기 filed로 가용시점 결정), 분기별 YoY 성장.
 파생: 시가총액(mktcap=close×shares, GKX 중요도 2위)·회전율(turnover)·PBR·PER·PSR·ROE·ROA·매출성장.
 """
+import functools
 import os
 import time
 
@@ -34,6 +35,7 @@ _REV = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"]
 
 
+@functools.lru_cache(maxsize=1)   # 한 실행 내 1회만 다운로드(fundamentals·sec_sector·earnings 공유 — #218)
 def ticker_cik_map() -> dict:
     with httpx.Client(timeout=30, headers=_UA) as c:
         j = c.get("https://www.sec.gov/files/company_tickers.json").json()
@@ -41,19 +43,32 @@ def ticker_cik_map() -> dict:
 
 
 def fetch_companyfacts(cik: str, client: httpx.Client, req_sleep: float = 0.12) -> dict | None:
+    # 캐시 영속(#218) — companyfacts는 신규 공시로 갱신되므로 조건부 GET(If-Modified-Since)으로 재검증한다:
+    # 304면 캐시 재사용(전송 0), 변경 시에만 재다운로드 → 매월 전량 재수신(~1GB) 회피 + 신규 공시 반영.
     os.makedirs(_CACHE, exist_ok=True)
     fp = os.path.join(_CACHE, f"{cik}.json")
-    if os.path.exists(fp):
+    lm_fp = fp + ".lastmod"
+    headers = {}
+    if os.path.exists(fp) and os.path.exists(lm_fp):
         try:
-            return load_json(fp)
-        except Exception:
+            with open(lm_fp, encoding="utf-8") as f:
+                headers["If-Modified-Since"] = f.read().strip()
+        except OSError:
             pass
     time.sleep(req_sleep)
-    r = client.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
-    if r.status_code != 200:
-        return None
+    r = client.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
+    if r.status_code == 304:                        # 미변경 → 캐시 재사용
+        return load_json(fp)
+    if r.status_code != 200:                        # 실패 → 캐시 있으면 폴백
+        return load_json(fp) if os.path.exists(fp) else None
     j = r.json()
     dump_json(fp, j)
+    if r.headers.get("Last-Modified"):
+        try:
+            with open(lm_fp, "w", encoding="utf-8") as f:
+                f.write(r.headers["Last-Modified"])
+        except OSError:
+            pass
     return j
 
 

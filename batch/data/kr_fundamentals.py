@@ -91,7 +91,8 @@ def _fetch_report(key, client, corp, year, reprt, sleep) -> list:
         if j.get("status") == "000" and j.get("list"):
             out = j["list"]
             break
-    dump_json(fp, out)
+    if out or year < date.today().year:   # 당해년도 빈 결과는 미확정 분기 → 미캐시(다음 실행 재시도, #218)
+        dump_json(fp, out)
     return out
 
 
@@ -104,7 +105,8 @@ def _fetch_shares(key, client, corp, year, sleep):
             "crtfc_key": key, "corp_code": corp, "bsns_year": str(year), "reprt_code": "11011"})
         time.sleep(sleep)
         cached = r.json().get("list", []) if r.json().get("status") == "000" else []
-        dump_json(fp, cached)
+        if cached or year < date.today().year:   # 당해년도 빈 결과 미캐시(#218)
+            dump_json(fp, cached)
     for it in cached:
         if (it.get("se") or "").strip() == "보통주":
             val = _num(it.get("distb_stock_co"))

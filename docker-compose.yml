@@ -79,6 +79,11 @@ x-batch-trade: &batch-trade
     TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
     TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
     TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
+  volumes:                          # 데이터 수집 캐시 영속 — 월간 유지보수 콜드 스타트 방지(#218)
+    - edgarcache:/app/batch/features/.edgar_cache
+    - cache13f:/app/batch/data/.13f_cache
+    - dartcache:/app/batch/data/.dart_cache
+    - insidercache:/app/batch/data/.insider_cache
 
 services:
   # ── Kafka (KRaft 단일 노드, Zookeeper 없음) ─────────────────────────
@@ -372,6 +377,10 @@ volumes:
   kafkadata:
   pgdata:
   chdata:
+  edgarcache:      # #218 수집 캐시 영속(콜드 스타트 방지): edgar companyfacts·sic_map
+  cache13f:        #                                       13F 분기 zip·cusip_map
+  dartcache:       #                                       DART corp_map·보고서
+  insidercache:    #                                       insider 분기 zip
   grafanadata:
   caddydata:
   caddyconfig:
