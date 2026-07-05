@@ -17,10 +17,10 @@
 >   - **스위퍼 = 기동실패 재시도**: 존 용량 부족(`ZONE_RESOURCE_POOL_EXHAUSTED`, 실사례 2026-06-30~07-01 3연속) 시 수 분 뒤 재기동. 이중 실행은 멱등(코인=목표 수렴, 주식=주간 마커). 기동 실패는 이메일 알림(아래 §11).
 >   - **주 1회 멱등(휴장·실패 재시도)**: 주식은 평일마다 부팅·시도하지만 `weekly_rebalance` 마커가 **주 1회만 실제 매매**를 보장. 휴장일(US=NYSE 게이트, KR=체결기반)·일시적 실패면 그 주 마커를 남기지 않아 **다음 평일 자동 재시도**. 체결 자체는 `kis_chase`(미체결 취소·재주문 추격)가 보장.
 >   - 매매 VM **로컬 postgres/clickhouse**(자기완결, 크로스VM 터널 없음), 동기 매매. 가동시간만 과금(~$1/월).
-> - **대시보드(온디맨드)**: 계좌/주문 Postgres가 매매 VM에 있어 대시보드도 그 VM 상주. 텔레그램 `/start_vm`(대시보드 모드) 기동 → SSH 터널 조회(`gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000`) → `/stop_vm`. 상시 공개 URL 없음(비용 절감 위해 온디맨드화). 매매 VM 수동 on/off = 텔레그램 봇([infra/telegram-vm-bot/](infra/telegram-vm-bot/)).
+> - **대시보드(온디맨드)**: 계좌/주문 Postgres가 매매 VM에 있어 대시보드도 그 VM 상주. 별도 **gcp-cost-controller**(텔레그램)에서 `/start quant-vm`(대시보드 모드) → SSH 터널 조회(`gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000`) → `/stop quant-vm`(미종료 시 2h 자동 종료). 상시 공개 URL 없음(비용 절감 위해 온디맨드화).
 > - **라이브 매매 경로**: `trade_once`(동기 배치). 스트리밍 `commander`/`engine`/`portfolio`는 코드로만 존재(로컬 dev). **Kafka는 데이터 팬아웃만**(매매 미사용).
 > - **데이터**: ClickHouse candles_1d(BTC/ETH 2019-11~) + 전 KRW 마켓 틱 상시 수집. **모의 거래**(실거래 API 없음) — 코인 가상잔고 ₩10M, 주식 KIS 모의계좌(KR ₩10M·US $100k). 모델 출처 = `docs/model.md`.
-> - **상시 비용 ~$66 → ~$25/월** (16GB 단일 → 4GB 데이터 + 온디맨드 매매로 분리).
+> - **상시 비용 ~$24 → ~$13/월** (e2-medium 풀스택 → e2-small 틱 수집 VM + 온디맨드 매매/대시보드로 분리).
 
 ---
 
@@ -164,7 +164,7 @@ infra/terraform/
 ## 11. 실제 배포 (저비용 단일 VM) — 적용됨
 
 > ⚠️ **일부 절차는 분리(collector/온디맨드) 이전 기준이다.** 최신 토폴로지·비용은 위 "현재 배포 상태" 요약(§상단)을 따른다:
-> 상시 VM은 이제 **틱 수집 전용 `--profile collector`(e2-small)**, 대시보드·Postgres·매매는 **온디맨드 매매 VM**(로컬 DB, `/start_vm`으로 대시보드 조회). 배포는 `deploy-collector-vm.sh`, 공개 `/healthz` 헬스체크는 제거(이미지 sha 라벨 대조로 대체). 아래 상세 단계 중 `--profile data`·`/healthz`·SSH 터널 DB·공개 대시보드 서술은 갱신 대상.
+> 상시 VM은 이제 **틱 수집 전용 `--profile collector`(e2-small)**, 대시보드·Postgres·매매는 **온디맨드 매매 VM**(로컬 DB, gcp-cost-controller `/start quant-vm`으로 대시보드 조회). 배포는 `deploy-collector-vm.sh`, 공개 `/healthz` 헬스체크는 제거(이미지 sha 라벨 대조로 대체). 아래 상세 단계 중 `--profile data`·`/healthz`·SSH 터널 DB·공개 대시보드 서술은 갱신 대상.
 
 비용 최소화를 위해 매니지드 서비스 대신 **단일 GCE VM에 docker-compose 풀스택**으로 배포했다.
 

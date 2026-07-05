@@ -2,8 +2,9 @@
 # CI/CD·스케줄러 1회 셋업 (멱등 — 재실행 안전). 소유자 gcloud 자격증명으로 로컬에서 실행:
 #   bash infra/setup-cicd.sh
 # 구성: API 활성화 → Artifact Registry(+정리정책) → WIF(github-pool/provider) → 배포 SA+최소권한
-#       → VM SA에 AR reader → 텔레그램 VM봇 SA에 인스턴스제어 → 모니터링(이메일 채널+기동실패 알림)
+#       → VM SA에 AR reader → 모니터링(이메일 채널+기동실패 알림)
 #       → 매매 스케줄러 8잡 upsert → 매매·수집 VM 메타데이터 반영(수집 VM은 최초 1회 e2-small 축소).
+# 참고: 매매 VM on/off·대시보드 모드는 별도 프로젝트(gcp-cost-controller)가 cross-project로 제어(여기선 IAM 부여 안 함).
 set -euo pipefail
 
 P=coin-auto-trader-jvfhgq
@@ -60,10 +61,6 @@ gcloud iam service-accounts add-iam-policy-binding $VMSA --project $P \
 echo "── 5. VM SA에 AR reader (양 VM 이미지 pull)"
 gcloud artifacts repositories add-iam-policy-binding docker --location=$R --project $P \
   --member=serviceAccount:$VMSA --role=roles/artifactregistry.reader --quiet
-
-echo "── 5b. 텔레그램 VM 봇(gen2 함수 런타임 SA=기본 compute SA)에 인스턴스 start/stop 권한"
-gcloud projects add-iam-policy-binding $P \
-  --member=serviceAccount:$VMSA --role=roles/compute.instanceAdmin.v1 --quiet
 
 echo "── 6. 사전 점검 (스코프에 cloud-platform 없으면 set-service-account 필요, OS Login은 꺼져 있어야 함)"
 gcloud compute instances describe coin-trader-vm --zone=$Z --project $P --format='value(serviceAccounts[0].scopes)' || true

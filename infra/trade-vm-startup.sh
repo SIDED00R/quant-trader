@@ -106,14 +106,16 @@ $(tail -n 20 "$3" 2>/dev/null)"
   docker compose --profile trade run --rm trade-once python -m common.notify_telegram "$MSG" >/dev/null 2>&1 || true
 }
 
-# ── 대시보드 모드 (텔레그램 봇이 /start_vm 시 metadata vm-boot-mode=dashboard 설정) ──
-# 수동 조회용: 로컬 DB는 위에서 이미 기동. api/grafana만 올리고(--no-deps로 kafka 불요) 매매·poweroff 스킵.
+# ── 대시보드 모드 (gcp-cost-controller가 /start quant-vm 시 metadata vm-boot-mode=dashboard 설정) ──
+# 수동 조회용: 로컬 DB는 위에서 이미 기동. api/grafana만 올리고(--no-deps로 kafka 불요) 매매·즉시 poweroff 스킵.
 # 접속은 SSH 터널(공개 IP/방화벽/인증서 불요): gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 → http://localhost:8000
+# 종료 잊음 대비 2시간 뒤 자동 poweroff(비용 상한). 정상 종료는 컨트롤러 /stop quant-vm.
 BOOT_MODE=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/vm-boot-mode" 2>/dev/null || true)
 if [ "$BOOT_MODE" = "dashboard" ]; then
   docker compose up -d --no-deps api grafana 2>&1 | tee -a /var/log/trade-boot.log || true
+  (sleep 7200; poweroff) &                              # 종료 잊음 대비 자동 poweroff(2h) — 비용 상한
   docker compose --profile trade run --rm trade-once python -m common.notify_telegram \
-    "🖥️ 대시보드 기동 — SSH 터널: gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 후 http://localhost:8000 (끝나면 /stop_vm)" >/dev/null 2>&1 || true
+    "🖥️ 대시보드 기동 — SSH 터널: gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 후 http://localhost:8000 (끝나면 /stop quant-vm; 미종료 시 2h 뒤 자동 종료)" >/dev/null 2>&1 || true
   echo "DASHBOARD_UP" | tee -a /var/log/trade-boot.log
   exit 0
 fi

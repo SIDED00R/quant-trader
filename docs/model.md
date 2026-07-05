@@ -31,7 +31,7 @@
 - **환경**: GCE **2-VM** — 상시 **틱 수집 VM** `coin-trader-vm`(e2-small, Kafka+CH+PG+틱 레코더만) + 온디맨드 매매 VM `coin-trade-vm`(로컬 DB 자기완결)
 - **파이프라인(코인: 매일 01:00 UTC)**: Cloud Scheduler가 매매 VM 기동 → 로컬 DB 기동 + 크립토 일봉 REST 백필 → `trade_once`가 일봉 합성 목표비중 산출(현재가=업비트 REST) → 주문·체결 **동기 처리**(매매 VM 로컬 DB) → 자가 종료. (스트리밍 `commander`/`engine`은 로컬 개발용으로만 존재) 같은 VM이 부팅 시각 분기로 평일 15:00 KST엔 KR 주식, 평일 15:30 ET엔 US 주식도 실행 — 스케줄 정본은 `DEPLOY.md` §11 (주식 모델 경위는 `docs/ml_progress.md`).
 - **거래 성격**: **모의(paper)** — 실거래 거래소 API 없음(가상 잔고). 초기 가상자본 ₩10,000,000
-- **대시보드**: 온디맨드(매매 VM 상주) — 텔레그램 `/start_vm` 기동 후 SSH 터널 조회, `/stop_vm`로 종료. 상시 공개 URL 없음(비용 절감).
+- **대시보드**: 온디맨드(매매 VM 상주) — gcp-cost-controller(텔레그램) `/start quant-vm` 기동 후 SSH 터널 조회, `/stop quant-vm`로 종료(미종료 시 2h 자동). 상시 공개 URL 없음(비용 절감).
 
 ## 한계·주의 (정직)
 - OOS 구간이 **2020-21·2023-25 대형 강세장**을 포함 → 추세추종에 유리했던 환경. 다른 레짐 일반화는 미검증.
