@@ -220,11 +220,14 @@ CREATE TABLE IF NOT EXISTS stock_short (
     short_balance_value Float64,          -- 공매도 잔고금액(원)
     market_cap          Float64,          -- 시가총액(원)
     short_balance_ratio Float64,          -- 잔고비중(%)
+    market              LowCardinality(String) DEFAULT 'KR',   -- KR(KRX) | US(FINRA). KR 6자리코드와 US 티커는 충돌 없음
     source              LowCardinality(String) DEFAULT 'KRX',
     ingested_at         DateTime64(3, 'UTC') DEFAULT now64(3)
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, date);
+-- 기존 설치 대응(신규 컬럼 추가는 CREATE IF NOT EXISTS로 반영 안 됨) — 재실행 멱등.
+ALTER TABLE stock_short ADD COLUMN IF NOT EXISTS market LowCardinality(String) DEFAULT 'KR' AFTER short_balance_ratio;
 
 -- KR 상장폐지 종목 메타(FDR KRX-DELISTING). 생존편향 보정 — PIT 유니버스(상장~폐지 구간) 구성용.
 -- 상폐 종목 OHLCV는 stock_candles_1d(market='KR')에 함께 적재, 폐지일 이후 제외 게이팅은 본 표로.
@@ -240,3 +243,55 @@ CREATE TABLE IF NOT EXISTS stock_delisting (
 )
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY symbol;
+
+-- ── 신규 무료 데이터(주식 퀀트 공용) ──
+
+-- 팩터 일간 수익률(Ken French Data Library). 수익 귀인(내 엣지가 알파냐 팩터노출이냐) + 팩터중립 피처.
+-- 롱 포맷(팩터 차원) — region으로 US/글로벌/KR(추후) 확장. batch/data/factor_returns.py 적재. 재실행 멱등.
+-- ret = 일간 수익률(소수). 원본 CSV는 %표기 → /100 저장. RF도 동일 축에 factor='rf'로 보관.
+CREATE TABLE IF NOT EXISTS factor_returns_daily (
+    date        Date,
+    region      LowCardinality(String) DEFAULT 'US',   -- US(KenFrench). 글로벌/KR은 추후 확장
+    factor      LowCardinality(String),                -- mkt_rf|smb|hml|rmw|cma|rf|umd
+    ret         Float64,                               -- 일간 수익률(소수 = 원본%/100)
+    source      LowCardinality(String) DEFAULT 'KenFrench',
+    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (region, factor, date);
+
+-- 내부자 거래(SEC Form 3/4/5, DERA insider-transactions 분기 데이터셋). 내부자 매수/매도 신호.
+-- ISSUERTRADINGSYMBOL로 티커 직접 획득(13F와 달리 OpenFIGI 불필요). filed_date로 PIT 게이팅.
+-- batch/data/insider.py 적재. trans_code: P(매수)·S(매도)·A(수여)·M(옵션행사)·F(세금納주식)·G(증여) 등.
+CREATE TABLE IF NOT EXISTS insider_transactions (
+    symbol             LowCardinality(String),
+    trans_date         Date,                      -- 거래일(TRANS_DATE)
+    filed_date         Date,                      -- 공시 접수일(PIT 게이팅용)
+    accession          String,                    -- 공시 접수번호
+    trans_sk           String,                    -- NONDERIV_TRANS_SK (accession 내 트랜잭션 유일키)
+    owner_cik          String,
+    relationship       LowCardinality(String),    -- director|officer|tenpct|other
+    trans_code         LowCardinality(String),    -- P|S|A|M|F|G|...
+    acquired_disp      LowCardinality(String),    -- A(취득) | D(처분)
+    shares             Float64,                   -- 거래 주식수
+    price              Float64,                   -- 주당 거래가($)
+    shares_owned_after Float64,                   -- 거래 후 보유주식수
+    source             LowCardinality(String) DEFAULT 'SEC',
+    ingested_at        DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (symbol, trans_date, accession, trans_sk);
+
+-- 실적 발표일 캘린더. US=SEC 8-K Item 2.02(실적) 접수일, KR=DART 실적공시 rcept_dt.
+-- 용도: 실적 전후 매매 마스킹(갭 리스크 회피) + 실적발표후표류(PEAD) 신호. batch/data/earnings.py 적재.
+CREATE TABLE IF NOT EXISTS earnings_calendar (
+    symbol        LowCardinality(String),
+    market        LowCardinality(String),          -- US | KR
+    announce_date Date,                             -- 실적 발표일(8-K 접수일 / DART rcept_dt)
+    period_end    Nullable(Date),                   -- 대상 회계기간말(가용 시)
+    form          LowCardinality(String),          -- 8-K(2.02) | DART 보고서명
+    source        LowCardinality(String) DEFAULT 'SEC',
+    ingested_at   DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (market, symbol, announce_date);
