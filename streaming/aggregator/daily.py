@@ -10,7 +10,7 @@ import time
 from common.clickhouse_client import create_client
 
 SLEEP_SEC = 3600
-LOOKBACK_DAYS = 7   # 최근 완료일만 리샘플(효율) — 과거분은 backfill_daily(직접 일봉 REST)가 채움
+LOOKBACK_DAYS = 2   # 최근 완료일만 리샘플 — 마감일은 불변이라 어제+그제로 충분(부팅 갭 여유). 과거분은 backfill_daily가 채움
 
 _SQL = f"""INSERT INTO candles_1d (symbol, window_start, open, high, low, close, volume, updated_at)
 SELECT symbol, toStartOfDay(window_start) AS d,

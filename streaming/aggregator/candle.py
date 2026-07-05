@@ -39,6 +39,7 @@ def run() -> None:
     print("[candle] started")
 
     candles: dict[tuple, dict] = {}
+    dirty: set[tuple] = set()          # 직전 플러시 이후 갱신된 (symbol, window) — 이것만 재적재
     max_window: datetime | None = None
     last_flush = time.monotonic()
     consumed = False
@@ -71,25 +72,28 @@ def run() -> None:
                         c["low"] = min(c["low"], price)
                         c["close"] = price
                         c["volume"] += vol
+                    dirty.add((sym, wstart))     # 이 봉을 다음 플러시 재적재 대상으로
 
-            if candles and now - last_flush >= FLUSH_SEC:
-                client.insert("candles_1m", _rows(candles), column_names=COLUMNS)
-                if consumed:
+            if now - last_flush >= FLUSH_SEC:
+                if dirty:                        # 갱신분만 재적재(마감봉·무입력 구간 재적재 제거)
+                    client.insert("candles_1m", _rows({k: candles[k] for k in dirty}), column_names=COLUMNS)
+                    print(f"[candle] upserted {len(dirty)} candles")
+                    dirty.clear()
+                if consumed:                     # insert와 분리 — 갱신 없어도(bad message 등) 오프셋은 진행
                     consumer.commit(asynchronous=False)
                     consumed = False
-                print(f"[candle] upserted {len(candles)} candles")
                 if max_window is not None:
                     cutoff = max_window - WATERMARK
                     for k in [k for k in candles if k[1] < cutoff]:
                         del candles[k]
                 last_flush = now
     finally:
-        if candles:
-            client.insert("candles_1m", _rows(candles), column_names=COLUMNS)
-            try:
-                consumer.commit(asynchronous=False)
-            except Exception:
-                pass
+        if dirty:                                # 미플러시 갱신분만(나머지는 이미 적재됨)
+            client.insert("candles_1m", _rows({k: candles[k] for k in dirty}), column_names=COLUMNS)
+        try:
+            consumer.commit(asynchronous=False)  # 마지막 오프셋 커밋(갱신 유무 무관)
+        except Exception:
+            pass
         consumer.close()
 
 
