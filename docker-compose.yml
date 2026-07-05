@@ -43,6 +43,11 @@ x-app: &app
     KIS_APPKEY: ${KIS_APPKEY:-}
     KIS_APPSECRET: ${KIS_APPSECRET:-}
     KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+    # 수동주문 실패 텔레그램 통보용(api의 stock_order_executor) — 미설정 시 발송만 조용히 스킵.
+    TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+    TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+    TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+    TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
   depends_on:
     kafka:
       condition: service_healthy

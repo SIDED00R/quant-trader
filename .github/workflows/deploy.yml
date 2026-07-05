@@ -22,7 +22,46 @@ env:
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 
 jobs:
+  # 테스트 게이트 — 이전엔 CI가 테스트 0으로 배포해 빨간 코드가 프로드 VM에 직행할 수 있었다.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -q -r requirements.txt -r requirements-ml.txt pytest
+      - run: python -m pytest batch/backtest/tests/ -q
+      - name: import 스윕 + 프로덕션 경계 검사
+        run: |
+          python - <<'EOF'
+          import importlib, pkgutil
+          # KRX 계열은 import 시점에 KRX 로그인(네트워크)을 트리거 → CI에서 제외(수동/연구용).
+          SKIP = {"batch.data._krx_session", "batch.data.krx", "batch.data.krx_bulk",
+                  "batch.data.kr_index_membership", "batch.data.kr_delisted"}
+          fails = []
+          for r in ("common", "streaming", "trading", "api", "batch", "scripts"):
+              pkg = importlib.import_module(r)
+              for m in pkgutil.walk_packages(pkg.__path__, r + "."):
+                  if m.name in SKIP:
+                      continue
+                  try:
+                      importlib.import_module(m.name)
+                  except Exception as e:
+                      fails.append(f"{m.name}: {type(e).__name__}: {e}")
+          if fails:
+              raise SystemExit("\n".join(fails))
+          print("IMPORT SWEEP OK")
+          EOF
+          # 프로덕션 앱 이미지는 batch/ 제외 — 상시 경로의 batch.* import는 배포 후 즉사(CLAUDE.md 경계)
+          if grep -rn --include='*.py' -E '^(from|import) batch' common streaming api trading \
+             | grep -vE 'stock_trade_once|us_trade_once|stock_trade_common'; then
+            echo '경계 위반: 프로덕션 상시 경로가 batch.*를 import'; exit 1
+          fi
+          echo "BOUNDARY OK"
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -97,3 +136,25 @@ jobs:
       - run: |
           gcloud compute instances add-metadata coin-trade-vm --project "$PROJECT" --zone "$ZONE" \
             --metadata-from-file startup-script=infra/trade-vm-startup.sh
+
+  # 어느 잡이든 실패 시 텔레그램 통보 — CI 실패가 GitHub 이메일에만 묻히지 않게 매매 알림과 채널 일원화.
+  # (github-deployer SA에 telegram-env secretAccessor 1회 바인딩 필요 — DEPLOY.md CI/CD 절 참조)
+  notify-failure:
+    if: failure()
+    needs: [test, build, deploy-collector-vm, update-trade-vm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: coin-auto-trader-jvfhgq
+          workload_identity_provider: projects/689150179824/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: |
+          gcloud secrets versions access latest --secret=telegram-env > .env
+          pip install -q telethon python-dotenv
+          python -m common.notify_telegram "🔴 CI deploy 실패 — ${GITHUB_SHA:0:7} / https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

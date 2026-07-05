@@ -9,6 +9,7 @@
 """
 import json
 import os
+import sys
 import tempfile
 import threading
 from datetime import datetime, timedelta, timezone
@@ -47,8 +48,11 @@ class TokenCache:
             os.makedirs(_CACHE_DIR, exist_ok=True)
             with open(self._file, "w", encoding="utf-8") as f:
                 json.dump({"token": self._token, "expires_at": self._expires_at.isoformat()}, f)
-        except Exception:
-            pass
+        except Exception as e:
+            # 저장 실패는 비치명(메모리 캐시로 동작)이지만 조용히 넘기면 매 프로세스가 재발급
+            # → KIS 발급한도 소진으로 이어질 수 있어 크게 남긴다.
+            print(f"[{self._name}] 토큰 캐시 저장 실패({type(e).__name__}: {e}) — "
+                  f"프로세스 간 토큰 재사용 불가, KIS 발급한도 소모 주의", file=sys.stderr)
 
     def get(self, force: bool = False) -> str:
         """유효한 토큰 반환(만료 임박 또는 force=True면 재발급, 발급 시 파일 갱신)."""

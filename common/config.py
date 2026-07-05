@@ -24,6 +24,11 @@ CLICKHOUSE_HTTP_PORT = int(os.getenv("CLICKHOUSE_HTTP_PORT", "8123"))
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "ch_pw")
 CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "coin_analytics")
+# 연결/소켓 무응답 상한(초)을 명시·env 조절 가능하게 고정. send_receive 기본 300 = 라이브러리
+# 기본과 동일(연구·유지보수 대형 쿼리 회귀 방지) — 무한 행의 최종 방어는 매매 VM 절대 워치독.
+# send_receive는 소켓 비활성 타임아웃(스트리밍 수신은 패킷마다 리셋).
+CLICKHOUSE_CONNECT_TIMEOUT = int(os.getenv("CLICKHOUSE_CONNECT_TIMEOUT", "10"))
+CLICKHOUSE_SEND_RECEIVE_TIMEOUT = int(os.getenv("CLICKHOUSE_SEND_RECEIVE_TIMEOUT", "300"))
 
 # ── Kafka 토픽 ──
 TOPIC_ORDERS = "orders"
@@ -177,7 +182,8 @@ POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_USER = os.getenv("POSTGRES_USER", "trader")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "trader_pw")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "coin_trading")
+POSTGRES_CONNECT_TIMEOUT = int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "10"))  # 연결 수립 상한(초) — 무한 대기 방지
 POSTGRES_DSN = (
     f"host={POSTGRES_HOST} port={POSTGRES_PORT} user={POSTGRES_USER} "
-    f"password={POSTGRES_PASSWORD} dbname={POSTGRES_DB}"
+    f"password={POSTGRES_PASSWORD} dbname={POSTGRES_DB} connect_timeout={POSTGRES_CONNECT_TIMEOUT}"
 )

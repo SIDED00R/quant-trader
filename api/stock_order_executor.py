@@ -1,6 +1,7 @@
 """수동 주식 주문 실행기 (단일 책임: 예약/즉시 수동주문의 도래분 집행 — lifespan 백그라운드 태스크).
 
-상시 api 컨테이너가 25s 주기로 due PENDING을 클레임해 place_and_chase(체결 추격)로 매매한다.
+api 컨테이너(매매 VM 온디맨드 대시보드 모드에서 기동 — 상시 아님)가 25s 주기로 due PENDING을
+클레임해 place_and_chase(체결 추격)로 매매한다. 예약 주문은 대시보드가 떠 있는 동안만 집행된다.
 - 클레임 = UPDATE … WHERE id=(SELECT … FOR UPDATE SKIP LOCKED) — 단일 인스턴스 전제(compose api 1개)지만 다중에도 안전.
 - 금액(amount) 주문은 실행 시점 현재가로 수량 환산(floor). 시세 미확인·수량<1 → FAILED.
 - 재시작 고아 복구: 30분 넘게 PLACED로 남은 주문(집행 중 재시작)은 FAILED 처리 — 잔고diff 진실은 대시보드가 보여준다.
@@ -11,6 +12,7 @@ import logging
 
 from psycopg.types.json import Json
 
+from common import notify_telegram
 from common.kis_chase import place_and_chase
 from common.kis_domestic_price import current_price
 from common.kis_overseas_price import price_and_exchange
@@ -32,6 +34,7 @@ def _recover_orphans() -> None:
         ).fetchall()
     if rows:
         log.warning("고아 수동주문 %d건 FAILED 처리: %s", len(rows), [r[0] for r in rows])
+        notify_telegram.send(f"🔴 수동주문 고아 복구 {len(rows)}건 FAILED 처리: {[r[0] for r in rows]} — 대시보드 확인")
 
 
 def _claim_one():
@@ -77,8 +80,17 @@ def _execute(row) -> None:
         q, ref, exch = _resolve(market, symbol, qty, amount)
     except Exception as e:
         _finish(order_id, "FAILED", {"error": f"{type(e).__name__}: {e}"})
+        # 예약 주문은 대시보드를 닫은 뒤 실행되므로 DB 기록만으론 조용히 묻힌다 — 텔레그램으로도 통보.
+        notify_telegram.send(f"🔴 수동주문 실패 #{order_id} [{market}] {side} {symbol} — {type(e).__name__}: {e}")
         return
-    r = place_and_chase(market, symbol, side, q, ref_price=ref, exchange=exch)
+    try:
+        r = place_and_chase(market, symbol, side, q, ref_price=ref, exchange=exch)
+    except Exception as e:
+        # 주문 전 기준선 잔고조회 등에서 raise(fail-loud 전환) — 여기서 안 잡으면 run()의 제네릭
+        # 핸들러가 로그만 남기고 주문이 PLACED로 고착된다(고아 복구는 재기동 시 1회뿐).
+        _finish(order_id, "FAILED", {"error": f"{type(e).__name__}: {e}"})
+        notify_telegram.send(f"🔴 수동주문 실패 #{order_id} [{market}] {side} {symbol} — {type(e).__name__}: {e}")
+        return
     detail = {"resolved_qty": q, "ref_price": ref, **r}
     if r["filled_qty"] >= q:
         _finish(order_id, "FILLED", detail)
@@ -87,6 +99,9 @@ def _execute(row) -> None:
         _finish(order_id, "FILLED", detail)
     else:
         _finish(order_id, "FAILED", detail)
+        err = (r.get("attempts") or [{}])[0].get("error")
+        notify_telegram.send(f"🔴 수동주문 실패 #{order_id} [{market}] {side} {symbol} x{q} — {r['status']}"
+                             + (f" ({err})" if err else ""))
     log.info("수동주문 #%s %s %s %s x%s → %s", order_id, market, side, symbol, q, r["status"])
 
 
