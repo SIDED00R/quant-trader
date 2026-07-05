@@ -125,7 +125,13 @@ if [ -n "$CUR_MT" ] && [ "$CUR_MT" != "e2-small" ]; then
   echo "  머신타입 $CUR_MT → e2-small (stop→resize→start; 틱 수집 잠시 중단)"
   gcloud compute instances stop coin-trader-vm --project $P --zone=$Z --quiet
   gcloud compute instances set-machine-type coin-trader-vm --project $P --zone=$Z --machine-type=e2-small --quiet
-  gcloud compute instances start coin-trader-vm --project $P --zone=$Z --quiet
+  # start는 재시도로 감싼다(set -e 하에서 실패 시 상시 VM이 정지 방치되지 않게 — ZONE 용량 부족 대비)
+  started=""
+  for i in 1 2 3; do
+    if gcloud compute instances start coin-trader-vm --project $P --zone=$Z --quiet; then started=1; break; fi
+    echo "  수집 VM start 재시도 $i (ZONE 용량 등)"; sleep 20
+  done
+  [ -n "$started" ] || echo "🔴 경고: 수집 VM이 정지된 채 남았습니다 — 'gcloud compute instances start coin-trader-vm --zone=$Z' 로 수동 기동 필요(틱 수집 중단 중)."
 fi
 
 echo "SETUP_DONE"

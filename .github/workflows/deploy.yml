@@ -1,4 +1,5 @@
-# main 푸시 → 이미지 병렬 빌드(레지스트리 캐시) → Artifact Registry → 데이터 VM 배포 + 매매 VM 메타데이터 갱신 → 헬스체크.
+# main 푸시 → 이미지 병렬 빌드(레지스트리 캐시) → Artifact Registry → 수집 VM 배포 + 매매 VM 메타데이터 갱신.
+# 배포 검증은 deploy-collector-vm.sh의 이미지 revision(sha) 라벨 대조로 수행(공개 대시보드는 온디맨드라 별도 헬스체크 없음).
 # 인증 = Workload Identity Federation(시크릿 저장 없음). 1회 인프라 셋업 = infra/setup-cicd.sh.
 name: deploy
 
@@ -19,7 +20,6 @@ env:
   PROJECT: coin-auto-trader-jvfhgq
   ZONE: us-central1-a
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
-  SITE_URL: https://jh-quantlab.duckdns.org
 
 jobs:
   build:
@@ -62,8 +62,8 @@ jobs:
           cache-from: type=registry,ref=${{ env.AR }}/${{ matrix.name }}:buildcache
           cache-to: type=registry,ref=${{ env.AR }}/${{ matrix.name }}:buildcache,mode=max
 
-  # 데이터 VM: git reset 후 pull+up (deploy-data-vm.sh가 sha 라벨 검증까지 수행)
-  deploy-data-vm:
+  # 수집 VM: git reset 후 collector 프로파일 pull+up (deploy-collector-vm.sh가 sha 라벨 검증까지 수행)
+  deploy-collector-vm:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +77,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             gcloud compute ssh coin-trader-vm --project "$PROJECT" --zone "$ZONE" --quiet --ssh-key-expire-after=10m \
-              --command "sudo bash -c 'export GIT_SSH_COMMAND=\"ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; git -C /opt/coin-auto-trader fetch origin main && git -C /opt/coin-auto-trader reset --hard origin/main && bash /opt/coin-auto-trader/infra/deploy-data-vm.sh ${{ github.sha }}'" && exit 0
+              --command "sudo bash -c 'export GIT_SSH_COMMAND=\"ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; git -C /opt/coin-auto-trader fetch origin main && git -C /opt/coin-auto-trader reset --hard origin/main && bash /opt/coin-auto-trader/infra/deploy-collector-vm.sh ${{ github.sha }}'" && exit 0
             echo "ssh 배포 재시도 $i"; sleep 20
           done
           exit 1
@@ -97,16 +97,3 @@ jobs:
       - run: |
           gcloud compute instances add-metadata coin-trade-vm --project "$PROJECT" --zone "$ZONE" \
             --metadata-from-file startup-script=infra/trade-vm-startup.sh
-
-  # 배포 검증: /healthz 의 sha가 방금 배포한 커밋과 일치할 때까지 대기(최대 2분)
-  healthcheck:
-    needs: deploy-data-vm
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          for i in $(seq 1 12); do
-            got=$(curl -fsS "$SITE_URL/healthz" | jq -r .sha || true)
-            if [ "$got" = "${{ github.sha }}" ]; then echo "healthz OK ($got)"; exit 0; fi
-            echo "대기($i): sha=$got"; sleep 10
-          done
-          echo "healthz sha 불일치"; exit 1

@@ -29,8 +29,8 @@ _STABLE = {"RUNNING", "TERMINATED", "SUSPENDED"}
 _BUSY_MSG = "⏳ VM 상태 전환 중입니다. 잠시 후 /status 로 확인하세요."
 _HELP = (
     "🖥️ 매매 VM 제어 봇\n"
-    "/start_vm — 매매 VM 기동(부팅 ~1분)\n"
-    "/stop_vm — 매매 VM 정지(비용 절감)\n"
+    "/start_vm — 매매 VM 기동(대시보드 조회 모드; 부팅 후 SSH 터널 안내가 옴)\n"
+    "/stop_vm — 매매 VM 정지(비용 절감·다음 예약 매매 정상화)\n"
     "/status — 현재 상태 확인"
 )
 
@@ -50,6 +50,17 @@ def _start() -> None:
 
 def _stop() -> None:
     _gce().instances().stop(project=PROJECT, zone=ZONE, instance=INSTANCE).execute()
+
+
+def _set_boot_mode(mode: str) -> None:
+    """다음 부팅 모드 설정(metadata vm-boot-mode). startup이 읽어 dashboard(조회)/trade(예약매매) 분기."""
+    inst = _gce().instances().get(project=PROJECT, zone=ZONE, instance=INSTANCE).execute()
+    md = inst.get("metadata", {})
+    items = [i for i in md.get("items", []) if i.get("key") != "vm-boot-mode"]
+    items.append({"key": "vm-boot-mode", "value": mode})
+    _gce().instances().setMetadata(
+        project=PROJECT, zone=ZONE, instance=INSTANCE,
+        body={"fingerprint": md.get("fingerprint"), "items": items}).execute()
 
 
 def _status_msg() -> str:
@@ -77,8 +88,9 @@ def _dispatch(command: str, chat_id) -> None:
             elif st not in _STABLE:
                 _reply(chat_id, _BUSY_MSG)
             else:
+                _set_boot_mode("dashboard")     # 수동 기동=대시보드 조회 모드(매매 잡·poweroff 스킵)
                 _start()
-                _reply(chat_id, "✅ 매매 VM 기동 요청 완료. 부팅에 ~1분 걸립니다. /status 로 확인하세요.")
+                _reply(chat_id, "✅ 매매 VM 대시보드 모드로 기동 요청. 부팅(~1분) 후 SSH 터널 안내가 텔레그램으로 옵니다. 조회 끝나면 /stop_vm.")
         elif command == "/stop_vm":
             st = _state()
             if st == "TERMINATED":
@@ -86,6 +98,7 @@ def _dispatch(command: str, chat_id) -> None:
             elif st not in _STABLE:
                 _reply(chat_id, _BUSY_MSG)
             else:
+                _set_boot_mode("trade")         # 다음 예약 부팅이 정상 매매하도록 리셋
                 _stop()
                 _reply(chat_id, "🛑 매매 VM 정지 요청 완료. 비용이 절감됩니다.")
         elif command == "/status":
