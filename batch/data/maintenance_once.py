@@ -14,7 +14,7 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-from batch.backtest import backfill_stock_daily
+from batch.backtest import selective_stock_backfill
 from batch.backtest.refresh_stock_daily import alive_symbols
 from batch.data import (earnings, factor_returns, finra_short, fundamentals,
                         insider, kr_fundamentals, sec_13f, sec_sector,
@@ -46,7 +46,7 @@ def main(argv=None) -> int:
     year = datetime.now(timezone.utc).year
     syms = _universe()
     steps = [
-        ("일봉 풀 재백필", lambda: backfill_stock_daily.main(["--symbols", ",".join(syms), "--days", str(_DAYS)])),
+        ("일봉 선별 재백필", lambda: selective_stock_backfill.run(syms, _DAYS)),
         ("EDGAR 펀더멘털", lambda: fundamentals.main(["--fetch"])),
         ("13F 기관보유", lambda: sec_13f.main(["--start-year", str(year)])),
         ("SIC 섹터", lambda: sec_sector.main([])),
