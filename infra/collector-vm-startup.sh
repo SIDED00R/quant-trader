@@ -50,6 +50,14 @@ if [ -n "${KIS_TOKEN:-}" ]; then
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/kis-env 2>/dev/null || true
   if [ -s /tmp/kis-env ]; then grep -v '^KIS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/kis-env > .env 2>/dev/null || true; rm -f /tmp/env.nok /tmp/kis-env; fi
 fi
+# ── telegram-env 주입 (kis-env와 동일 패턴) — 헬스체크(collector-healthcheck.sh) 텔레그램 통보용.
+#    VM SA에 telegram-env secretAccessor 1회 바인딩 필요(DEPLOY.md). 실패해도 진행(통보만 스킵됨).
+if [ -n "${KIS_TOKEN:-}" ]; then
+  curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/telegram-env/versions/latest:access" 2>/dev/null \
+    | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/tg-env 2>/dev/null || true
+  if [ -s /tmp/tg-env ]; then grep -v '^TELEGRAM_' .env > /tmp/env.notg 2>/dev/null || true; cat /tmp/env.notg /tmp/tg-env > .env 2>/dev/null || true; rm -f /tmp/env.notg /tmp/tg-env; fi
+fi
+
 # ── Artifact Registry 로그인 (CI 프리빌드 이미지 pull용 — 실패 시 아래 --build 폴백) ──
 echo "${DK_TOKEN:-}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev || true
 
@@ -59,6 +67,12 @@ docker compose --profile app --profile data --profile batch --profile trade --pr
 # CI 프리빌드 이미지 pull(빠름) — 실패 시 로컬 빌드 폴백(#94/#99 불변식 계승 — 폴백 제거 금지)
 if docker compose --profile collector pull -q; then B=""; else B="--build"; fi
 docker compose --profile collector up -d $B            # db-init(스키마)은 의존성으로 자동 실행
+
+# ── 헬스체크 cron 등록 (30분 주기: 디스크·컨테이너·틱 유입 → 텔레그램) + 주간 도커 정리(빌드캐시·dangling) ──
+# 스택 기동 뒤에 등록 — 부팅 중(down~up 사이) cron 틱이 '컨테이너 다운' 오탐을 내지 않게.
+printf '*/30 * * * * root bash /opt/coin-auto-trader/infra/collector-healthcheck.sh >> /var/log/collector-healthcheck.log 2>&1\n0 3 * * 0 root docker builder prune -af >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1\n' \
+  > /etc/cron.d/collector-healthcheck
+chmod 644 /etc/cron.d/collector-healthcheck
 
 # 틱 아카이브의 candles_1d는 틱 집계로 채워진다(가동 이후부터). 과거 코인 일봉 시딩이 필요하면(1회):
 #   docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
