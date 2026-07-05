@@ -1,5 +1,10 @@
 name: coin-auto-trader   # 레거시 프로젝트명 유지 — 볼륨 prefix(pgdata 등) 보존, 리네임 시 라이브 데이터 고아화
 
+# 도커 로그 로테이션 공통 설정 — 미지정 시 json-file 무제한 누적 → 24/7 수집 VM 디스크 고갈(수집 중단).
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
+
 # 앱 서비스 공통 설정 (profile: app). 컨테이너는 내부 네트워크 호스트로 접속.
 # image: = CI(deploy.yml)가 굽는 Artifact Registry 참조 — VM은 pull, 로컬 dev는 build:가 같은 태그로 빌드.
 x-app: &app
@@ -7,6 +12,7 @@ x-app: &app
   image: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-app:latest
   restart: unless-stopped
   profiles: ["app"]
+  logging: *logging
   environment:
     KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     POSTGRES_HOST: postgres
@@ -68,6 +74,7 @@ x-batch-trade: &batch-trade
   profiles: ["trade"]
   restart: "no"
   network_mode: host
+  logging: *logging
   environment:
     POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
@@ -96,6 +103,7 @@ services:
     image: apache/kafka:3.9.0
     container_name: kafka
     restart: unless-stopped
+    logging: *logging
     ports:
       - "127.0.0.1:9092:9092"   # host(EXTERNAL) → localhost:9092 (루프백만 노출)
     environment:
@@ -126,6 +134,7 @@ services:
   kafka-init:
     image: apache/kafka:3.9.0
     container_name: kafka-init
+    logging: *logging
     depends_on:
       kafka:
         condition: service_healthy
@@ -147,6 +156,7 @@ services:
     image: postgres:16
     container_name: postgres
     restart: unless-stopped
+    logging: *logging
     ports:
       # 기본 loopback 고정 — 매매 VM은 자기완결(로컬 DB)이라 크로스 VM 노출 없음. DB_BIND는 로컬 개발 오버라이드용.
       - "${DB_BIND:-127.0.0.1}:5432:5432"
@@ -167,6 +177,7 @@ services:
     image: clickhouse/clickhouse-server:24.8
     container_name: clickhouse
     restart: unless-stopped
+    logging: *logging
     ports:
       - "${DB_BIND:-127.0.0.1}:8123:8123"   # HTTP. 기본 loopback 고정(매매 VM 자기완결 — 크로스 VM 노출 없음). native 9000 비노출
     environment:
@@ -190,6 +201,7 @@ services:
     image: grafana/grafana:11.2.0
     container_name: grafana
     restart: unless-stopped
+    logging: *logging
     profiles: ["app", "data"]   # collector VM 제외(대시보드 불요 — 메모리 절약)
     depends_on:
       - clickhouse
@@ -299,6 +311,7 @@ services:
     image: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-batch:latest
     profiles: ["batch"]
     restart: "no"
+    logging: *logging
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
@@ -322,6 +335,7 @@ services:
     profiles: ["trade"]
     restart: "no"
     network_mode: host
+    logging: *logging
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
@@ -365,6 +379,7 @@ services:
     image: caddy:2
     container_name: caddy
     restart: unless-stopped
+    logging: *logging
     profiles: ["app", "data"]
     depends_on:
       - api

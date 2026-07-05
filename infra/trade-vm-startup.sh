@@ -17,6 +17,11 @@
 # 루트로 실행. -e 제외(어떤 실패에도 마지막 poweroff까지 도달하도록).
 set -uxo pipefail
 
+# ── 절대 워치독 — 어느 경로가 '행'이어도 90분 뒤 강제 종료(온디맨드 VM 무한 과금 차단) ──
+# shutdown은 systemd(logind) 예약이라 startup-script 유닛이 끝나도 살아남는다(백그라운드 sleep은 reap됨).
+# 정상 경로는 말미 poweroff가 먼저 실행돼 무해. 유지보수(장시간)·대시보드 분기는 아래에서 재조정.
+shutdown -P +90 "trade-vm watchdog: 90분 상한 도달 — 강제 종료" || true
+
 REPO=/opt/coin-auto-trader   # 경로는 기존 VM 유지(.env 등 보존) — 레포명 quant-trader와 무관
 AR=us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 APP_IMG=$AR/quant-trader-app:latest
@@ -113,7 +118,10 @@ $(tail -n 20 "$3" 2>/dev/null)"
 BOOT_MODE=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/vm-boot-mode" 2>/dev/null || true)
 if [ "$BOOT_MODE" = "dashboard" ]; then
   docker compose up -d --no-deps api grafana 2>&1 | tee -a /var/log/trade-boot.log || true
-  (sleep 7200; poweroff) &                              # 종료 잊음 대비 자동 poweroff(2h) — 비용 상한
+  # 종료 잊음 대비 자동 poweroff(2h) — 비용 상한. 워치독(+90)을 취소하고 +120으로 재예약.
+  # (구현 주의: `(sleep 7200; poweroff) &`는 startup 유닛 종료 시 cgroup째 reap돼 미발화 — shutdown 예약 사용)
+  shutdown -c 2>/dev/null || true
+  shutdown -P +120 "dashboard 모드 2h 상한" || true
   docker compose --profile trade run --rm trade-once python -m common.notify_telegram \
     "🖥️ 대시보드 기동 — SSH 터널: gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 후 http://localhost:8000 (끝나면 /stop quant-vm; 미종료 시 2h 뒤 자동 종료)" >/dev/null 2>&1 || true
   echo "DASHBOARD_UP" | tee -a /var/log/trade-boot.log
@@ -129,6 +137,9 @@ case "$BOOT_HOUR" in
     # 데이터 유지보수(매월 첫 토요일 04:00 UTC + 스위퍼 05:00). 스케줄러는 매주 토요일 발화 —
     # 첫 주(1~7일)만 실행해 월간화한다. 토요일 새벽이라 매매 잡과 겹치지 않는다(코인은 01·02시 종료).
     if [ "$BOOT_DOW" -eq 6 ] && [ "$(date -u +%d | sed 's/^0//')" -le 7 ]; then
+      # 월간 풀백필+EDGAR 수집은 90분을 넘을 수 있음 — 워치독을 6h로 재예약(행 방어는 유지)
+      shutdown -c 2>/dev/null || true
+      shutdown -P +360 "maintenance watchdog: 6h 상한" || true
       docker compose --profile trade run $(build_flag maintenance-once "$BATCH_IMG") --rm maintenance-once 2>&1 | tee -a /var/log/maintenance.log
       notify_fail "데이터 유지보수" "${PIPESTATUS[0]}" /var/log/maintenance.log
     fi

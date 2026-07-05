@@ -1,3 +1,7 @@
+-- 원시 틱은 TTL 180일 — 집계(candles_1m/1d)가 영구본이고 원시분은 인트라데이 연구·재집계용이라
+-- 반년 보존이면 충분. 무TTL이면 24/7 수집 VM(30GB)이 디스크풀 → 수집 중단으로 간다.
+-- ⚠ TTL은 CREATE에만 있어 신규 설치 전용. 기존(라이브) 테이블은 DEPLOY.md 런북의 1회 ALTER로 적용
+--   (init_db가 이 파일을 매 부팅 재실행하므로 ALTER MODIFY TTL을 여기 두면 매번 재물질화됨 — 금지).
 CREATE TABLE IF NOT EXISTS ticks (
     symbol     LowCardinality(String),
     price      Float64,
@@ -8,7 +12,8 @@ CREATE TABLE IF NOT EXISTS ticks (
     ingest_ts  DateTime64(3, 'UTC') DEFAULT now64(3)
 )
 ENGINE = ReplacingMergeTree(ingest_ts)
-ORDER BY (symbol, seq);
+ORDER BY (symbol, seq)
+TTL toDateTime(trade_ts) + INTERVAL 180 DAY;
 
 CREATE TABLE IF NOT EXISTS stock_ticks (
     symbol     LowCardinality(String),
@@ -20,7 +25,8 @@ CREATE TABLE IF NOT EXISTS stock_ticks (
     ingest_ts  DateTime64(3, 'UTC') DEFAULT now64(3)
 )
 ENGINE = ReplacingMergeTree(ingest_ts)
-ORDER BY (symbol, seq);
+ORDER BY (symbol, seq)
+TTL toDateTime(trade_ts) + INTERVAL 180 DAY;
 
 CREATE TABLE IF NOT EXISTS candles_1m (
     symbol        LowCardinality(String),

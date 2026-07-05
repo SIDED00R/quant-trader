@@ -196,6 +196,26 @@ infra/terraform/
   gcloud secrets add-iam-policy-binding dart-env --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"
   ```
 - **정기 데이터 유지보수(`maintenance-once`, #204)**: 매매 전 증분 갱신(14일)이 다루지 못하는 수정주가 기준 재조정·분기 공시 반영을 매월 첫 토요일 04:00 UTC에 1회 실행한다(활성 유니버스 일봉 선별 재백필(재조정/데이터갭 종목만) + EDGAR·13F·SIC·DART 수집기 재실행). 단계별 격리 + 텔레그램 통보.
+- **원시 틱 TTL 180일 — 기존(라이브) 테이블 1회 ALTER 런북**: 스키마의 TTL은 신규 설치 전용(`db/clickhouse_schema.sql` 주석 — init_db가 매 부팅 재실행하므로 ALTER를 스키마에 넣으면 매번 재물질화). 수집 VM에 1회 적용:
+  ```bash
+  gcloud compute ssh coin-trader-vm --zone=us-central1-a --command \
+   "cd /opt/coin-auto-trader && P=\$(sudo grep -E '^CLICKHOUSE_PASSWORD=' .env | cut -d= -f2-); \
+    for T in ticks stock_ticks; do sudo docker exec clickhouse clickhouse-client --password \"\${P:-ch_pw}\" \
+      -q \"ALTER TABLE coin_analytics.\$T MODIFY TTL toDateTime(trade_ts) + INTERVAL 180 DAY\"; done"
+  # 확인: SELECT name, engine_full FROM system.tables WHERE database='coin_analytics' AND name IN ('ticks','stock_ticks')
+  # 테이블 나이 < 180일인 지금 실행하면 만료 0행이라 재물질화 부하도 사실상 없음.
+  # (매매 VM 로컬 ticks 테이블은 비어 있어 무관 — 다음 재생성 시 스키마 TTL이 자연 적용)
+  ```
+- **수집 VM 헬스체크(`infra/collector-healthcheck.sh`) 활성화**: cron(30분)이 디스크(≥80%)·필수 컨테이너 다운·틱 유입 정지(코인 24/7, 주식 KRX 장중)를 검사해 텔레그램 통보(검사키별 6h 쿨다운, 회복 시 재무장). 1회 셋업:
+  ```bash
+  # ① 수집 VM SA에 telegram-env 접근 허용(주입은 startup이 수행)
+  gcloud secrets add-iam-policy-binding telegram-env --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"
+  # ② 이미 켜져 있는 VM에 즉시 적용(다음 부팅부터는 startup이 자동): SSH로 startup 스크립트 재실행 또는
+  #    git pull 후 cron 파일만 수동 설치 + telegram-env를 .env에 수동 병합
+  # 드라이런: sudo DISK_MAX=1 bash infra/collector-healthcheck.sh → 🟠 수신 확인, 재실행 시 쿨다운 억제 확인,
+  #           sudo rm /var/tmp/collector-healthcheck.state 로 리셋
+  ```
+- **매매 VM 절대 워치독**: startup 시작 직후 `shutdown -P +90`(유지보수 분기 +360, 대시보드 +120으로 재예약) — 어떤 단계가 행이어도 과금 상한. 정상 경로는 말미 `poweroff`가 선행돼 무해.
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
   1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.
   2. 활성 유니버스 전체 재백필(수정주가 기준 통일):
