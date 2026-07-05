@@ -50,7 +50,8 @@ else
 fi
 
 # 3) 틱 유입 신선도 (ClickHouse max(ingest_ts) 지연) — 코인 24/7, 주식은 KRX 장중(평일 00:15~06:30 UTC)만
-CHPW=$(grep -E '^CLICKHOUSE_PASSWORD=' .env 2>/dev/null | cut -d= -f2-)
+# 인라인 주석·후행공백 제거 필수 — compose는 벗겨서 쓰므로 grep 원문을 쓰면 AUTHENTICATION_FAILED(#236)
+CHPW=$(grep -E '^CLICKHOUSE_PASSWORD=' .env 2>/dev/null | cut -d= -f2- | sed 's/[[:space:]]*#.*//; s/[[:space:]]*$//')
 lag() {
   docker exec clickhouse clickhouse-client --password "${CHPW:-ch_pw}" -q \
     "SELECT toInt64(dateDiff('second', max(ingest_ts), now64(3))) FROM coin_analytics.$1" 2>/dev/null
