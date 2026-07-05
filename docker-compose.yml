@@ -54,7 +54,7 @@ x-app: &app
       condition: service_completed_successfully
 
 # 온디맨드 주식 매매 공통 설정 (profile: trade — 매매 VM, batch 이미지). KR/US가 command만 다름.
-# DB 접근=SSH 터널 + network_mode:host(127.0.0.1). KIS 자격증명은 VM .env 주입.
+# DB 접근=매매 VM 로컬 postgres/clickhouse(127.0.0.1) + network_mode:host(자기완결, 크로스VM 터널 없음). KIS 자격증명은 VM .env 주입.
 x-batch-trade: &batch-trade
   build:
     context: .
@@ -180,6 +180,7 @@ services:
     image: grafana/grafana:11.2.0
     container_name: grafana
     restart: unless-stopped
+    profiles: ["app", "data"]   # collector VM 제외(대시보드 불요 — 메모리 절약)
     depends_on:
       - clickhouse
       - postgres
@@ -205,7 +206,7 @@ services:
   db-init:
     <<: *app
     container_name: db-init
-    profiles: ["app", "data"]    # 데이터 VM도 스키마(pg/ch) 필요
+    profiles: ["app", "data", "collector"]    # 데이터 VM·수집 VM 모두 스키마(pg/ch) 필요
     command: python -m scripts.init_db
     restart: "no"
     depends_on:
@@ -217,38 +218,38 @@ services:
   ingester:
     <<: *app
     container_name: ingester
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.ingester.upbit_ws
 
   sink:
     <<: *app
     container_name: sink
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.sink.tick_clickhouse
 
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
     <<: *app
     container_name: stock-ingester
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.ingester.stock_kiwoom
 
   stock-sink:
     <<: *app
     container_name: stock-sink
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.sink.stock_tick_clickhouse
 
   candle:
     <<: *app
     container_name: candle
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.aggregator.candle
 
   daily-aggregator:
     <<: *app
     container_name: daily-aggregator
-    profiles: ["app", "data"]
+    profiles: ["app", "data", "collector"]
     command: python -m streaming.aggregator.daily        # candles_1m → candles_1d 일봉 리샘플(매일 최신화)
 
   engine:
@@ -301,9 +302,9 @@ services:
     command: python -m batch.backtest.reeval_weights
 
   # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
-  # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=SSH 터널:
-  # 매매 VM 호스트가 데이터 VM으로 -L 5432/8123 터널을 열고, network_mode:host로 컨테이너가 127.0.0.1(터널)에 접속.
-  # (사설IP 직접노출 대신 터널 — DB는 데이터 VM에서 loopback 유지). depends_on 없음(원격 DB).
+  # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=매매 VM 로컬 postgres/clickhouse(127.0.0.1):
+  # startup이 로컬 DB를 먼저 기동(자기완결, 크로스VM 터널 없음), network_mode:host로 컨테이너가 127.0.0.1에 접속.
+  # depends_on 없음(startup이 로컬 DB 기동·스키마를 선행).
   trade-once:
     image: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-app:latest
     build: .

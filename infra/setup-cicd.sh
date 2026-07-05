@@ -2,8 +2,9 @@
 # CI/CD·스케줄러 1회 셋업 (멱등 — 재실행 안전). 소유자 gcloud 자격증명으로 로컬에서 실행:
 #   bash infra/setup-cicd.sh
 # 구성: API 활성화 → Artifact Registry(+정리정책) → WIF(github-pool/provider) → 배포 SA+최소권한
-#       → VM SA에 AR reader → 모니터링(이메일 채널+기동실패 알림) → 매매 스케줄러 8잡 upsert
-#       → 매매 VM 메타데이터 즉시 반영.
+#       → VM SA에 AR reader → 모니터링(이메일 채널+기동실패 알림)
+#       → 매매 스케줄러 8잡 upsert → 매매·수집 VM 메타데이터 반영(수집 VM은 최초 1회 e2-small 축소).
+# 참고: 매매 VM on/off·대시보드 모드는 별도 프로젝트(gcp-cost-controller)가 cross-project로 제어(여기선 IAM 부여 안 함).
 set -euo pipefail
 
 P=coin-auto-trader-jvfhgq
@@ -112,5 +113,22 @@ upsert trade-vm-maintenance-sweep "0 5 * * 6"     "Etc/UTC"
 echo "── 9. 매매 VM 메타데이터 즉시 반영 (새 KR 잡이 구 분기표로 발화하는 일 방지)"
 gcloud compute instances add-metadata coin-trade-vm --project $P --zone=$Z \
   --metadata-from-file startup-script="$(dirname "$0")/trade-vm-startup.sh" --quiet
+
+echo "── 10. 수집 VM(coin-trader-vm) 메타데이터(collector startup) + e2-small 축소(최초 1회만 stop/resize/start; 이미 small이면 no-op)"
+gcloud compute instances add-metadata coin-trader-vm --project $P --zone=$Z \
+  --metadata-from-file startup-script="$(dirname "$0")/collector-vm-startup.sh" --quiet
+CUR_MT=$(gcloud compute instances describe coin-trader-vm --project $P --zone=$Z --format='value(machineType.scope(machineTypes))' 2>/dev/null || true)
+if [ -n "$CUR_MT" ] && [ "$CUR_MT" != "e2-small" ]; then
+  echo "  머신타입 $CUR_MT → e2-small (stop→resize→start; 틱 수집 잠시 중단)"
+  gcloud compute instances stop coin-trader-vm --project $P --zone=$Z --quiet
+  gcloud compute instances set-machine-type coin-trader-vm --project $P --zone=$Z --machine-type=e2-small --quiet
+  # start는 재시도로 감싼다(set -e 하에서 실패 시 상시 VM이 정지 방치되지 않게 — ZONE 용량 부족 대비)
+  started=""
+  for i in 1 2 3; do
+    if gcloud compute instances start coin-trader-vm --project $P --zone=$Z --quiet; then started=1; break; fi
+    echo "  수집 VM start 재시도 $i (ZONE 용량 등)"; sleep 20
+  done
+  [ -n "$started" ] || echo "🔴 경고: 수집 VM이 정지된 채 남았습니다 — 'gcloud compute instances start coin-trader-vm --zone=$Z' 로 수동 기동 필요(틱 수집 중단 중)."
+fi
 
 echo "SETUP_DONE"

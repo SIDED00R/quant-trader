@@ -2,7 +2,7 @@
 
 온디맨드 매매 VM이 부팅 시 1회 실행한다. 스트리밍(commander/engine/portfolio 상시) 대신,
 candles_1d·포지션을 읽어 부하 합성 목표비중을 산출하고 주문→체결을 **동기**로 처리(Kafka 불요) 후 끝낸다.
-일봉 저빈도 매매라 배치가 자연스럽다. 원격 DB는 env(CLICKHOUSE_HOST/POSTGRES_HOST)로 데이터 VM을 가리킨다.
+일봉 저빈도 매매라 배치가 자연스럽다. DB는 매매 VM 로컬(env CLICKHOUSE_HOST/POSTGRES_HOST 기본 127.0.0.1) — startup이 선기동.
 
 순수 결정부 plan_decisions는 테스트 가능(매매·유지 전부를 사유와 함께 산출). 체결·상태 갱신은 검증된
 portfolio.apply_execution을 재사용한다. 매 실행의 결정은 trade_decisions에 기록(대시보드 '매매 결정 기록' 탭).
@@ -18,10 +18,10 @@ from psycopg.types.json import Jsonb
 
 from common import notify_telegram
 from common.candles import daily_candles
-from common.clickhouse_client import create_client
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
+from common.upbit_ticker import latest_prices
 from trading.portfolio.updater import apply_execution
 from trading.strategy.commander import combined_for_bar, decide
 from trading.strategy.decision_record import classify
@@ -58,12 +58,6 @@ def equity(cash_amt: Decimal, pos: dict, prices: dict) -> Decimal:
         if p:
             eq += qty * p
     return eq
-
-
-def latest_prices(ch_client) -> dict:
-    res = ch_client.query(
-        "SELECT symbol, argMax(price, seq) FROM ticks WHERE trade_ts > now() - INTERVAL 1 HOUR GROUP BY symbol")
-    return {r[0]: Decimal(str(r[1])) for r in res.result_rows}
 
 
 def compute_targets() -> dict:
@@ -172,10 +166,9 @@ def run(dry_run: bool = False) -> int:
     종료코드: 0=정상 / 70=거부 발생 또는 오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
     """
     open_pool()
-    ch = create_client()
     rejected = 0
     try:
-        prices = latest_prices(ch)
+        prices = latest_prices(ENSEMBLE_SYMBOLS)   # 업비트 REST 현재가(틱 DB 비의존 — 수집 VM과 디커플링)
         analysis = compute_targets()
         band = float(ENSEMBLE_REBALANCE_BAND)
         accts = enabled_accounts()
