@@ -76,6 +76,7 @@ def _zip_urls(client: httpx.Client, start_year: int) -> list:
 
 def _fetch_zip(url: str, client: httpx.Client):
     """분기 ZIP을 캐시에서 또는 다운로드. 손상 캐시는 재다운로드. (zf, infotable_member) 반환."""
+    os.makedirs(_CACHE, exist_ok=True)   # 신선 환경(부트스트랩 _cusip_to_ticker 전에 호출) 대응
     fn = url.split("/")[-1]
     fp = os.path.join(_CACHE, fn)
     for attempt in (1, 2):

@@ -15,5 +15,6 @@ def load_json(path: str, default=None):
 
 
 def dump_json(path: str, obj) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)   # 신선 환경(캐시 디렉터리 부재) 대응
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
