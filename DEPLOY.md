@@ -20,7 +20,7 @@
 > - **대시보드(온디맨드)**: 계좌/주문 Postgres가 매매 VM에 있어 대시보드도 그 VM 상주. 별도 **gcp-cost-controller**(텔레그램)에서 `/start quant-vm`(대시보드 모드) → SSH 터널 조회(`gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000`) → `/stop quant-vm`(미종료 시 2h 자동 종료). 상시 공개 URL 없음(비용 절감 위해 온디맨드화).
 > - **라이브 매매 경로**: `trade_once`(동기 배치). 스트리밍 `commander`/`engine`/`portfolio`는 코드로만 존재(로컬 dev). **Kafka는 데이터 팬아웃만**(매매 미사용).
 > - **데이터**: ClickHouse candles_1d(BTC/ETH 2019-11~) + 전 KRW 마켓 틱 상시 수집. **모의 거래**(실거래 API 없음) — 코인 가상잔고 ₩10M, 주식 KIS 모의계좌(KR ₩10M·US $100k). 모델 출처 = `docs/model.md`.
-> - **상시 비용 ~$24 → ~$13/월** (e2-medium 풀스택 → e2-small 틱 수집 VM + 온디맨드 매매/대시보드로 분리).
+> - **상시 비용 ~$66 → ~$13/월** (단일 상시 VM 풀스택 → e2-small 틱 수집 VM + 온디맨드 매매/대시보드로 분리).
 
 ---
 
