@@ -118,18 +118,37 @@ $(tail -n 20 "$3" 2>/dev/null)"
 }
 
 # ── 대시보드 모드 (gcp-cost-controller가 /start quant-vm 시 metadata vm-boot-mode=dashboard 설정) ──
-# 수동 조회용: 로컬 DB는 위에서 이미 기동. api/grafana만 올리고(--no-deps로 kafka 불요) 매매·즉시 poweroff 스킵.
-# 접속은 SSH 터널(공개 IP/방화벽/인증서 불요): gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 → http://localhost:8000
+# 수동 조회용: 로컬 DB는 위에서 이미 기동. api/grafana(+공개 시 caddy)만 올리고 매매·즉시 poweroff 스킵.
+# 접속 2가지: ① 공개 HTTPS — web-env(SITE_ADDRESS·OAuth) 주입 시 Caddy가 https://<도메인> 자동발급·서비스(구글 OAuth 보호).
+#           ② SSH 터널(공개 미설정 폴백): gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 → http://localhost:8000
 # 종료 잊음 대비 2시간 뒤 자동 poweroff(비용 상한). 정상 종료는 컨트롤러 /stop quant-vm.
 BOOT_MODE=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/vm-boot-mode" 2>/dev/null || true)
 if [ "$BOOT_MODE" = "dashboard" ]; then
-  docker compose up -d --no-deps api grafana 2>&1 | tee -a /var/log/trade-boot.log || true
+  # 공개 대시보드 자격증명 주입 (web-env → SITE_ADDRESS·GOOGLE_CLIENT_ID/SECRET·ALLOWED_EMAILS·SESSION_SECRET).
+  # 있으면 api가 OAuth 활성(https_only 쿠키)·Caddy가 그 도메인으로 HTTPS 발급. 미설정/실패면 루프백 SSH 터널만.
+  if [ -n "${KIS_TOKEN:-}" ]; then
+    curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/web-env/versions/latest:access" 2>/dev/null \
+      | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/web-env 2>/dev/null || true
+    if [ -s /tmp/web-env ]; then
+      grep -vE '^(SITE_ADDRESS|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|ALLOWED_EMAILS|SESSION_SECRET)=' .env > /tmp/env.noweb 2>/dev/null || true
+      cat /tmp/env.noweb /tmp/web-env > .env 2>/dev/null || true
+      rm -f /tmp/env.noweb /tmp/web-env
+    fi
+  fi
+  # 공개 HTTPS(Caddy)는 SITE_ADDRESS·GOOGLE_CLIENT_ID 둘 다 있을 때만 — 무인증 대시보드가 공개포트에 뜨는 것 방지.
+  DASH_SVCS="api grafana"
+  if grep -qE '^SITE_ADDRESS=.+' .env 2>/dev/null && grep -qE '^GOOGLE_CLIENT_ID=.+' .env 2>/dev/null; then
+    DASH_SVCS="$DASH_SVCS caddy"
+  fi
+  docker compose up -d --no-deps $DASH_SVCS 2>&1 | tee -a /var/log/trade-boot.log || true
   # 종료 잊음 대비 자동 poweroff(2h) — 비용 상한. 워치독(+90)을 취소하고 +120으로 재예약.
   # (구현 주의: `(sleep 7200; poweroff) &`는 startup 유닛 종료 시 cgroup째 reap돼 미발화 — shutdown 예약 사용)
   shutdown -c 2>/dev/null || true
   shutdown -P +120 "dashboard 모드 2h 상한" || true
+  DASH_MSG="🖥️ 대시보드 기동 — SSH 터널: gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 후 http://localhost:8000"
+  case " $DASH_SVCS " in *" caddy "*) DASH_MSG="🖥️ 대시보드 기동 — https://$(grep -E '^SITE_ADDRESS=' .env | cut -d= -f2-) (구글 OAuth 로그인)" ;; esac
   docker compose --profile trade run --rm trade-once python -m common.notify_telegram \
-    "🖥️ 대시보드 기동 — SSH 터널: gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000 후 http://localhost:8000 (끝나면 /stop quant-vm; 미종료 시 2h 뒤 자동 종료)" >/dev/null 2>&1 || true
+    "$DASH_MSG (끝나면 /stop quant-vm; 미종료 시 2h 뒤 자동 종료)" >/dev/null 2>&1 || true
   echo "DASHBOARD_UP" | tee -a /var/log/trade-boot.log
   exit 0
 fi
