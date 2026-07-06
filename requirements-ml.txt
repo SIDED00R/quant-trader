@@ -3,6 +3,7 @@
 # 설치: .venv/Scripts/python -m pip install -r requirements-ml.txt
 pandas>=2.0
 numpy>=1.26
+scikit-learn>=1.4  # lightgbm sklearn API(LGBMRanker/LGBMRegressor) 런타임 필수 — lightgbm 4.x는 하드 의존 아님(제거 금지)
 lightgbm>=4.0
 pykrx>=1.2.8        # KRX 데이터(외국인 수급·공매도·KR PIT) — 1.2.8+ 로그인(KRX_ID/KRX_PW) 지원
 setuptools<81      # Py3.13+setuptools81+ 는 pkg_resources 제거 → pykrx import 깨짐(pin 필수)
