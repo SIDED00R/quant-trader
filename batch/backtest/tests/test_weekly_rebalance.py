@@ -38,6 +38,23 @@ class TestCompleted(unittest.TestCase):
         # 랭킹 산출 실패(데이터 결손) → 미완료 → 그 주 마커 안 남기고 재시도
         self.assertFalse(completed({"targets": [], "buys": []}, []))
 
+    def test_sells_ignored_by_default(self):
+        # US(기본값): sells는 발주 안 하므로 buys 없으면 체결 없어도 완료 — 회귀 고정
+        self.assertTrue(completed({"targets": ["AAPL"], "buys": [], "sells": ["MSFT"]}, []))
+
+    def test_rebalance_sells_requires_fill(self):
+        # KR(rebalance_sells=True): 이탈 매도만 있어도 '할 일' — 매도 체결돼야 완료
+        plan = {"targets": ["AAPL"], "buys": [], "sells": ["MSFT"]}
+        self.assertFalse(completed(plan, [{"symbol": "MSFT", "side": "SELL", "filled": False}],
+                                   rebalance_sells=True))
+        self.assertTrue(completed(plan, [{"symbol": "MSFT", "side": "SELL", "filled": True}],
+                                  rebalance_sells=True))
+
+    def test_rebalance_sells_nothing_to_do(self):
+        # KR: buys·sells 모두 없음 = 이미 목표 정렬 → 완료
+        self.assertTrue(completed({"targets": ["AAPL"], "buys": [], "sells": []}, [],
+                                  rebalance_sells=True))
+
 
 class TestMarketHoliday(unittest.TestCase):
     def test_us_holiday(self):
