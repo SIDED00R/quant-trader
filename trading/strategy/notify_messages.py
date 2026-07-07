@@ -18,7 +18,8 @@ def _header(market_label: str, dry_run: bool = False) -> str:
 def stock_message(market_label: str, r: dict, live: bool) -> str:
     """KR/US 주간 리밸런싱 결과 문안. r = execute() 반환 dict(bar/cash/targets/buys/sells/placed/skipped).
 
-    KR placed 항목은 accepted/msg/filled/filled_qty, US는 status/attempts 추가 — .get()으로 공용 처리.
+    KR placed 항목은 side(BUY|SELL)·accepted/msg/filled/filled_qty, US는 status/attempts 추가 —
+    .get()으로 공용 처리(side 미지정=매수).
     """
     lines = [_header(market_label, dry_run=not live)]
     lines.append(f"bar={r.get('bar')} 타깃 {len(r.get('targets') or [])}종목 / "
@@ -33,27 +34,26 @@ def stock_message(market_label: str, r: dict, live: bool) -> str:
         lines.append("매매하지 않음 — 모델 실행됐으나 유효 종목 없음(주간 마커 미기록, 다음 평일 재시도)")
         return "\n".join(lines)
     placed = r.get("placed") or []
-    if not r.get("buys"):
+    if not placed:                       # 발주 자체가 없음(buys·발주 대상 sells 없음) = 이미 목표 보유
         lines.append("매매하지 않음 — 이미 목표 정렬(이번주 완료 기록)")
         return "\n".join(lines)
     accepted = sum(1 for o in placed if o.get("accepted"))
     filled = sum(1 for o in placed if o.get("filled"))
     for o in placed:
         sym, qty = o.get("symbol"), o.get("qty", 0)
+        side = "매도" if o.get("side") == "SELL" else "매수"
         if o.get("error"):
-            lines.append(f"· {sym} {qty}주 — 오류: {o['error']}")
+            lines.append(f"· {side} {sym} {qty}주 — 오류: {o['error']}")
         elif not o.get("accepted"):
-            lines.append(f"· {sym} — 거부/스킵: {o.get('msg') or o.get('status') or '사유 미상'}")
+            lines.append(f"· {side} {sym} — 거부/스킵: {o.get('msg') or o.get('status') or '사유 미상'}")
         elif o.get("filled"):
-            lines.append(f"· {sym} {qty}주 — 체결 {o.get('filled_qty', 0)}주"
+            lines.append(f"· {side} {sym} {qty}주 — 체결 {o.get('filled_qty', 0)}주"
                          + (f" (시도 {o['attempts']}회)" if o.get("attempts") else ""))
         else:
-            lines.append(f"· {sym} {qty}주 — 접수(미체결)")
+            lines.append(f"· {side} {sym} {qty}주 — 접수(미체결)")
     lines.append(f"요약: 접수 {accepted}건 / 체결 {filled}건 · 주문 전 현금 {r.get('cash', 0):,.0f}")
-    if placed and filled == 0:
+    if filled == 0:
         lines.append("체결 0건 — 주간 마커 미기록, 다음 평일 재시도")
-    elif not placed:
-        lines.append("매매하지 않음 — 주문 대상 없음")
     return "\n".join(lines)
 
 

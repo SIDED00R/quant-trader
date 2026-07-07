@@ -40,6 +40,25 @@ class TestStockMessage(unittest.TestCase):
         self.assertIn("접수(미체결)", m)
         self.assertIn("거부/스킵", m)
 
+    def test_sell_and_buy_lines_labeled(self):
+        placed = [
+            {"symbol": "031980", "side": "SELL", "qty": 5, "accepted": True, "filled": True, "filled_qty": 5},
+            {"symbol": "005930", "side": "BUY", "qty": 3, "accepted": True, "filled": True, "filled_qty": 3},
+        ]
+        m = stock_message("KR 주식", _r(buys=["005930"], sells=["031980"], placed=placed), live=True)
+        self.assertIn("매도 031980 5주 — 체결 5주", m)
+        self.assertIn("매수 005930 3주 — 체결 3주", m)
+        self.assertIn("접수 2건 / 체결 2건", m)
+
+    def test_sells_only_listed_not_aligned(self):
+        # 매수 없이 이탈 매도만 발주된 주 — '이미 목표 정렬'이 아니라 주문 목록 표시
+        placed = [{"symbol": "031980", "side": "SELL", "qty": 5, "accepted": True,
+                   "filled": False, "filled_qty": 0}]
+        m = stock_message("KR 주식", _r(buys=[], sells=["031980"], placed=placed), live=True)
+        self.assertNotIn("이미 목표 정렬", m)
+        self.assertIn("매도 031980 5주 — 접수(미체결)", m)
+        self.assertIn("체결 0건", m)
+
     def test_zero_fills_notes_retry(self):
         placed = [{"symbol": "005930", "qty": 3, "accepted": True, "filled": False, "filled_qty": 0}]
         m = stock_message("US 주식", _r(buys=["005930"], placed=placed), live=True)
