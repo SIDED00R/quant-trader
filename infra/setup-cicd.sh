@@ -105,8 +105,8 @@ upsert trade-vm-daily          "0 1 * * *"     "Etc/UTC"            # 코인 (KS
 upsert trade-vm-daily-sweep    "0 2 * * *"     "Etc/UTC"
 upsert trade-vm-kr-close       "0 15 * * 1-5"  "Asia/Seoul"         # KR 마감 30분 전
 upsert trade-vm-kr-close-sweep "10 15 * * 1-5" "Asia/Seoul"
-upsert trade-vm-us-close       "30 15 * * 1-5" "America/New_York"   # US 마감 30분 전(DST 자동)
-upsert trade-vm-us-close-sweep "45 15 * * 1-5" "America/New_York"
+upsert trade-vm-us-close       "0 15 * * 1-5"  "America/New_York"   # US 마감 1시간 전(15:00 ET — 부팅 지연 ~30분 흡수→주문 마감 30분 전 도달; DST 자동)
+upsert trade-vm-us-close-sweep "15 15 * * 1-5" "America/New_York"
 upsert trade-vm-maintenance       "0 4 * * 6"     "Etc/UTC"            # 데이터 유지보수(매주 토 발화, 첫 주 가드는 startup이 담당)
 upsert trade-vm-maintenance-sweep "0 5 * * 6"     "Etc/UTC"
 

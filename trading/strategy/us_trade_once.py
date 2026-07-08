@@ -9,18 +9,21 @@ KR판(stock_trade_once)의 US 대응. 차이: USD 통화·해외 잔고(us_balan
 import argparse
 import sys
 import traceback
+from datetime import datetime, timezone
 
 from batch.backtest.refresh_stock_daily import refresh
 from common import kis_balance, notify_telegram
 from common.kis_chase import place_and_chase
 from common.kis_overseas_price import price_and_exchange
 from common.market_holidays import market_today
+from common.market_hours import market_open, market_seconds_to_close
 from common.stock_price import latest_closes
 from trading.strategy.notify_messages import error_message, stock_message
 from trading.strategy.stock_trade_common import build_plan, skip_result, weekly_guard
 from trading.strategy.weekly_marker import completed, mark_week_done
 
 _BUFFER = 1.02   # 동일가중 수량 산정용 1차 지정가 버퍼(kis_chase의 1차 BUY 버퍼와 동일)
+_MIN_SECONDS_TO_CLOSE = 300   # 정규장 마감까지 이 이하로 남으면 발주 스킵(부분 거부 방지 — 다음 평일 재시도)
 
 
 def plan(top_n: int = 20, macro: bool = False) -> dict:
@@ -35,6 +38,12 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
     reason = weekly_guard("US")                  # 가드 먼저 — 휴장·완료 주엔 스코어링·토스 호출 안 함
     if reason:
         return skip_result(reason)
+    now = datetime.now(timezone.utc)             # 정규장 세션 가드 — 마감 도달분 거부(REJECTED)·부분체결 후 마커 트랩 방지
+    if not market_open("US", now):
+        return skip_result("US 정규장 아님 — 다음 평일 재시도")
+    ttc = market_seconds_to_close("US", now)
+    if ttc is not None and ttc < _MIN_SECONDS_TO_CLOSE:
+        return skip_result(f"US 마감 임박({ttc:.0f}s) — 다음 평일 재시도")
     refresh(["US"], log=print)                   # 일봉 증분 갱신(종목별 격리 — 부분 실패는 신선도 게이트가 방어)
     p = plan(top_n=top_n, macro=macro)
     today = market_today("US")
@@ -58,8 +67,9 @@ def execute(top_n: int = 20, macro: bool = False, live: bool = False, max_orders
                            "msg": f"수량<1 (가격 {limit} > 목표 {per:,.0f})"})
             continue
         r = place_and_chase("US", sym, "BUY", qty, ref_price=ref, exchange=exch or "NASD")
+        rej = r["attempts"][0].get("error") if r["status"] == "REJECTED" and r["attempts"] else None
         placed.append({"symbol": sym, "qty": qty, "status": r["status"], "attempts": r["attempts"],
-                       "accepted": r["status"] != "REJECTED",
+                       "accepted": r["status"] != "REJECTED", "msg": rej,   # 거부 시 실제 KIS 사유(msg_cd/msg1) 노출
                        "filled_qty": r["filled_qty"], "filled": r["filled_qty"] > 0})
     if completed(p, placed):                                # 체결됨(또는 매수할 것 없음) → 그 주 완료 기록
         mark_week_done("US", today)

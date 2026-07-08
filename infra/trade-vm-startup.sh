@@ -5,7 +5,7 @@
 # 분기표(스케줄러와 정합):
 #   UTC 04·05    → 데이터 유지보수(maintenance-once) ← 매월 첫 토요일 04:00 UTC + 스위퍼 05:00(월간화는 startup이 날짜 가드)
 #   UTC 06·07    → KR 주식(stock-trade-once)  ← kr-close 15:00 KST + sweep 15:10 KST (06:00/06:10 UTC, 평일)
-#   UTC 19·20·21 → US 주식(us-trade-once)     ← us-close 15:30 ET + sweep 15:45 ET (EDT 19:30/45·EST 20:30/45, 평일)
+#   UTC 19·20·21 → US 주식(us-trade-once)     ← us-close 15:00 ET + sweep 15:15 ET (EDT 19:00/15·EST 20:00/15, 평일)
 #   그 외(01·02) → 코인(trade-once)           ← daily 01:00 + sweep 02:00 UTC (매일)
 #   (07·21은 부팅지연 여유. 임의 시각 수동 start는 코인 분기 — 목표 수렴형이라 무해)
 # 스위퍼 = 존 용량 부족(ZONE_RESOURCE_POOL_EXHAUSTED) 등 기동 실패 재시도. 이중 실행은 멱등:
@@ -177,7 +177,7 @@ case "$BOOT_HOUR" in
     fi
     ;;
   19|20|21)
-    # US 마감 30분 전(15:30 ET; EDT 19:30/EST 20:30 UTC 발화 → hour 19·20, 21은 지연 여유).
+    # US 마감 1시간 전(15:00 ET; EDT 19:00/EST 20:00 UTC 발화 → hour 19·20, 21은 지연 여유). 부팅 지연 흡수→주문 마감 30분 전 도달.
     if [ "$BOOT_DOW" -le 5 ]; then
       docker compose --profile trade run $(build_flag us-trade-once "$BATCH_IMG") --rm us-trade-once 2>&1 | tee -a /var/log/us-trade.log
       notify_fail "US 주식" "${PIPESTATUS[0]}" /var/log/us-trade.log

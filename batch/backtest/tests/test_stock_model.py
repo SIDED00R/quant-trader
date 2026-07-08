@@ -9,7 +9,10 @@ from decimal import Decimal
 from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
-from common.market_hours import asset_class, is_coin, is_market_open, is_stock, periods_per_year
+from common.market_hours import (
+    asset_class, is_coin, is_market_open, is_stock,
+    market_open, market_seconds_to_close, periods_per_year,
+)
 
 UTC = timezone.utc
 
@@ -64,6 +67,33 @@ class TestMarketHours(unittest.TestCase):
 
     def test_us_weekend_closed(self):
         self.assertFalse(is_market_open("AAPL", datetime(2026, 6, 27, 14, 0, tzinfo=UTC)))   # 토요일
+
+
+class TestMarketLevelSession(unittest.TestCase):
+    """시장 단위(심볼 없이) 정규장 판정 — 라이브 주문 게이트용 market_open/market_seconds_to_close."""
+
+    def test_market_open_us(self):
+        # 2026-06-29(월) EDT: 14:00 UTC=10:00 EDT open, 20:01 UTC=16:01 EDT 장후, 토요일 휴장
+        self.assertTrue(market_open("US", datetime(2026, 6, 29, 14, 0, tzinfo=UTC)))
+        self.assertFalse(market_open("US", datetime(2026, 6, 29, 20, 1, tzinfo=UTC)))
+        self.assertFalse(market_open("US", datetime(2026, 6, 27, 14, 0, tzinfo=UTC)))
+
+    def test_market_open_kr(self):
+        # 평일 10:00 KST=01:00 UTC open, 15:31 KST=06:31 UTC 장후
+        self.assertTrue(market_open("KR", datetime(2026, 6, 29, 1, 0, tzinfo=UTC)))
+        self.assertFalse(market_open("KR", datetime(2026, 6, 29, 6, 31, tzinfo=UTC)))
+
+    def test_market_open_coin_always(self):
+        self.assertTrue(market_open("COIN", datetime(2026, 6, 27, 1, 0, tzinfo=UTC)))   # 토요일도 True
+
+    def test_us_seconds_to_close(self):
+        # EDT: 마감 16:00 ET=20:00 UTC. 15:30 ET=19:30 UTC→1800s, 15:55 ET=19:55 UTC→300s(가드 임계), 마감 후 음수
+        self.assertEqual(market_seconds_to_close("US", datetime(2026, 6, 29, 19, 30, tzinfo=UTC)), 1800.0)
+        self.assertEqual(market_seconds_to_close("US", datetime(2026, 6, 29, 19, 55, tzinfo=UTC)), 300.0)
+        self.assertLess(market_seconds_to_close("US", datetime(2026, 6, 29, 20, 30, tzinfo=UTC)), 0)
+
+    def test_coin_seconds_to_close_none(self):
+        self.assertIsNone(market_seconds_to_close("COIN", datetime(2026, 6, 29, 12, 0, tzinfo=UTC)))
 
 
 class TestPeriodsPerYear(unittest.TestCase):
