@@ -100,3 +100,20 @@ def seconds_to_close(symbol: str, now: datetime) -> float | None:
     local = now.astimezone(_local_tz(symbol))
     close_dt = local.replace(hour=close.hour, minute=close.minute, second=0, microsecond=0)
     return (close_dt - local).total_seconds()
+
+
+# 시장 단위(심볼 없이) 정규장 판정용 대표 심볼 — asset_class 분기만 태운다(라이브 주문 게이트용).
+_MARKET_PROXY = {"KR": "005930", "US": "SPY", "COIN": "KRW-BTC"}
+
+
+def market_open(market: str, now: datetime | None = None) -> bool:
+    """시장('KR'|'US'|'COIN') 정규장 개장 여부 — 종목 없이 시장 단위로 묻는다(라이브 주문 게이트).
+
+    is_market_open을 대표 심볼로 재사용(세션 시간 로직 단일 출처).
+    """
+    return is_market_open(_MARKET_PROXY[market], now)
+
+
+def market_seconds_to_close(market: str, now: datetime) -> float | None:
+    """시장 마감까지 남은 초 — 시장 단위(코인=None, 음수면 마감 후)."""
+    return seconds_to_close(_MARKET_PROXY[market], now)

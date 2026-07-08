@@ -17,7 +17,7 @@
 | **OLAP** | ClickHouse — 틱/캔들(1분·일봉)/분석 |
 | **API·대시보드** | FastAPI + Grafana (+ Caddy 자동 HTTPS) |
 | **전략** | [주식] LightGBM 횡단면 챔피언(KR=OHLCV+DART 펀더 / US=+13F·섹터) 주간 top-N · [코인] 일봉 저회전 추세추종 앙상블(5/40·10/60·20/100), walk-forward·Deflated Sharpe 검증 |
-| **배포** | GCP **2-VM** — 상시 **틱 수집 VM(collector, e2-small)** + 온디맨드 **매매 VM(자기완결·로컬 DB)**(스케줄러 8잡: 코인 매일 10:00 KST / KR 평일 15:00 KST / US 평일 15:30 ET / 데이터 유지보수 매월 첫 토 04:00 UTC + 각 스위퍼 재시도) · 매매 VM on/off·대시보드는 별도 `gcp-cost-controller`(텔레그램) 담당 · main 머지 시 CI/CD 자동배포 |
+| **배포** | GCP **2-VM** — 상시 **틱 수집 VM(collector, e2-small)** + 온디맨드 **매매 VM(자기완결·로컬 DB)**(스케줄러 8잡: 코인 매일 10:00 KST / KR 평일 15:00 KST / US 평일 15:00 ET / 데이터 유지보수 매월 첫 토 04:00 UTC + 각 스위퍼 재시도) · 매매 VM on/off·대시보드는 별도 `gcp-cost-controller`(텔레그램) 담당 · main 머지 시 CI/CD 자동배포 |
 | **주식 브로커/데이터** | KIS(모의 체결 KR+US·수동주문) · 토스(일봉 데이터) · 키움(틱·인증) |
 
 ---

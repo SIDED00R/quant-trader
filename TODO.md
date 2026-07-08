@@ -4,7 +4,7 @@
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
 > **📌 현재 운영/배포 상태 (2026-07-05)**: **코인 앙상블 + KR/US 주식 ML 라이브 배포(모의) — 2-VM 온디맨드**.
-> - **아키텍처**: 수집 VM(상시, e2-small, `--profile collector` 수집·저장만) + **매매 VM(온디맨드·자기완결 로컬 DB, Cloud Scheduler 8잡: 코인 매일 01:00 UTC·KR 15:00 KST·US 15:30 ET 장마감 전·월간 유지보수 첫 토요일, 기동→동기 배치→자가종료)**. 라이브 매매 = trade_once/stock_trade_once/us_trade_once. Kafka는 데이터 팬아웃만. **상시 비용 ~$13/월**.
+> - **아키텍처**: 수집 VM(상시, e2-small, `--profile collector` 수집·저장만) + **매매 VM(온디맨드·자기완결 로컬 DB, Cloud Scheduler 8잡: 코인 매일 01:00 UTC·KR 15:00 KST·US 15:00 ET 장마감 전·월간 유지보수 첫 토요일, 기동→동기 배치→자가종료)**. 라이브 매매 = trade_once/stock_trade_once/us_trade_once. Kafka는 데이터 팬아웃만. **상시 비용 ~$13/월**.
 > - 대시보드 = 매매 VM 온디맨드 모드(SSH 터널 `gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000` + 구글 OAuth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
 > - 계정 초기화 완료(본인 2계정 → ₩10M). 주식은 KIS 모의계좌(KR+US 통합).
 
