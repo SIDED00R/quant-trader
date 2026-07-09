@@ -71,6 +71,8 @@ if [ -n "${KIS_TOKEN:-}" ]; then
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/krx-env 2>/dev/null || true
   curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/fred-env/versions/latest:access" 2>/dev/null \
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/fred-env 2>/dev/null || true
+  curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/duckdns-env/versions/latest:access" 2>/dev/null \
+    | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/duckdns-env 2>/dev/null || true
   # 시크릿별 독립 병합 — 자기 fetch가 성공했을 때만 자기 prefix 라인을 교체(한쪽 실패가 다른 쪽을 지우지 않게)
   if [ -s /tmp/kis-env ]; then grep -v '^KIS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/kis-env > .env 2>/dev/null || true; fi
   if [ -s /tmp/telegram-env ]; then grep -v '^TELEGRAM_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/telegram-env > .env 2>/dev/null || true; fi
@@ -78,7 +80,8 @@ if [ -n "${KIS_TOKEN:-}" ]; then
   if [ -s /tmp/dart-env ]; then grep -v '^DART_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/dart-env > .env 2>/dev/null || true; fi
   if [ -s /tmp/krx-env ]; then grep -v '^KRX_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/krx-env > .env 2>/dev/null || true; fi
   if [ -s /tmp/fred-env ]; then grep -v '^FRED_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/fred-env > .env 2>/dev/null || true; fi
-  rm -f /tmp/env.nok /tmp/kis-env /tmp/telegram-env /tmp/toss-env /tmp/dart-env /tmp/krx-env /tmp/fred-env
+  if [ -s /tmp/duckdns-env ]; then grep -v '^DUCKDNS_' .env > /tmp/env.nok 2>/dev/null || true; cat /tmp/env.nok /tmp/duckdns-env > .env 2>/dev/null || true; fi
+  rm -f /tmp/env.nok /tmp/kis-env /tmp/telegram-env /tmp/toss-env /tmp/dart-env /tmp/krx-env /tmp/fred-env /tmp/duckdns-env
 fi
 
 # ── Artifact Registry 로그인 (gcloud 불요 — VM 메타데이터 토큰. 실패해도 진행: 아래 --build 폴백) ──
@@ -134,6 +137,13 @@ if [ "$BOOT_MODE" = "dashboard" ]; then
       cat /tmp/env.noweb /tmp/web-env > .env 2>/dev/null || true
       rm -f /tmp/env.noweb /tmp/web-env
     fi
+  fi
+  # 고정 IP 해제(ephemeral) 대응 — 부팅마다 바뀌는 공인 IP를 duckdns에 갱신해 공개 도메인이 이 부팅을 가리키게 한다.
+  # (DUCKDNS_TOKEN 미설정 시 no-op — 고정 IP 유지 구성과 호환)
+  if [ -n "${DUCKDNS_TOKEN:-}" ]; then
+    MYIP=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" 2>/dev/null || true)
+    curl -s "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN:-jh-quantlab}&token=${DUCKDNS_TOKEN}&ip=${MYIP}" >/dev/null 2>&1 || true
+    echo "DUCKDNS_UPDATED ip=$MYIP" | tee -a /var/log/trade-boot.log
   fi
   # 공개 HTTPS(Caddy)는 SITE_ADDRESS·GOOGLE_CLIENT_ID 둘 다 있을 때만 — 무인증 대시보드가 공개포트에 뜨는 것 방지.
   DASH_SVCS="api grafana"
