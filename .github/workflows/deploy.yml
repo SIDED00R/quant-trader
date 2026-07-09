@@ -112,7 +112,16 @@ jobs:
           workload_identity_provider: projects/689150179824/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Check collector VM status
+        id: vm
+        run: |
+          ST=$(gcloud compute instances describe coin-trader-vm --project "$PROJECT" --zone "$ZONE" --format='value(status)' 2>/dev/null || echo MISSING)
+          echo "status=$ST" >> "$GITHUB_OUTPUT"
+          echo "수집 VM 상태: $ST"
+      # 수집 VM은 비용절감으로 평소 정지(코인 틱 파이프라인 라이브 매매 비필수). RUNNING일 때만 배포하고,
+      # 정지 중이면 스킵 — 재가동 시 collector-vm-startup이 git reset + 최신 이미지 pull로 자체 최신화한다.
       - name: SSH deploy
+        if: steps.vm.outputs.status == 'RUNNING'
         run: |
           for i in 1 2 3; do
             gcloud compute ssh coin-trader-vm --project "$PROJECT" --zone "$ZONE" --quiet --ssh-key-expire-after=10m \
@@ -120,6 +129,9 @@ jobs:
             echo "ssh 배포 재시도 $i"; sleep 20
           done
           exit 1
+      - name: Skip notice
+        if: steps.vm.outputs.status != 'RUNNING'
+        run: echo "수집 VM이 RUNNING 아님(${{ steps.vm.outputs.status }}) — collector 배포 스킵. 재가동 시 startup이 최신 코드·이미지로 자체 최신화."
 
   # 매매 VM: 메타데이터 startup-script 갱신(TERMINATED/RUNNING 무관) — 다음 부팅부터 적용
   update-trade-vm:
