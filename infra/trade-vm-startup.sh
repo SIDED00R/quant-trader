@@ -139,8 +139,10 @@ if [ "$BOOT_MODE" = "dashboard" ]; then
     fi
   fi
   # 고정 IP 해제(ephemeral) 대응 — 부팅마다 바뀌는 공인 IP를 duckdns에 갱신해 공개 도메인이 이 부팅을 가리키게 한다.
-  # (DUCKDNS_TOKEN 미설정 시 no-op — 고정 IP 유지 구성과 호환)
-  if [ -n "${DUCKDNS_TOKEN:-}" ]; then
+  # 토큰은 .env(위 시크릿 주입)에만 있고 셸 변수엔 없으므로 grep으로 읽는다(SYMS와 동일). 미설정 시 no-op(정적 IP 유지 구성과 호환).
+  DUCKDNS_TOKEN=$(grep -E '^DUCKDNS_TOKEN=' .env 2>/dev/null | cut -d= -f2-)
+  DUCKDNS_DOMAIN=$(grep -E '^DUCKDNS_DOMAIN=' .env 2>/dev/null | cut -d= -f2-)
+  if [ -n "$DUCKDNS_TOKEN" ]; then
     MYIP=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" 2>/dev/null || true)
     curl -s "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN:-jh-quantlab}&token=${DUCKDNS_TOKEN}&ip=${MYIP}" >/dev/null 2>&1 || true
     echo "DUCKDNS_UPDATED ip=$MYIP" | tee -a /var/log/trade-boot.log
