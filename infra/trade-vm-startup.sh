@@ -101,8 +101,8 @@ docker compose run --rm db-init 2>&1 | tee -a /var/log/trade-boot.log || true
 # CI가 org.opencontainers.image.revision=<sha> 라벨로 이미지를 굽는다. pull한 :latest의 라벨이
 # 위 git reset 결과(HEAD)와 다르거나 pull이 실패하면 --build로 폴백해 최신 소스로 재빌드한다.
 # 낡은 코드가 조용히 실행되는 일을 원천 차단 — **이 폴백 제거 금지**.
-build_flag() {  # $1=compose 서비스명 $2=이미지 ref → ""(pull 신선) 또는 "--build"
-  docker compose --profile trade pull -q "$1" >/dev/null 2>&1 || { echo "--build"; return; }
+build_flag() {  # $1=compose 서비스명 $2=이미지 ref $3=프로파일(기본 trade) → ""(pull 신선) 또는 "--build"
+  docker compose --profile "${3:-trade}" pull -q "$1" >/dev/null 2>&1 || { echo "--build"; return; }
   [ "$(docker image inspect "$2" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null)" \
     = "$(git rev-parse HEAD)" ] || echo "--build"
 }
@@ -189,7 +189,7 @@ case "$BOOT_HOUR" in
     SYMS=$(grep -E '^ENSEMBLE_SYMBOLS=' .env | cut -d= -f2- 2>/dev/null); SYMS="${SYMS:-KRW-BTC,KRW-ETH}"
     # 백필 실패는 매매를 죽이지 않는다(기존 신선 데이터로 목표 수렴). 단 무언 실패(#248: tz버그로 0행 지속→신선도 위반)를
     # 조기 경보한다 — PIPESTATUS[0]=backfill exit(tee 뒤라 라인 exit는 0). `|| true` 대신 코드를 잡아 notify_fail로.
-    docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
+    docker compose --profile batch run $(build_flag reeval "$BATCH_IMG" batch) --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인 백필" "${PIPESTATUS[0]}" /var/log/trade-once.log
     docker compose --profile trade run $(build_flag trade-once "$APP_IMG") --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인" "${PIPESTATUS[0]}" /var/log/trade-once.log
