@@ -32,8 +32,11 @@ def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: flo
     재삽입하나 ReplacingMergeTree라 멱등 — 실제 절감은 딥 페이지 제거).
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    if since is not None and since > cutoff:
-        cutoff = since                          # 증분: 최신 저장일 이후만
+    if since is not None:
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)  # CH DateTime('UTC')는 naive로 옴 — aware 정규화(naive/aware 비교 TypeError 방지)
+        if since > cutoff:
+            cutoff = since                      # 증분: 최신 저장일 이후만
     rows: list = []
     to = None
     with httpx.Client(timeout=20) as client:

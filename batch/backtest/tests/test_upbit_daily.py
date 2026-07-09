@@ -45,12 +45,12 @@ class _Client:
         return _Resp(self._pages.pop(0) if self._pages else [])
 
 
-def _run(pages, days=4000, complete_until="2026-06-20"):
+def _run(pages, days=4000, complete_until="2026-06-20", since=None):
     cu = datetime.fromisoformat(f"{complete_until}T00:00:00").replace(tzinfo=timezone.utc)
     client = _Client(pages)
     with mock.patch.object(ud.httpx, "Client", return_value=client), \
          mock.patch.object(_hc.time, "sleep"):
-        rows = ud.fetch_daily("KRW-BTC", days, cu, req_sleep=0, log=lambda *a: None)
+        rows = ud.fetch_daily("KRW-BTC", days, cu, req_sleep=0, log=lambda *a: None, since=since)
     return rows, client
 
 
@@ -85,6 +85,14 @@ class TestFetchDaily(unittest.TestCase):
         with mock.patch.object(ud, "_PAGE", 2):
             _, client = _run([page, page], days=1)
         self.assertEqual(len(client.calls), 1)  # oldest<=cutoff → 추가요청 없음
+
+    def test_naive_since_does_not_raise(self):
+        # CH max(window_start)는 tz-naive로 옴 — aware cutoff와 비교 시 TypeError 나면 안 됨(#248 회귀).
+        # 수정 전: `since > cutoff`에서 can't compare offset-naive and offset-aware datetimes.
+        naive_since = datetime(2026, 6, 18)  # tzinfo=None (ClickHouse DateTime('UTC') 반환 형태)
+        page = [_candle("2026-06-19", 200), _candle("2026-06-18", 100)]
+        rows, _ = _run([page], since=naive_since)
+        self.assertEqual([r[1].date().isoformat() for r in rows], ["2026-06-18", "2026-06-19"])
 
 
 class TestUpsert(unittest.TestCase):
