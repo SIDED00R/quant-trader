@@ -187,7 +187,10 @@ case "$BOOT_HOUR" in
     # 데일리(01:00 UTC=KST 10:00) + 스위퍼(02:00 UTC) → 코인만(매일, 목표 수렴형이라 재실행 무해).
     # 크립토 일봉을 로컬 CH에 REST 백필(틱 집계 대신 — 수집 VM과 디커플링). chdata 영속이라 최근분만 갱신.
     SYMS=$(grep -E '^ENSEMBLE_SYMBOLS=' .env | cut -d= -f2- 2>/dev/null); SYMS="${SYMS:-KRW-BTC,KRW-ETH}"
-    docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log || true
+    # 백필 실패는 매매를 죽이지 않는다(기존 신선 데이터로 목표 수렴). 단 무언 실패(#248: tz버그로 0행 지속→신선도 위반)를
+    # 조기 경보한다 — PIPESTATUS[0]=backfill exit(tee 뒤라 라인 exit는 0). `|| true` 대신 코드를 잡아 notify_fail로.
+    docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
+    notify_fail "코인 백필" "${PIPESTATUS[0]}" /var/log/trade-once.log
     docker compose --profile trade run $(build_flag trade-once "$APP_IMG") --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인" "${PIPESTATUS[0]}" /var/log/trade-once.log
     ;;
