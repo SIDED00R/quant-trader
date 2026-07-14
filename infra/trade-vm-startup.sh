@@ -1,7 +1,7 @@
 #!/bin/bash
 # 온디맨드 매매 VM startup — Cloud Scheduler(메인 4잡 + 스위퍼 4잡, infra/setup-cicd.sh)가 start하면:
 #   docker/repo 준비(멱등) → AR 이미지 pull(revision 라벨 검증, 실패 시 --build 폴백) → 로컬 DB(postgres/clickhouse) 기동+스키마
-#   → UTC 부팅시각 분기로 1회 매매 → poweroff(self-stop). (자기완결 — 수집 VM과 크로스VM 터널 없음)
+#   → UTC 부팅시각 분기로 1회 매매 → 자산 차트 발행(equity-chart → assets 브랜치) → poweroff(self-stop). (자기완결 — 수집 VM과 크로스VM 터널 없음)
 # 분기표(스케줄러와 정합):
 #   UTC 04·05    → 데이터 유지보수(maintenance-once) ← 매월 첫 토요일 04:00 UTC + 스위퍼 05:00(월간화는 startup이 날짜 가드)
 #   UTC 06·07    → KR 주식(stock-trade-once)  ← kr-close 15:00 KST + sweep 15:10 KST (06:00/06:10 UTC, 평일)
@@ -203,10 +203,37 @@ case "$BOOT_HOUR" in
     # 조기 경보한다 — PIPESTATUS[0]=backfill exit(tee 뒤라 라인 exit는 0). `|| true` 대신 코드를 잡아 notify_fail로.
     docker compose --profile batch run $(build_flag reeval "$BATCH_IMG" batch) --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인 백필" "${PIPESTATUS[0]}" /var/log/trade-once.log
+    # 환율(usdkrw) 일일 갱신 — 자산 곡선 '전체(KRW 환산)'용(월간 유지보수만으론 최대 한 달 지연).
+    # 실패해도 매매·차트는 진행(직전 환율 forward-fill 캐리) — 실패 통보의 정본은 월간 _fred_step.
+    docker compose --profile trade run $(build_flag maintenance-once "$BATCH_IMG") --rm maintenance-once python -m batch.data.fred 2>&1 | tee -a /var/log/trade-once.log || true
     docker compose --profile trade run $(build_flag trade-once "$APP_IMG") --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인" "${PIPESTATUS[0]}" /var/log/trade-once.log
     ;;
 esac
+
+# ── 자산 차트 갱신 + assets 브랜치 발행 (비치명 — 어떤 실패도 poweroff를 막지 않음) ──
+# equity_snapshots → SVG(라이트/다크) 렌더 후 orphan 단일 커밋을 assets 브랜치에 force-push한다.
+# README <picture>가 raw.githubusercontent…/assets/…를 참조. force-push 단일 커밋 = 브랜치 크기
+# SVG 2개 고정(히스토리 무증가), deploy.yml은 main 전용이라 CI 미발화. 쓰기 배포키(github-push-key)는
+# 읽기 키(github-deploy-key)와 분리 — 키/시크릿 미준비면 push만 조용히 스킵(코드 배포와 디커플링).
+docker compose --profile trade run $(build_flag equity-chart "$APP_IMG") --rm equity-chart 2>&1 | tee -a /var/log/equity-chart.log || true
+PUSH_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
+curl -s -H "Authorization: Bearer ${PUSH_TOKEN:-}" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/github-push-key/versions/latest:access" 2>/dev/null \
+  | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))" > /root/.ssh/id_ed25519_push 2>/dev/null || true
+chmod 600 /root/.ssh/id_ed25519_push 2>/dev/null || true
+if [ -s charts/equity-light.svg ] && [ -s /root/.ssh/id_ed25519_push ]; then
+  PUSH_TMP=$(mktemp -d)
+  git -C "$PUSH_TMP" init -q -b assets \
+    && cp charts/equity-*.svg "$PUSH_TMP"/ \
+    && git -C "$PUSH_TMP" -c user.name=trade-vm -c user.email=trade-vm@quant-trader.local add -A \
+    && git -C "$PUSH_TMP" -c user.name=trade-vm -c user.email=trade-vm@quant-trader.local commit -qm "equity charts $(date -u -Is)" \
+    && GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519_push -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+       git -C "$PUSH_TMP" push -qf git@github.com:SIDED00R/quant-trader.git assets:assets \
+    && echo "EQUITY_CHART_PUBLISHED" | tee -a /var/log/equity-chart.log \
+    || echo "EQUITY_CHART_PUSH_FAILED(비치명)" | tee -a /var/log/equity-chart.log
+  rm -rf "$PUSH_TMP"
+fi
+rm -f /root/.ssh/id_ed25519_push 2>/dev/null || true   # 쓰기 키는 push 스텝 동안만 디스크에 존재(유출 반경 최소화)
 
 # ── 정리 + self-stop ──
 docker image prune -f >/dev/null 2>&1 || true   # 새 pull로 방금 dangling 된 직전 :latest 회수

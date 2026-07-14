@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from batch.backtest.refresh_stock_daily import refresh
 from common import kis_balance, notify_telegram
+from common.equity_snapshot import record_stock_snapshot
 from common.kis_chase import place_and_chase
 from common.kis_overseas_price import price_and_exchange
 from common.market_holidays import market_today
@@ -96,6 +97,8 @@ def main(argv=None) -> int:
         traceback.print_exc()
         sent = notify_telegram.send(error_message("US 주식", e))
         return 70 if sent else 1
+    if a.live:   # 자산 곡선 원천 — 주간 스킵 날도 매일 1포인트(비치명, KR판과 동일)
+        record_stock_snapshot("US", kis_balance.us_balance)
     print(f"[us-trade] bar={r['bar']} cash={r['cash']:,.2f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):

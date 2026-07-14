@@ -21,6 +21,8 @@ def reset(account_ids: list[str]) -> None:
                 (acct,))
             conn.execute("DELETE FROM orders WHERE account_id=%s", (acct,))
             conn.execute("DELETE FROM positions WHERE account_id=%s", (acct,))
+            # 자산 곡선(코인 시리즈)도 함께 초기화 — 리셋 전 이력이 곡선을 왜곡하지 않게
+            conn.execute("DELETE FROM equity_snapshots WHERE market='COIN' AND account_id=%s", (acct,))
             n = conn.execute("UPDATE accounts SET krw_balance=%s WHERE account_id=%s",
                              (INITIAL_BALANCE, acct)).rowcount
             print(f"[reset] {acct}: 잔고 {INITIAL_BALANCE:,} 원으로 리셋, 포지션/주문/체결 삭제"

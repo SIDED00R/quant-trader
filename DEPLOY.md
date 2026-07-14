@@ -325,6 +325,25 @@ startup 분기표: **04·05→유지보수(토·1~7일 가드) / 06·07→KR / 1
 - **스위퍼 근거**: `instances.start`는 존 용량 부족(`ZONE_RESOURCE_POOL_EXHAUSTED`) 등으로 실패할 수 있고 Scheduler는 디스패치 성공만 보므로 재시도가 없다(실사례: 2026-06-30~07-01 3연속 실패로 매매 유실). 스위퍼가 10~60분 뒤 재기동한다. 이중 실행은 멱등 — 코인은 목표 수렴(재실행 주문 0), 주식은 `week_done` skip(수 초 내 poweroff).
 - **엣지**: RUNNING 중 start 호출 = startup 재실행 없음(무해). 메인 런 중 스위퍼 발화 = start 실패로 유실될 수 있으나 코인=익일, 주식=익 평일 마커 재시도가 커버. KR 스윕 주문(~15:13)은 연속매매(≤15:20) 또는 동시호가(15:20~15:30 단일가) 체결. NYSE 반일장(13:00 마감)은 그날 미체결 → 마커가 익 평일 재시도.
 
+### 📈 자산 차트 발행 (assets 브랜치 — README 자동 갱신)
+
+각 매매 잡이 종료 시 시장별 평가자산을 `equity_snapshots`에 upsert하고(코인=잡 내부 훅, KR/US=`main()`에서 KIS 잔고 재조회 — 주간 스킵 날도 기록), startup 말미가 `equity-chart` 컨테이너(app 이미지, `scripts/render_equity_chart.py`)로 SVG 라이트/다크 2벌을 렌더해 **orphan `assets` 브랜치에 단일 커밋 force-push**한다. README `<picture>`가 `raw.githubusercontent.com/SIDED00R/quant-trader/assets/equity-{light,dark}.svg`를 참조.
+
+- **설계 근거**: DB가 매매 VM 로컬이라 GitHub Actions에선 접근 불가 → 데이터·git 키·시크릿이 이미 있는 매매 VM에서 발행. force-push 단일 커밋 = 브랜치 크기 SVG 2개 고정(히스토리 무증가). `deploy.yml`은 `push: branches: [main]` 전용이라 **CI 미발화**. raw 이미지는 camo가 ~5분 캐시(일 1~3회 갱신에 무해).
+- **쓰기 배포키 1회 셋업** (미준비 동안 push 스텝만 조용히 스킵 — 코드 배포와 독립):
+  ```bash
+  ssh-keygen -t ed25519 -f gh-push-key -N "" -C trade-vm-assets-push
+  gh repo deploy-key add gh-push-key.pub -R SIDED00R/quant-trader --title "trade-vm assets push" --allow-write
+  gcloud secrets create github-push-key --data-file=gh-push-key --project=coin-auto-trader-jvfhgq
+  gcloud secrets add-iam-policy-binding github-push-key --project=coin-auto-trader-jvfhgq \
+    --member="serviceAccount:689150179824-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"
+  rm gh-push-key gh-push-key.pub
+  ```
+  기존 읽기 키(`github-deploy-key`, clone/fetch용)와 **분리** — 쓰기 키는 push 스텝에서만 사용(유출 반경 최소화).
+- **환율**: '전체(KRW 환산)' 시리즈용 FRED usdkrw는 코인 데일리 잡이 `batch.data.fred`로 일 1회 갱신(`FRED_API_KEY`=기존 `fred-env` 시크릿, 실패 비치명 — 직전 환율 캐리).
+- **텔레그램 사진**: 같은 곡선을 코인 데일리 잡이 PNG로 렌더해 텔레그램 사진 1장/일 발송(`common/equity_chart_telegram`, 스위퍼 재실행은 trade_once의 '이미 실행됨' 가드가 차단) — VM을 켜지 않고도 자산 흐름 확인.
+- **확인**: 잡 후 `assets` 브랜치 커밋 1개 + README 이미지 갱신. 렌더/발행 로그는 VM `/var/log/equity-chart.log`(`EQUITY_CHART_PUBLISHED` / `EQUITY_CHART_PUSH_FAILED(비치명)`).
+
 ### 🔔 VM 기동 실패 알림 (Cloud Monitoring)
 
 `setup-cicd.sh` §7이 로그기반 알림을 만든다: `instances.start`의 `severity>=ERROR` 감사로그 매치 → **이메일**(mywinningtime@gmail.com), 1시간 레이트리밋. 메일이 오면 존 용량 부족·쿼터·IAM 실패 중 하나 — 스위퍼가 곧 재시도하므로 보통 조치 불요. 같은 날 반복되면 수동 재시도(분기 시간대 안에서만):

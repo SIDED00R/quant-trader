@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from batch.backtest.refresh_stock_daily import refresh
 from common import kis_balance, notify_telegram
+from common.equity_snapshot import record_stock_snapshot
 from common.kis_order import place_domestic_order
 from common.market_holidays import market_today
 from common.stock_price import latest_closes
@@ -111,6 +112,8 @@ def main(argv=None) -> int:
         traceback.print_exc()
         sent = notify_telegram.send(error_message("KR 주식", e))
         return 70 if sent else 1
+    if a.live:   # 자산 곡선 원천 — 주간 스킵 날도 매일 1포인트(체결확인 뒤 재조회=체결 후 상태, 비치명)
+        record_stock_snapshot("KR", kis_balance.kr_balance)
     print(f"[stock-trade] bar={r['bar']} cash={r['cash']:,.0f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):
