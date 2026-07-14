@@ -19,6 +19,7 @@ from psycopg.types.json import Jsonb
 from common import notify_telegram
 from common.candles import daily_candles
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
+from common.equity_snapshot import record_snapshot
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
 from common.upbit_ticker import latest_prices
@@ -241,6 +242,9 @@ def run(dry_run: bool = False) -> int:
         for a in accts:
             c = cash(a)
             balances[a] = {"cash": c, "equity": equity(c, positions(a), prices)}
+        for a, b in balances.items():   # 자산 곡선 원천(equity_snapshots) — 실패는 내부 흡수, 매매 결과 무관
+            record_snapshot("COIN", a, "KRW", b["equity"], cash=b["cash"],
+                            positions_value=b["equity"] - b["cash"])
         notify_telegram.send(coin_message(decisions, rejected, shown, dry_run=False, balances=balances))
         return 70 if rejected else 0
     except Exception as e:

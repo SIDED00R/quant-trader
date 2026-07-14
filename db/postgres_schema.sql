@@ -112,3 +112,28 @@ CREATE TABLE IF NOT EXISTS weekly_rebalance (
 INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;
+
+-- 시장별 평가자산 스냅샷: 각 매매 잡이 종료 시 하루 1행 upsert(common/equity_snapshot.py).
+-- 대시보드 '자산' 탭(/equity/history)과 README 차트(scripts/render_equity_chart.py)의 원천.
+-- account_id: COIN=accounts.account_id, KR/US='kis'(단일 KIS 모의계좌) — accounts FK 없음(의도).
+-- snap_date=UTC 달력일. 같은 날 재실행(스위퍼·US 다중 부팅)은 PK upsert로 마지막 실행이 승리.
+CREATE TABLE IF NOT EXISTS equity_snapshots (
+    ts               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    snap_date        DATE NOT NULL,
+    market           TEXT NOT NULL CHECK (market IN ('COIN','KR','US')),
+    account_id       TEXT NOT NULL,
+    currency         TEXT NOT NULL,
+    cash             NUMERIC(20,4),
+    positions_value  NUMERIC(20,4),
+    equity           NUMERIC(20,4) NOT NULL,
+    PRIMARY KEY (market, account_id, snap_date)
+);
+
+-- 코인 과거분 백필(멱등): trade_decisions의 결정 시점 equity를 일 단위로 시딩. 매 부팅(db-init) 실행되므로
+-- 라이브 스냅샷이 실패한 날도 다음 부팅에 결정 기록으로 자가 회복된다. 라이브 행 우선(DO NOTHING).
+-- 같은 run_ts 안에서 equity는 종목 순회 중 수수료만큼 드리프트(≤0.05%)·시세 없는 행은 NULL → MAX+NULL 제외.
+INSERT INTO equity_snapshots (ts, snap_date, market, account_id, currency, equity)
+SELECT max(run_ts), (run_ts AT TIME ZONE 'UTC')::date, 'COIN', account_id, 'KRW', max(equity)
+FROM trade_decisions WHERE equity IS NOT NULL
+GROUP BY account_id, (run_ts AT TIME ZONE 'UTC')::date
+ON CONFLICT (market, account_id, snap_date) DO NOTHING;

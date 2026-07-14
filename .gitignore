@@ -15,6 +15,7 @@ env/
 logs/
 *.log
 runs/
+/charts/    # 자산 차트 SVG 산출물 — assets 브랜치로만 발행(main 미추적)
 
 # IDE / OS
 .idea/

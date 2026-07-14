@@ -369,6 +369,24 @@ services:
     <<: *batch-trade
     command: python -m batch.data.maintenance_once
 
+  # ── 자산 차트 렌더 (profile: trade — 매매 잡 후 startup이 실행, charts/*.svg 생성 → assets 브랜치 발행) ──
+  # 앱 이미지(scripts/ 포함 — batch 이미지엔 없음). DB=매매 VM 로컬(127.0.0.1), 출력은 호스트 ./charts 바인드.
+  equity-chart:
+    image: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-app:latest
+    build: .
+    profiles: ["trade"]
+    restart: "no"
+    network_mode: host
+    logging: *logging
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+    volumes:
+      - ./charts:/app/charts
+    command: python -m scripts.render_equity_chart --out charts
+
   api:
     <<: *app
     container_name: api

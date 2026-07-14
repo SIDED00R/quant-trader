@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from api import auth_google, stock_order_executor, warmup
-from api.routes import account, autotrade, decisions, health, history, market, orders, performance, rebalance, stock_orders, stocks, strategy, web
+from api.routes import account, autotrade, decisions, equity, health, history, market, orders, performance, rebalance, stock_orders, stocks, strategy, web
 from api.security import auth_gate
 from common.config import SESSION_SECRET, SITE_ADDRESS
 from common.postgres_client import close_pool, open_pool
@@ -49,6 +49,7 @@ app.include_router(autotrade.router)
 app.include_router(strategy.router)
 app.include_router(performance.router)
 app.include_router(decisions.router)
+app.include_router(equity.router)
 app.include_router(stocks.router)
 app.include_router(stock_orders.router)
 app.include_router(rebalance.router)
