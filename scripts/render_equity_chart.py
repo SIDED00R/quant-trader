@@ -14,18 +14,16 @@ from pathlib import Path
 
 from common.equity_series import (
     KIS_ACCOUNT,
+    chart_rows,
     fetch_coin_series_total,
     fetch_market_series,
     fetch_usdkrw,
-    merge_total_krw,
-    normalize,
 )
 from common.postgres_client import close_pool, open_pool, pool
 
 W, H = 920, 420
 PAD_L, PAD_R, PAD_T, PAD_B = 52, 20, 96, 42
 FONT = "-apple-system,'Segoe UI','Malgun Gothic',sans-serif"
-ORDER = ["TOTAL", "COIN", "KR", "US"]
 LABELS = {"TOTAL": "전체(KRW)", "COIN": "코인", "KR": "국장", "US": "미장"}
 WIDTHS = {"TOTAL": 3.0, "COIN": 2.0, "KR": 2.0, "US": 2.0}
 # 시리즈 색 — 대시보드(index.html --coin/--kr/--us)와 동일 세트(CVD 검증 통과). 전체=잉크 굵은 선.
@@ -47,18 +45,10 @@ def _tw(s: str, size: float = 12.0) -> float:
 
 
 def prepare_rows(markets: dict[str, list], fx: list[tuple]) -> list[dict]:
-    """시장 시계열 → 렌더 행(TOTAL 합성 + 정규화 + 현재값·수익률). 포인트<2 시리즈 제외 — 순수(테스트 대상)."""
-    pool_ = dict(markets)
-    pool_["TOTAL"] = merge_total_krw(markets, fx)
-    rows = []
-    for key in ORDER:
-        pts = pool_.get(key) or []
-        idx = normalize(pts)
-        if len(idx) < 2:
-            continue
-        currency = "USD" if key == "US" else "KRW"
-        rows.append({"key": key, "points": idx, "ret": idx[-1][1] - 100.0,
-                     "value_text": _money(currency, float(pts[-1][1]))})
+    """공용 chart_rows + SVG 범례용 현재값 텍스트 — 순수(테스트 대상)."""
+    rows = chart_rows(markets, fx)
+    for r in rows:
+        r["value_text"] = _money(r["currency"], r["last_value"])
     return rows
 
 

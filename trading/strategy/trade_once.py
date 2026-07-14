@@ -19,6 +19,7 @@ from psycopg.types.json import Jsonb
 from common import notify_telegram
 from common.candles import daily_candles
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
+from common.equity_chart_telegram import send_chart
 from common.equity_snapshot import record_snapshot
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
@@ -246,6 +247,7 @@ def run(dry_run: bool = False) -> int:
             record_snapshot("COIN", a, "KRW", b["equity"], cash=b["cash"],
                             positions_value=b["equity"] - b["cash"])
         notify_telegram.send(coin_message(decisions, rejected, shown, dry_run=False, balances=balances))
+        send_chart()   # 자산 차트 사진 1장/일 — 스위퍼 재실행은 상단 '이미 실행됨' 가드가 차단(비치명)
         return 70 if rejected else 0
     except Exception as e:
         traceback.print_exc()

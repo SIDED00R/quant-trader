@@ -341,6 +341,7 @@ startup 분기표: **04·05→유지보수(토·1~7일 가드) / 06·07→KR / 1
   ```
   기존 읽기 키(`github-deploy-key`, clone/fetch용)와 **분리** — 쓰기 키는 push 스텝에서만 사용(유출 반경 최소화).
 - **환율**: '전체(KRW 환산)' 시리즈용 FRED usdkrw는 코인 데일리 잡이 `batch.data.fred`로 일 1회 갱신(`FRED_API_KEY`=기존 `fred-env` 시크릿, 실패 비치명 — 직전 환율 캐리).
+- **텔레그램 사진**: 같은 곡선을 코인 데일리 잡이 PNG로 렌더해 텔레그램 사진 1장/일 발송(`common/equity_chart_telegram`, 스위퍼 재실행은 trade_once의 '이미 실행됨' 가드가 차단) — VM을 켜지 않고도 자산 흐름 확인.
 - **확인**: 잡 후 `assets` 브랜치 커밋 1개 + README 이미지 갱신. 렌더/발행 로그는 VM `/var/log/equity-chart.log`(`EQUITY_CHART_PUBLISHED` / `EQUITY_CHART_PUSH_FAILED(비치명)`).
 
 ### 🔔 VM 기동 실패 알림 (Cloud Monitoring)

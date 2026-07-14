@@ -99,3 +99,24 @@ def normalize(points: list[tuple]) -> list[tuple]:
     if base <= 0:
         return []
     return [(p[0], float(p[1]) / base * 100.0) for p in points]
+
+
+ORDER = ["TOTAL", "COIN", "KR", "US"]
+
+
+def chart_rows(markets: dict[str, list], fx: list[tuple]) -> list[dict]:
+    """시장 시계열 → 차트 행(TOTAL 합성 + 정규화 + 수익률 + 마지막 원값). 포인트<2 시리즈 제외.
+
+    SVG(scripts/render_equity_chart)·텔레그램 PNG(common/equity_chart_telegram) 렌더 공용.
+    """
+    merged = dict(markets)
+    merged["TOTAL"] = merge_total_krw(markets, fx)
+    rows = []
+    for key in ORDER:
+        pts = merged.get(key) or []
+        idx = normalize(pts)
+        if len(idx) < 2:
+            continue
+        rows.append({"key": key, "points": idx, "ret": idx[-1][1] - 100.0,
+                     "last_value": float(pts[-1][1]), "currency": "USD" if key == "US" else "KRW"})
+    return rows
