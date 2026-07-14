@@ -10,7 +10,7 @@ import bisect
 from datetime import datetime, timedelta, timezone
 
 from common.clickhouse_client import create_client
-from common.equity_snapshot import KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(라우트·렌더러가 이 모듈만 import)
+from common.equity_snapshot import KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(조회 콜러가 쓰기 모듈을 몰라도 되게)
 
 
 def _since(days: int):
@@ -38,7 +38,7 @@ def fetch_coin_series_total(conn, days: int) -> list[tuple]:
 def fetch_usdkrw(days: int) -> list[tuple]:
     """FRED USD/KRW [(date, rate)] 오름차순 — 주말/휴일 forward-fill용 여유분 포함 조회."""
     rows = create_client().query(
-        "SELECT date, usdkrw FROM macro_daily FINAL WHERE usdkrw > 0 AND date >= %(since)s ORDER BY date",
+        "SELECT date, usdkrw FROM macro_daily FINAL WHERE usdkrw > 0 AND date >= {since:Date} ORDER BY date",
         parameters={"since": _since(days + 30)}).result_rows
     return [(r[0], float(r[1])) for r in rows]
 

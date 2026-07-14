@@ -233,6 +233,7 @@ if [ -s charts/equity-light.svg ] && [ -s /root/.ssh/id_ed25519_push ]; then
     || echo "EQUITY_CHART_PUSH_FAILED(비치명)" | tee -a /var/log/equity-chart.log
   rm -rf "$PUSH_TMP"
 fi
+rm -f /root/.ssh/id_ed25519_push 2>/dev/null || true   # 쓰기 키는 push 스텝 동안만 디스크에 존재(유출 반경 최소화)
 
 # ── 정리 + self-stop ──
 docker image prune -f >/dev/null 2>&1 || true   # 새 pull로 방금 dangling 된 직전 :latest 회수
