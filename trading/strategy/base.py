@@ -2,7 +2,7 @@
 
 Strategy는 시장 틱과 Broker만 의존하는 순수 의사결정 단위다(Kafka/DB 비의존).
 - 백테스트: BacktestEngine이 Broker를 구현(단일 계좌·동기 체결).
-- 라이브(4~5단계 예정): 계좌별 Broker 어댑터가 place_order/포지션 캐시를 구현해 동일 전략을 구동.
+- 라이브: 앙상블 경로(live_ensemble→commander / trade_once)가 전략의 순수 판정을 재사용해 동기 체결한다.
 틱은 symbol/price/ts만 요구하는 MarketTick 구조로 받는다(데이터원 비의존 — 백테스트 BTick·라이브 틱 공통).
 """
 from abc import ABC, abstractmethod

@@ -1,11 +1,11 @@
 """부하 재평가 잡 (단일 책임: 부하별 OOS 성과 → strategy_weights 갱신).
 
-5.4 야간 배치. 각 추세 부하(default_loads: 5/40·10/60·20/100)를 candles_1d로 walk-forward OOS 평가해
+수동 전용 잡(스케줄 미배선). 각 추세 부하(default_loads: 5/40·10/60·20/100)를 candles_1d로 walk-forward OOS 평가해
 위험조정성과(스코어=OOS Sharpe)와 유의도(게이트=DSR, 고정구성이라 N=1 → PSR)를 구하고, 보수적 정책
 (weight_policy.compute_weights: floor/cap·EWMA·DSR게이트·demote≠delete)으로 새 가중치를 산출·UPSERT한다.
 
 **실행 환경 주의**: backtest(walkforward/datasource) + ClickHouse 의존 → 라이브 prod 이미지가 아닌 별도
-backtest 이미지/배치로 실행한다(라이브 commander는 strategy_weights를 읽기만 함). 5.5에서 이 잡을 Airflow DAG로 감싼다.
+backtest 이미지/배치로 실행한다(라이브 commander는 strategy_weights를 읽기만 함).
 잡이 테이블을 갱신해도 commander는 ENSEMBLE_ADAPTIVE를 켜야 반영하므로, 적응 활성 전 A/B·검증 단계에서 안전하게 돌릴 수 있다.
 """
 import argparse

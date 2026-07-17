@@ -10,7 +10,7 @@
 ### 1.1 목표
 - Kafka의 핵심 개념(파티셔닝, consumer group, replay, 스트림 집계, 멱등성)을 실제 동작하는 시스템으로 체득한다.
 - OLTP(PostgreSQL)와 OLAP(ClickHouse)의 역할 분리를 경험한다.
-- 로컬(Docker Compose)에서 완성한 뒤 GCP로 이전한다.
+- 로컬(Docker Compose)에서 완성한 뒤 GCP로 이전한다. (이전 완료 — 현행 배포는 [DEPLOY.md](DEPLOY.md))
 
 ### 1.2 범위 (MVP)
 - 업비트 KRW 마켓 실시간 체결가 수집
@@ -92,9 +92,11 @@
 
 | 토픽 | 키 | 파티션 | 보관 | 내용 |
 |------|-----|--------|------|------|
-| `market.ticks` | symbol | 6 | 1일 (시간 기반) | 실시간 체결가 틱 |
+| `market.ticks` | symbol | 6 | 1일 (시간 기반) | 실시간 체결가 틱(코인) |
+| `stock.ticks` | symbol | 6 | 1일 (시간 기반) | 주식 실시간 체결 틱(키움 — 아카이브 수집) |
 | `orders` | symbol | 6 | 7일 | 사용자 매수/매도 주문 |
 | `executions` | symbol | 6 | 7일 | 체결 결과(fill) |
+| `strategy.signals` | symbol | 6 | 7일 | 전략 부하 → commander 신호 버스 |
 
 ### 5.1 이벤트 스키마 (JSON)
 
