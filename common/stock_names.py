@@ -56,6 +56,17 @@ def fetch_all() -> dict:
     return out
 
 
+def refresh_clickhouse(ch) -> int:
+    """fetch_all → ClickHouse stock_names upsert(ReplacingMergeTree 멱등). 적재 행수. ch=create_client()."""
+    names = fetch_all()
+    rows = [[sym.upper() if market == "US" else sym, market, nm, "SEC" if market == "US" else "KRX"]
+            for market, pairs in names.items() for sym, nm in pairs]
+    if not rows:
+        return 0
+    ch.insert("stock_names", rows, column_names=["symbol", "market", "name", "source"])
+    return len(rows)
+
+
 def build_index(names: dict) -> dict:
     """검색 인덱스: by_symbol(대문자 티커→행) · by_name(정규화명→행) · rows[(market,symbol,name)]."""
     rows, by_symbol, by_name = [], {}, {}
@@ -91,6 +102,6 @@ def resolve(index: dict, q: str):
     # 사전 미스 → 티커 형태면 직행(KR 6자리 / US 알파)
     if _KR_CODE.match(q):
         return ("KR", q, q)
-    if _US_TICKER.match(q) and not q.isdigit():
+    if _US_TICKER.match(q):                                     # 첫 글자가 알파벳이라 숫자열과 배타
         return ("US", up, up)
     return None

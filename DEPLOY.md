@@ -235,6 +235,10 @@ infra/terraform/
   # 주의: Bot API getUpdates는 단일 소비자만 허용 — 로컬 테스트는 반드시 별도 테스트 토큰 사용(운영 토큰 동시 폴링 시 409).
   # 주의: Toss 토큰은 클라이언트당 1개 — 봇/매매 잡이 같은 client_id면 상호 무효화 가능(봇은 401 자가재발급, 잡은 다음 부팅 회복).
   ```
+- **관심종목 검색 종목명 첫 시딩(선택)**: CH `stock_names`는 db-init이 테이블만 만들고 실제 이름은 월간 maintenance(`_stock_names_step`)가 채운다. 첫 월간 실행 전 대시보드 이름검색을 쓰려면 매매 VM에서 1회 수동 시딩(없어도 티커 검색·관심종목 등록·`watchlist-charts`는 정상 동작):
+  ```bash
+  docker compose --profile trade run --rm maintenance-once python -c "from common.clickhouse_client import create_client; from common.stock_names import refresh_clickhouse; print(refresh_clickhouse(create_client()))"
+  ```
 - **매매 VM 절대 워치독**: startup 시작 직후 `shutdown -P +90`(유지보수 분기 +360, 대시보드 +120으로 재예약) — 어떤 단계가 행이어도 과금 상한. 정상 경로는 말미 `poweroff`가 선행돼 무해.
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
   1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.

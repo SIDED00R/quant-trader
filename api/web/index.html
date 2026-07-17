@@ -212,7 +212,21 @@
   <button class="tab" data-view="equity">자산</button>
   <button class="tab" data-view="dashboard">코인</button>
   <button class="tab" data-view="decisions">매매 결정 기록</button>
+  <button class="tab" data-view="watchlist">관심종목</button>
 </nav>
+
+<div id="view-watchlist" hidden>
+  <div class="panel">
+    <h2>관심종목 검색 <span class="tag">이름 또는 티커</span></h2>
+    <input id="wlSearch" placeholder="삼성전자 / 005930 / AAPL" autocomplete="off"
+           style="width:100%;padding:9px;box-sizing:border-box;font-size:15px">
+    <div id="wlResults" class="tickers" style="margin-top:10px"></div>
+  </div>
+  <div class="panel">
+    <h2>내 관심종목 <span class="tag" id="wlCount">0</span></h2>
+    <div id="wlSaved" class="tickers"><div class="muted" style="padding:8px">로딩…</div></div>
+  </div>
+</div>
 
 <div id="view-dashboard" hidden>
 <section class="stance">
@@ -555,9 +569,58 @@ function showView(name){
   document.getElementById("view-decisions").hidden = name !== "decisions";
   document.getElementById("view-stocks").hidden = name !== "stocks";
   document.getElementById("view-equity").hidden = name !== "equity";
+  const vw = document.getElementById("view-watchlist"); if(vw) vw.hidden = name !== "watchlist";
   if(name === "decisions") loadDecisions();
   if(name === "stocks"){ loadStocks(); loadStockOrders(); loadRebalance(); }
   if(name === "equity") loadEquity();
+  if(name === "watchlist") loadWatchlist();
+}
+
+// ── 관심종목(검색·토글) ──
+let wlTimer = null;
+async function loadWatchlist(){
+  try {
+    const items = await api("/watchlist");
+    document.getElementById("wlCount").textContent = items.length;
+    const el = document.getElementById("wlSaved");
+    el.innerHTML = items.length ? items.map(wlCard).join("")
+      : `<div class="muted" style="padding:8px">없음 — 위에서 검색해 ★로 추가하세요</div>`;
+    bindWl(el);
+  } catch(e){
+    document.getElementById("wlSaved").innerHTML =
+      `<div class="muted" style="padding:8px">불러오기 실패 — 새로고침 또는 재로그인</div>`;
+  }
+}
+const wlEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function wlCard(it){
+  const star = it.watched === false ? "☆" : "★";
+  const on = it.watched === false ? "" : "on";
+  const nm = it.name ? `${wlEsc(it.name)} ` : "";
+  return `<div class="ticker" data-m="${wlEsc(it.market)}" data-s="${wlEsc(it.symbol)}">
+    <div>${nm}<span class="num">${wlEsc(it.symbol)}</span> <span class="tag">${wlEsc(it.market)}</span></div>
+    <button class="wl-star ${on}" style="background:none;border:none;cursor:pointer;font-size:18px">${star}</button></div>`;
+}
+function bindWl(container){
+  container.querySelectorAll(".ticker").forEach(c => {
+    const btn = c.querySelector(".wl-star");
+    if(btn) btn.onclick = async (e) => {
+      e.stopPropagation();
+      try { await api("/watchlist/toggle", { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ market: c.dataset.m, symbol: c.dataset.s }) }); } catch(err){}
+      loadWatchlist(); wlDoSearch();
+    };
+  });
+}
+function wlDoSearch(){
+  const q = document.getElementById("wlSearch").value.trim();
+  const el = document.getElementById("wlResults");
+  if(!q){ el.innerHTML = ""; return; }
+  api("/watchlist/search?q=" + encodeURIComponent(q)).then(rows => {
+    el.innerHTML = rows.length ? rows.map(wlCard).join("")
+      : `<div class="muted" style="padding:8px">결과 없음 — 티커로 시도(005930, AAPL)</div>`;
+    bindWl(el);
+  }).catch(() => {});
 }
 
 // ── 용어 설명(호버 툴팁) ──
@@ -968,6 +1031,8 @@ async function boot(){
 
   // 탭 전환
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => showView(t.dataset.view));
+  const wls = document.getElementById("wlSearch");
+  if(wls) wls.oninput = () => { clearTimeout(wlTimer); wlTimer = setTimeout(wlDoSearch, 300); };
   // 호버 툴팁(테이블 overflow에도 안 잘리게 fixed 위치)
   const tip = document.getElementById("tip");
   document.addEventListener("mouseover", e => {
