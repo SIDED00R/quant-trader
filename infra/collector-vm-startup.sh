@@ -57,13 +57,6 @@ if [ -n "${KIS_TOKEN:-}" ]; then
     | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/tg-env 2>/dev/null || true
   if [ -s /tmp/tg-env ]; then grep -v '^TELEGRAM_' .env > /tmp/env.notg 2>/dev/null || true; cat /tmp/env.notg /tmp/tg-env > .env 2>/dev/null || true; rm -f /tmp/env.notg /tmp/tg-env; fi
 fi
-# ── toss-env 주입 (telegram-env와 동일 패턴) — /차트 봇(telegram-bot)의 온디맨드 일봉 fetch용.
-#    VM SA에 toss-env secretAccessor 1회 바인딩 필요(DEPLOY.md). 실패해도 진행(봇은 토큰 없으면 '조회 실패' 응답).
-if [ -n "${KIS_TOKEN:-}" ]; then
-  curl -s -H "Authorization: Bearer $KIS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/coin-auto-trader-jvfhgq/secrets/toss-env/versions/latest:access" 2>/dev/null \
-    | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['payload']['data']).decode())" > /tmp/toss-env 2>/dev/null || true
-  if [ -s /tmp/toss-env ]; then grep -v '^TOSS_' .env > /tmp/env.notoss 2>/dev/null || true; cat /tmp/env.notoss /tmp/toss-env > .env 2>/dev/null || true; rm -f /tmp/env.notoss /tmp/toss-env; fi
-fi
 
 # ── Artifact Registry 로그인 (CI 프리빌드 이미지 pull용 — 실패 시 아래 --build 폴백) ──
 echo "${DK_TOKEN:-}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev || true
