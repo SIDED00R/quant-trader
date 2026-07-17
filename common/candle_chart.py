@@ -20,7 +20,7 @@ def _ascii(s: str) -> str:
     return "".join(ch if ord(ch) < 128 else "?" for ch in str(s))
 
 
-def render_candle_chart(bars: list, title: str, lines: dict | None = None, disp: int = 26) -> bytes:
+def render_candle_chart(bars: list, title: str, lines: dict | None = None) -> bytes:
     """bars=[(date,o,h,l,c[,v])] 오름차순(표시 구간으로 슬라이스된 상태) → PNG bytes.
 
     lines: {"tenkan","kijun","span_a","span_b"} — bars와 동일 인덱스(구름은 '그 시각에 그려진' 값). None이면 캔들만.

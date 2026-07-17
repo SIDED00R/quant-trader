@@ -34,7 +34,7 @@ _HELP = ("📈 사용법: /차트 <종목명 또는 티커>\n"
 
 def parse_command(text: str):
     """텍스트 → ('chart', 질의) | ('help', '') | None. `/차트`·`/chart`(@봇명 허용)·`/help`·`/start`."""
-    if not text:
+    if not text or not text.strip():
         return None
     parts = text.strip().split(maxsplit=1)
     cmd = parts[0].lower().lstrip("/").split("@")[0]
@@ -53,7 +53,9 @@ def _url(method: str, token: str) -> str:
 def send_message(token: str, chat_id, text: str) -> None:
     rate_limit.acquire("telegram", "bot")
     try:
-        httpx.post(_url("sendMessage", token), data={"chat_id": chat_id, "text": text}, timeout=20)
+        r = httpx.post(_url("sendMessage", token), data={"chat_id": chat_id, "text": text}, timeout=20)
+        if r.status_code != 200:                    # best-effort지만 진단 로그는 남긴다
+            print(f"[chart-bot] sendMessage {r.status_code}: {r.text[:200]}")
     except Exception as e:
         print(f"[chart-bot] sendMessage 실패: {type(e).__name__}: {e}")
 
@@ -61,8 +63,10 @@ def send_message(token: str, chat_id, text: str) -> None:
 def send_photo(token: str, chat_id, png: bytes, caption: str) -> None:
     rate_limit.acquire("telegram", "bot")
     try:
-        httpx.post(_url("sendPhoto", token), data={"chat_id": chat_id, "caption": caption[:1024]},
-                   files={"photo": ("chart.png", io.BytesIO(png), "image/png")}, timeout=30)
+        r = httpx.post(_url("sendPhoto", token), data={"chat_id": chat_id, "caption": caption[:1024]},
+                       files={"photo": ("chart.png", io.BytesIO(png), "image/png")}, timeout=30)
+        if r.status_code != 200:
+            print(f"[chart-bot] sendPhoto {r.status_code}: {r.text[:200]}")
     except Exception as e:
         print(f"[chart-bot] sendPhoto 실패: {type(e).__name__}: {e}")
 
@@ -111,7 +115,7 @@ def _handle_update(token: str, upd: dict, index: dict) -> None:
     chat_id = (msg.get("chat") or {}).get("id")
     if chat_id is None:
         return
-    if TELEGRAM_ALLOWED_CHAT_IDS and chat_id not in TELEGRAM_ALLOWED_CHAT_IDS:
+    if chat_id not in TELEGRAM_ALLOWED_CHAT_IDS:    # 빈 화이트리스트 = 전면 거부(fail-closed — 문서 기본값)
         print(f"[chart-bot] 비허용 chat_id={chat_id} drop")
         return
     parsed = parse_command(msg.get("text", ""))

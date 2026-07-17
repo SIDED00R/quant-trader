@@ -79,4 +79,4 @@ def fetch_daily(symbol: str, days: int, req_sleep: float = 0.25, log=print) -> l
                 log(f"[stock-daily] {symbol}: 401 — 토큰 강제 재발급 후 1회 재시도")
                 continue
             raise
-    return []
+    raise RuntimeError(f"{symbol}: fetch 실패(도달 불가)")   # for 루프는 항상 return/raise — 타입체커용 방어
