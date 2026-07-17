@@ -22,7 +22,7 @@ env:
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 
 jobs:
-  # 테스트 게이트 — 이전엔 CI가 테스트 0으로 배포해 빨간 코드가 프로드 VM에 직행할 수 있었다.
+  # 테스트 게이트 — 테스트를 통과해야 빌드·배포(빨간 코드의 프로드 VM 직행 차단).
   test:
     runs-on: ubuntu-latest
     steps:

@@ -19,4 +19,4 @@ COPY batch ./batch
 
 ENV PYTHONUNBUFFERED=1
 
-# 기본 커맨드 없음 — compose/Airflow에서 `python -m batch.backtest.reeval_weights [--dry-run]`로 지정
+# 기본 커맨드 없음 — compose에서 `python -m batch.backtest.reeval_weights [--dry-run]` 등으로 지정

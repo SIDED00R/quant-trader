@@ -16,8 +16,8 @@
 | Toss | 주식 데이터 | AUTH | **5** | — | client | 관측 |
 | Toss | 주식 데이터 | MARKET_DATA_CHART | **5** | — | client | 관측 |
 | Toss | 주식 데이터 | MARKET_DATA 외 | 응답 헤더로 확인 | — | client | 동적 |
-| Kiwoom | 데이터/정보 | REST (TR별) | **≈1** (버스트 2) | — | TR/계정 | 추정 |
-| Kiwoom | 데이터/정보 | WebSocket | 등록 제한 | — | 세션 | 보조 |
+| Kiwoom | 틱 아카이브 수집(매매 미채택) | REST (TR별) | **≈1** (버스트 2) | — | TR/계정 | 추정 |
+| Kiwoom | 틱 아카이브 수집(매매 미채택) | WebSocket | 등록 제한 | — | 세션 | 보조 |
 | Telegram | 매매 알림 발송 | send(MTProto) | **1** | ~20(채팅당) | 계정/채팅 | 공식(보수) |
 
 > 통합 레이트리미터 기본값은 위 "초당" 열을 보수적으로 채택했다. KIS는 모의(5) 기준이며 실전 전환 시 `acquire("kis","rest", rate=20)`. Telegram은 매매 잡당 1건(하루 수 건)이라 1/s로 충분하며, 초과 시 서버가 FloodWait을 주고 `notify_telegram`이 흡수한다.
@@ -44,7 +44,7 @@
 - 정확값은 응답 헤더 `X-RateLimit-Limit / -Remaining / -Reset` 로 확인(동적). 토큰 1개/클라이언트(재발급 시 이전 토큰 무효).
 - 출처: 토스 Open API OpenAPI 스펙(`servers: openapi.tossinvest.com`) + 본 프로젝트 실측.
 
-### Kiwoom 키움증권 (주식 — 데이터/키움 전용 정보)
+### Kiwoom 키움증권 (주식 — 틱 아카이브 수집 전용, 매매 미채택)
 - 신규 REST는 **TR(api_id)별 독립 제한** — 동일 TR 반복 시 **≈초당 1건(버스트 2)** 수렴, 서로 다른 TR은 합산 처리량이 더 높음. 초과 시 429 → 백오프.
 - 공식 명시 수치가 불투명해 **보수적으로 초당 1**로 둔다(실측 후 상향 가능).
 - 출처: [키움 REST API 래퍼(레이트리미터 동작)](https://github.com/younghwan91/kiwoom-rest-api), [키움 OpenAPI 개발가이드](https://openapi.kiwoom.com/)

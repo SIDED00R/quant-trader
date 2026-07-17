@@ -74,7 +74,7 @@
 - **운영 메모**: per-symbol 수집기는 장기범위 느림(공매도 8년 ~3시간) → **by-date 전종목 함수**(`get_*_by_ticker`, `get_market_net_purchases_of_equities_by_ticker`)로 벌크 리팩터 권장(검증 적재는 이 방식으로 수행). pykrx는 **import 시점 KRX_ID/PW 로그인** → .env를 import 전 로드. DART는 thstrm=분기3개월·연간12개월(Q4=연간−Q3누적).
 - **챔피언 확정(task3a)**: KR 챔피언 = **OHLCV + DART 펀더멘털**(macro·미시구조 제외). 7y purged-WF: OHLCV-only(no macro) 0.67% → **+DART 1.34%/NW_t 1.1/LS_Sharpe 1.42**. **macro 추가 시 1.17%로 악화**(US와 동일 — 시장수준 과적합), 미시구조 증분 0(#158). 재현: `python -m batch.ml.baseline_lgbm KR`(플래그 없음 = 챔피언: macro·kr-micro 기본 제외). 라이브 스코어러 `batch/ml/stock_score.py`가 이 설정.
 - **생존편향 소스 확보(task3b)**: 과거 "상폐 가격 무료소스 없음" **반증** — `FinanceDataReader('KRX-DELISTING')`(상폐 4,146종목 + 폐지일·사유 + 종목별 OHLCV)·`marcap`(1995~ by-date 스냅샷이 상폐종목 보존=생존편향-free)·pykrx `adjusted=False`(KRX 원시가). 보정안: FDR(상폐 라벨)+marcap(벌크 PIT 가격) → 별도 수집 트랙. 절대 IC 과대(생존편향)의 본질적 해결책.
-- **실모의 거래 배선(PR2)**: 챔피언 스코어러 → KIS 모의주문(`kis_order`) → 체결확인(잔고-diff; KIS 모의는 일별체결조회 미지원) 배선·실측(삼성 등 체결, 주문번호 0000014493). 대시보드 주식 탭(PR1)에 표시. KIS 호출은 `rate_limit`(5/s)+토큰 파일캐시. 운영화(동일가중 사이징·주간 스케줄·US 해외주문) 후속.
+- **실모의 거래 배선(PR2)**: 챔피언 스코어러 → KIS 모의주문(`kis_order`) → 체결확인(잔고-diff; KIS 모의는 일별체결조회 미지원) 배선·실측(삼성 등 체결, 주문번호 0000014493). 대시보드 주식 탭(PR1)에 표시. KIS 호출은 `rate_limit`(5/s)+토큰 파일캐시. 운영화(동일가중 사이징·주간 스케줄·US 해외주문)까지 라이브 가동 완료.
 
 ---
 *갱신: 외부데이터·DL·KR 추가 시 본 표를 이어서 기록. 절대값은 생존편향 미보정 잠정치.*

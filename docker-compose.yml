@@ -288,7 +288,7 @@ services:
     container_name: portfolio
     command: python -m trading.portfolio.updater
 
-  # 라이브 앙상블 파이프라인 (sma_trader 대체 — 이중 매매 방지로 단일 자동매매 경로 유지)
+  # 라이브 앙상블 파이프라인 (단일 자동매매 경로 — 이중 매매 방지)
   ensemble-signals:
     <<: *app
     container_name: ensemble-signals
@@ -358,7 +358,7 @@ services:
     <<: *batch-trade
     command: python -m trading.strategy.stock_trade_once --live --top-n 10 --max-orders 5
 
-  # ── 온디맨드 US 주간 모의 리밸런싱 (평일 15:30 ET, 마감 30분 전) — KR판의 US 대응 ──
+  # ── 온디맨드 US 주간 모의 리밸런싱 (평일 15:00 ET, 마감 1시간 전) — KR판의 US 대응 ──
   # 차이: USD·해외 잔고/지정가주문(시장가 불가)·거래소 라우팅+체결추격. 스타트업이 UTC 부팅시각(19·20·21)으로만 실행.
   us-trade-once:
     <<: *batch-trade

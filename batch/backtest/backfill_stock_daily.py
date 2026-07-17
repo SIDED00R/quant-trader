@@ -11,7 +11,7 @@ import sys
 from batch.backtest.toss_daily import fetch_daily, upsert_clickhouse
 from common.clickhouse_client import create_client
 
-_DEFAULT_SYMBOLS = "005930,000660,AAPL"   # 잠정(8단계 유니버스 확정 전). KR=6자리 숫자, US=티커.
+_DEFAULT_SYMBOLS = "005930,000660,AAPL"   # CLI 기본값(수동 백필용 샘플). KR=6자리 숫자, US=티커.
 
 
 def main(argv=None) -> int:

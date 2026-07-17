@@ -4,8 +4,7 @@
 손절/익절/트레일링 청산 사유를 제공한다. 백테스트 전략(sma·disciplined)이 임계값
 발산 없이 공유하도록 이 모듈에 둔다.
 
-과거 이 파일의 라이브 틱봇(run 루프: market.ticks 구독 → 계정별 진입/청산)은
-앙상블 경로(live_ensemble→commander / trade_once)로 대체되어 제거됨.
+라이브 매매는 앙상블 경로(live_ensemble→commander / trade_once)가 담당한다 — 이 모듈은 순수 판정 함수만 제공.
 """
 from collections import deque
 from decimal import Decimal

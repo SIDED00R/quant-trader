@@ -72,7 +72,7 @@ ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (symbol, window_start);
 
 -- 주식 분봉(인트라데이 연구·검증, 플랜 단계 0). stock_candles_1d와 동일 구조(통화/시장 차원 포함).
--- window_start = 분봉 시작 시각(UTC). 백필(토스/키움/US) 또는 stock.ticks 라이브 집계로 적재. 재실행 멱등.
+-- window_start = 분봉 시작 시각(UTC). 백필(토스/US) 또는 stock.ticks 라이브 집계로 적재. 재실행 멱등.
 CREATE TABLE IF NOT EXISTS stock_candles_1m (
     symbol        LowCardinality(String),
     window_start  DateTime('UTC'),
