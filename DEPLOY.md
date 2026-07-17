@@ -223,7 +223,25 @@ infra/terraform/
   # 드라이런: sudo DISK_MAX=1 bash infra/collector-healthcheck.sh → 🟠 수신 확인, 재실행 시 쿨다운 억제 확인,
   #           sudo rm /var/tmp/collector-healthcheck.state 로 리셋
   ```
-- **텔레그램 `/chart` 봇**: 이 레포가 아니라 별도 프로젝트 **`gcp-cost-controller`**(웹훅 gen2 Cloud Function, 항상 켜짐)의 `chart.py`가 담당한다 — `jhgcpcaller` 봇에 `/chart` 추가. 셋업·Toss 시크릿은 그 레포 `README.md`(§/chart 셋업)·`deploy.sh` 참조. (렌더/일목/종목명 코드는 quant-trader `common/`을 그 함수에 벤더링.)
+- **텔레그램 `/chart` 봇(수집 VM 상시 `telegram-bot` 서비스, 제어봇과 별도 봇)**: `/chart <종목명|티커>`(한글 `/차트` 별칭) → 봉차트(KR 주봉+일목·US 일봉) 응답. gcp-cost-controller(제어봇 jhgcpcaller, 서버리스)와 **분리** — 서버리스 egress IP는 가변이라 아래 Toss IP 허용목록을 못 맞춘다(그래서 상시 수집 VM에 얹음). 1회 셋업:
+  ```bash
+  # ⚠️ 핵심: Toss OpenAPI는 IP 허용목록 방식(미등록 IP는 토큰 발급부터 403 access_denied). 수집 VM은
+  #    예약 고정 IP가 있어야 하고, 그 IP를 Toss 개발자 콘솔 허용목록에 등록해야 봇/매매 데이터 fetch가 동작.
+  # ① 고정 IP 예약 + 수집 VM에 부여(부팅마다 바뀌는 임시 IP 금지 — 등록이 stale돼 403). 이미 예약돼 있으면 create 생략:
+  gcloud compute addresses create coin-trader-vm-ip --region=us-central1   # 예약값: 136.113.2.241 (기존 coin-trader-ip와 혼동 주의)
+  AC=$(gcloud compute instances describe coin-trader-vm --zone=us-central1-a --format="value(networkInterfaces[0].accessConfigs[0].name)")  # 대개 external-nat 또는 'External NAT'
+  gcloud compute instances delete-access-config coin-trader-vm --zone=us-central1-a --access-config-name="$AC"
+  gcloud compute instances add-access-config    coin-trader-vm --zone=us-central1-a --access-config-name="external-nat" --address=coin-trader-vm-ip
+  #    → 그 고정 IP(136.113.2.241)를 Toss 콘솔 허용목록에 등록(운영자 수동, 기존 34.28.69.174 대체 가능).
+  # ② 봇 생성(BotFather) → 토큰. (선택) /setcommands: chart - 종목 봉차트 조회 (등록은 ASCII만 → /chart, /차트는 타이핑만)
+  # ③ telegram-env 시크릿에 2줄 append(기존 MTProto 키 유지) — startup의 ^TELEGRAM_ prefix 병합으로 자동 반영:
+  #    TELEGRAM_BOT_TOKEN=123456:ABC...  /  TELEGRAM_ALLOWED_CHAT_IDS=<chat_id>  (새 버전 add)
+  # ④ 봇용 toss-env(일봉 fetch)·telegram-env(봇 토큰)를 수집 VM SA에 바인딩(주입은 startup의 각 블록이 수행):
+  for s in toss-env telegram-env; do gcloud secrets add-iam-policy-binding $s --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"; done
+  # ⑤ 수집 VM 재부팅(startup이 최신 main pull + telegram-bot 기동) 또는 `docker compose --profile collector up -d telegram-bot`
+  # 주의: Bot API getUpdates는 단일 소비자만 허용 — 로컬 테스트는 반드시 별도 테스트 토큰 사용(운영 토큰 동시 폴링 시 409).
+  # 주의: Toss 토큰은 클라이언트당 1개 — 봇/매매 잡이 같은 client_id면 상호 무효화 가능(봇은 401 자가재발급, 잡은 다음 부팅 회복).
+  ```
 - **관심종목 검색 종목명 첫 시딩(선택)**: CH `stock_names`는 db-init이 테이블만 만들고 실제 이름은 월간 maintenance(`_stock_names_step`)가 채운다. 첫 월간 실행 전 대시보드 이름검색을 쓰려면 매매 VM에서 1회 수동 시딩(없어도 티커 검색·관심종목 등록·`watchlist-charts`는 정상 동작):
   ```bash
   docker compose --profile trade run --rm maintenance-once python -c "from common.clickhouse_client import create_client; from common.stock_names import refresh_clickhouse; print(refresh_clickhouse(create_client()))"
