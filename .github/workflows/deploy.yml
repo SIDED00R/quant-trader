@@ -19,7 +19,7 @@ permissions:
 env:
   PROJECT: coin-auto-trader-jvfhgq
   ZONE: us-central1-a          # 수집 VM(coin-trader-vm, 상시)
-  TRADE_ZONE: us-central1-c    # 매매 VM(coin-trade-vm) — 존 용량 고갈 회피로 이전(#266)
+  TRADE_ZONE: asia-northeast3-a  # 매매 VM(coin-trade-vm) — 서울 리전(us-central1 용량 고갈 회피, #266)
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 
 jobs:

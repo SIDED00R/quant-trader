@@ -9,7 +9,7 @@ set -euo pipefail
 
 P=coin-auto-trader-jvfhgq
 Z=us-central1-a          # 수집 VM(coin-trader-vm, 상시) 존
-TRADE_Z=us-central1-c    # 매매 VM(coin-trade-vm) 존 — us-central1-a 용량 고갈 회피로 이전(#266)
+TRADE_Z=asia-northeast3-a  # 매매 VM(coin-trade-vm) 존 — 서울 리전(us-central1 용량 고갈 회피 + 한국 거래소/브로커 근접, #266)
 R=us-central1
 GH=SIDED00R/quant-trader
 EMAIL=mywinningtime@gmail.com
@@ -114,9 +114,9 @@ upsert trade-vm-maintenance-sweep "0 5 * * 6"     "Etc/UTC"
 echo "── 9. 매매 VM 메타데이터 즉시 반영 (새 KR 잡이 구 분기표로 발화하는 일 방지)"
 gcloud compute instances add-metadata coin-trade-vm --project $P --zone=$TRADE_Z \
   --metadata-from-file startup-script="$(dirname "$0")/trade-vm-startup.sh" --quiet
-# 머신타입 보장: us-central1-a 존 용량 고갈(ZONE_RESOURCE_POOL_EXHAUSTED)로 start가 반복 실패(#260/#261 — 07-16 US 매매 누락,
-# 07-17엔 KR 시간대까지 확산 + 마지막 보루 c2d-standard-2마저 고갈). 원인은 특정 머신타입이 아니라 붐비는 us-central1-a 존
-# 자체 → 매매 VM을 us-central1-c($TRADE_Z)로 이전(#266)하고 머신타입을 최저가 범용 e2-standard-2(동일 2vCPU/8GB)로 되돌린다.
+# 머신타입 보장: us-central1 존 용량 고갈(ZONE_RESOURCE_POOL_EXHAUSTED)로 start가 반복 실패(#260/#261 — 07-16 US 매매 누락,
+# 07-17 c2d까지 고갈; 이후 실측 -c/-f/-b는 e2 고갈, -a만 e2 가용 — 고갈은 존×타입×시각의 움직이는 로또라 특정 조합 고정은 취약).
+# → 매매 VM을 서울(asia-northeast3, $TRADE_Z)로 이전(#266): us-central1과 독립 용량 풀 + 한국 거래소/브로커 근접. 타입은 최저가 e2-standard-2.
 # 온디맨드 VM이라 평소 TERMINATED — set-machine-type만 적용하고 start는 하지 않는다(스케줄러가 기동; 켜두면 스케줄 매매가 막힘).
 TRADE_MT=$(gcloud compute instances describe coin-trade-vm --project $P --zone=$TRADE_Z --format='value(machineType.scope(machineTypes))' 2>/dev/null || true)
 if [ -n "$TRADE_MT" ] && [ "$TRADE_MT" != "e2-standard-2" ]; then
