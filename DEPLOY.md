@@ -227,16 +227,17 @@ infra/terraform/
   ```bash
   # ⚠️ 핵심: Toss OpenAPI는 IP 허용목록 방식(미등록 IP는 토큰 발급부터 403 access_denied). 수집 VM은
   #    예약 고정 IP가 있어야 하고, 그 IP를 Toss 개발자 콘솔 허용목록에 등록해야 봇/매매 데이터 fetch가 동작.
-  # ① 고정 IP 예약 + 수집 VM에 부여(부팅마다 바뀌는 임시 IP 금지 — 등록이 stale돼 403):
-  gcloud compute addresses create coin-trader-vm-ip --region=us-central1
-  gcloud compute instances delete-access-config coin-trader-vm --zone=us-central1-a --access-config-name="external-nat"
-  gcloud compute instances add-access-config    coin-trader-vm --zone=us-central1-a --access-config-name="external-nat" --address=<고정IP>
-  #    → 그 <고정IP>를 Toss 콘솔 허용목록에 등록(운영자 수동). 현재 예약값: 136.113.2.241
+  # ① 고정 IP 예약 + 수집 VM에 부여(부팅마다 바뀌는 임시 IP 금지 — 등록이 stale돼 403). 이미 예약돼 있으면 create 생략:
+  gcloud compute addresses create coin-trader-vm-ip --region=us-central1   # 예약값: 136.113.2.241 (기존 coin-trader-ip와 혼동 주의)
+  AC=$(gcloud compute instances describe coin-trader-vm --zone=us-central1-a --format="value(networkInterfaces[0].accessConfigs[0].name)")  # 대개 external-nat 또는 'External NAT'
+  gcloud compute instances delete-access-config coin-trader-vm --zone=us-central1-a --access-config-name="$AC"
+  gcloud compute instances add-access-config    coin-trader-vm --zone=us-central1-a --access-config-name="external-nat" --address=coin-trader-vm-ip
+  #    → 그 고정 IP(136.113.2.241)를 Toss 콘솔 허용목록에 등록(운영자 수동, 기존 34.28.69.174 대체 가능).
   # ② 봇 생성(BotFather) → 토큰. (선택) /setcommands: chart - 종목 봉차트 조회 (등록은 ASCII만 → /chart, /차트는 타이핑만)
   # ③ telegram-env 시크릿에 2줄 append(기존 MTProto 키 유지) — startup의 ^TELEGRAM_ prefix 병합으로 자동 반영:
   #    TELEGRAM_BOT_TOKEN=123456:ABC...  /  TELEGRAM_ALLOWED_CHAT_IDS=<chat_id>  (새 버전 add)
-  # ④ 봇의 온디맨드 일봉 fetch용 toss-env·telegram-env를 수집 VM SA에 바인딩(주입은 startup 블록이 수행):
-  gcloud secrets add-iam-policy-binding toss-env --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"
+  # ④ 봇용 toss-env(일봉 fetch)·telegram-env(봇 토큰)를 수집 VM SA에 바인딩(주입은 startup의 각 블록이 수행):
+  for s in toss-env telegram-env; do gcloud secrets add-iam-policy-binding $s --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"; done
   # ⑤ 수집 VM 재부팅(startup이 최신 main pull + telegram-bot 기동) 또는 `docker compose --profile collector up -d telegram-bot`
   # 주의: Bot API getUpdates는 단일 소비자만 허용 — 로컬 테스트는 반드시 별도 테스트 토큰 사용(운영 토큰 동시 폴링 시 409).
   # 주의: Toss 토큰은 클라이언트당 1개 — 봇/매매 잡이 같은 client_id면 상호 무효화 가능(봇은 401 자가재발급, 잡은 다음 부팅 회복).
