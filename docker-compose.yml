@@ -409,6 +409,28 @@ services:
       - ./charts:/app/charts
     command: python -m scripts.render_equity_chart --out charts
 
+  # ── 관심종목 데일리 차트 푸시 (profile: trade — 코인 분기(매일 10:00 KST)에서 startup이 실행) ──
+  # app 이미지(pillow+telethon). 로컬 CH 우선/낡으면 Toss 폴백 → symbol_chart 렌더 → 유저세션 텔레그램 발송.
+  watchlist-charts:
+    image: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-app:latest
+    build: .
+    profiles: ["trade"]
+    restart: "no"
+    network_mode: host
+    logging: *logging
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_pw}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-127.0.0.1}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-ch_pw}
+      TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}          # 로컬 CH에 없는/낡은 관심종목 봉 폴백
+      TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+      TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
+    command: python -m common.watchlist_chart_telegram
+
   api:
     <<: *app
     container_name: api

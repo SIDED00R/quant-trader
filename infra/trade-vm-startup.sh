@@ -211,6 +211,8 @@ case "$BOOT_HOUR" in
     docker compose --profile trade run $(build_flag maintenance-once "$BATCH_IMG") --rm maintenance-once python -m batch.data.fred 2>&1 | tee -a /var/log/trade-once.log || true
     docker compose --profile trade run $(build_flag trade-once "$APP_IMG") --rm trade-once python -m trading.strategy.trade_once 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인" "${PIPESTATUS[0]}" /var/log/trade-once.log
+    # 관심종목 데일리 차트 푸시(매일 — 코인 분기에서만). 비치명: 실패해도 poweroff 진행.
+    docker compose --profile trade run $(build_flag watchlist-charts "$APP_IMG") --rm watchlist-charts 2>&1 | tee -a /var/log/watchlist-charts.log || true
     ;;
 esac
 

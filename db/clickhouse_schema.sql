@@ -250,6 +250,18 @@ CREATE TABLE IF NOT EXISTS stock_delisting (
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY symbol;
 
+-- 종목명 사전(US=SEC company_tickers·KR=KRX 정보데이터시스템). 대시보드 관심종목 검색용 — 월간 maintenance가 갱신.
+-- KR 6자리코드·US 티커는 충돌 없음. 없어도 검색은 티커 합성행으로 degrade(관심종목 추가는 티커만으로 가능).
+CREATE TABLE IF NOT EXISTS stock_names (
+    symbol      LowCardinality(String),
+    market      LowCardinality(String),          -- KR | US
+    name        String,                          -- KR=한글약명, US=영문명
+    source      LowCardinality(String) DEFAULT 'auto',
+    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(ingested_at)
+ORDER BY (market, symbol);
+
 -- ── 신규 무료 데이터(주식 퀀트 공용) ──
 
 -- 팩터 일간 수익률(Ken French Data Library). 수익 귀인(내 엣지가 알파냐 팩터노출이냐) + 팩터중립 피처.
