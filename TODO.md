@@ -1,11 +1,11 @@
-# TODO — 매매 알고리즘 고도화 (앙상블) + 주식(키움) 확장
+# TODO — 매매 알고리즘 고도화 (앙상블) + 주식(KR/US) 확장
 
 > 순차 진행. 한 항목 끝나면 체크하고 다음으로. 세션 종료 시 "TODO.md 업데이트해줘"로 진행상황 반영.
 > 원칙: 각 단계는 백테스트/회귀로 **검증 가능한 성공 기준**을 갖는다.
 
 > **📌 현재 운영/배포 상태 (2026-07-05)**: **코인 앙상블 + KR/US 주식 ML 라이브 배포(모의) — 2-VM 온디맨드**.
 > - **아키텍처**: 수집 VM(상시, e2-small, `--profile collector` 수집·저장만) + **매매 VM(온디맨드·자기완결 로컬 DB, Cloud Scheduler 8잡: 코인 매일 01:00 UTC·KR 15:00 KST·US 15:00 ET 장마감 전·월간 유지보수 첫 토요일, 기동→동기 배치→자가종료)**. 라이브 매매 = trade_once/stock_trade_once/us_trade_once. Kafka는 데이터 팬아웃만. **상시 비용 ~$13/월**.
-> - 대시보드 = 매매 VM 온디맨드 모드(SSH 터널 `gcloud compute ssh coin-trade-vm -- -L 8000:localhost:8000` + 구글 OAuth). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
+> - 대시보드 = 매매 VM 온디맨드 모드(`https://jh-quantlab.duckdns.org` 구글 OAuth, SSH 터널 폴백). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
 > - 계정 초기화 완료(본인 2계정 → ₩10M). 주식은 KIS 모의계좌(KR+US 통합).
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
@@ -97,7 +97,7 @@
 - [x] **5.2 가중치 저장소**: Postgres `strategy_weights(strategy, weight, updated_at)` + `load_weights`(미등록/합0 → 동일가중 폴백) #68 #69
 - [x] **5.3 commander 적응형 합의**: 봉별 버퍼링 → `strategy_weights` 가중합(`combined_for_bar`), **적응 toggle `ENSEMBLE_ADAPTIVE` 기본 off=동일가중=부하 평균**(현 동작 보존) #68 #69 — VM 배포·검증 완료(2026-06-20)
 - [x] **5.4 부하별 성과추적 + 재평가 잡**: `reeval_weights`가 각 부하 OOS 성과(`walkforward.oos_returns`/DSR) → `weight_policy.compute_weights`(floor·cap·EWMA·**demote≠delete**·DSR게이트) → `strategy_weights` UPSERT. 별도 배치 이미지(`Dockerfile.batch`). #71 #72 #73 #74
-- [x] **5.5 스케줄러 + 온디맨드 인프라**: 단일 16GB → **2-VM 분리**(상시 데이터 `--profile data` + 온디맨드 매매) + **Cloud Scheduler**(매일 01:00 UTC 매매 VM 기동 → `trade_once` 동기 배치 → 자가종료). **Airflow는 보류**(무거운 정기 잡 없음 → DL 도입 시 도입). 비용 ~$66→~$25/월. #75~#87
+- [x] **5.5 스케줄러 + 온디맨드 인프라**: 단일 16GB → **2-VM 분리**(상시 수집 + 온디맨드 매매) + **Cloud Scheduler**(매일 01:00 UTC 매매 VM 기동 → `trade_once` 동기 배치 → 자가종료). **Airflow는 보류**(무거운 정기 잡 없음 → DL 도입 시 도입). 비용 ~$66→~$13/월(현행). #75~#87
 - [~] **5.6 병렬성**: Kafka 다소비자 팬아웃(ingester→sink+candle)으로 데이터 경로는 이미 충족. 부하 합성은 `trade_once`가 동기 처리(온디맨드 배치라 N개 독립 컨슈머 불요 — 설계 변경으로 대체)
 > ⚠️ **가드(절대)**: 적응층 기본 off · DSR 게이트 · EWMA/일변동 캡 · demote≠delete · 가중식 자체 OOS 검증.
 > "재학습으로 향상"이 아니라 "**열화 부하 자동 강등**" 안전장치로 보수적 사용.
@@ -108,18 +108,15 @@
 - [x] 대시보드 성과 패널 — 실현손익·승률·거래수·수수료(`/performance` FIFO, `api/web`) #61
 - [x] 코인 단계 회고/문서화 (`BACKLOG.md` 회고 + `docs/model.md` 모델카드) #61
 
-## 7단계 — 주식(키움) 토대
-> **진행**: ① #4 체결/계좌 모델 ✅(#120/PR#121) → ② 정규장(09:00~15:30 KST)에 #2 라이브 틱 검증 + FID 보정(대기) → ③ #5 단건 주문 왕복(KIS 주문 PR#117 평일 체결검증 대기). (#3 유니버스는 8단계 백테스트 후 결정·보류).
+## 7단계 — 주식 토대
+> **완결** — 체결/계좌 모델·틱 수집기 완료. 키움 기반 매매 계획(단건 주문 왕복·FID 보정·유니버스 선정)은 **폐기**: 체결=KIS(`common/kis_*`), 유니버스=ML 동적 top-N.
 - [x] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md` (#102)
-- [~] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. **토큰·WS·LOGIN·REG 실서버(모의) 검증 완료** — 정규장 0B 틱 수신·FID(10/15/20) 보정만 대기)
-- [ ] 종목 유니버스 선정 논의/결정 (전 종목 X — 어떤 종목 대상으로 할지) → `docs/kiwoom.md` (잠정 005930+000660, 확정은 8단계 백테스트 성과로)
-- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/market_hours.py`(`asset_class`/`is_coin`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST, 미국주식 미지원) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개. *라이브 `place_order` 정수/장시간 가드는 #5로 이월.*
-- [ ] 키움 모의계정으로 단건 주문 왕복 검증 (API → 모의체결 → 내 대시보드 반영) — **정규장+모의계좌 필요**: 코인 Kafka 매칭엔진 **우회**. `api/routes/stock_orders.py`(kt10000 매수 1주) + `kiwoom_client` 주문 호출 + `executions`에 `asset_class`/`broker_order_id` 컬럼(ADD COLUMN IF NOT EXISTS) + 대시보드 주식 패널(`loadStockExecs`). 체결멱등 `uuid5(ord_no)`
+- [x] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. 실서버(모의) 검증 완료 — **아카이브 수집 전용으로 운영**, 매매 활용 계획은 폐기)
+- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/market_hours.py`(`asset_class`/`is_coin`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개.
 
-## 8단계 — 주식 앙상블 (구조 재사용)
-- [ ] 코인 `Strategy`/`Commander`/신호버스 구조를 주식에 재사용 (`stock.signals` 토픽)
-- [~] 주식용 알고리즘 백테스트·기준치 선별 (주식 데이터 기준) — 하니스 지원 완료(#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계). 기준치 선별·유니버스 확정은 잔여(ClickHouse 주식 일봉 적재 후 실행). *후속: `TREND_BARS_PER_YEAR`/연율화를 주식 거래일 ~252로 분기(현 코인 365 공용).*
-- [ ] 주식 모의매매 라이브 + 성과 검증
+## 8단계 — 주식 백테스트·라이브 (ML 스코어러로 전환)
+- [x] 주식용 백테스트 하니스 지원 (#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계) — 기준치 선별·유니버스는 ML 트랙(GBDT 챔피언·동적 top-N)으로 대체
+- [x] 주식 모의매매 라이브 가동 — ML 챔피언 주간 리밸런싱(KIS KR/US), 성과는 운용 관찰 중
 
 ### 8.1 인트라데이(분봉) 매매 연구·검증 (신규 트랙 — `docs/intraday_research.md`)
 > 일 1회 → 분 단위(1~60분) 고빈도 탐색. 유니버스 KOSPI200+KOSDAQ150+S&P500+NASDAQ(~950, long-or-cash). 연구→검증→조건부배포, ML/DL 포함(GPU는 DL/RL 학습 시에만).
@@ -127,8 +124,8 @@
 - [x] 단계0 분봉 데이터(#128 스키마·#130 토스 분봉 수집기·게이트 통과 1m KR+US 3년+) + 정합성 하니스(#132 US세션/연율화/정규장필터)
 - [x] 단계2 shortlist 구현: 횡단면 엔진 `xs_reversal`/`xs_momentum`(#134) + 세션 `orb`/`intraday_momentum`(#136). 트리 ML은 미착수(후속)
 - [x] 단계3 검증(#138 일반화 walk-forward) → **1차 실측 결과 `docs/intraday_baseline.md`**: 1분봉 전멸(−100%, 비용사), **일봉 횡단면 모멘텀(lb60) OOS +116%·PSR 0.99 게이트 통과**. 빈도가 결정변수.
-- [ ] 단계3b 채택후보(xs_momentum 일봉) **전 유니버스 재검증**(breadth·다중검정 N보정·레짐·US/point-in-time) — 라이브 전 필수
-- [ ] 단계4 조건부 배포(통과 유지 시 — 일/저회전이라 분 스트리밍 불요·trade_once류 일배치 재사용; KIS 체결)
+- [x] 단계3b 채택후보(xs_momentum 일봉) **전 유니버스 재검증** — 856종목·7.1y 통과(#143/PR#144, DSR≥0.99) → 이후 ML 트랙(GBDT 챔피언)으로 발전
+- [x] 단계4 배포 — ML 챔피언(GBDT) 주간 리밸런싱으로 실현(trade_once류 일배치·KIS 체결)
 
 ## 9단계 — 통합 자산배분
 - [ ] 전체 자산 100 기준 코인+주식 배분 정책 설계 (자산군 비중·리밸런싱)
