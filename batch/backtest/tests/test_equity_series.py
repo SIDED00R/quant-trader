@@ -8,7 +8,14 @@ US 참여인데 환율 없으면 빈 리스트(부분 합산 착시 방지) · K
 import unittest
 from datetime import date
 
-from common.equity_series import _fx_at, common_start, merge_total_krw, rebase_pct
+from common.equity_series import (
+    PAPER_MARKETS,
+    _fx_at,
+    chart_rows,
+    common_start,
+    merge_total_krw,
+    rebase_pct,
+)
 
 D = date
 
@@ -94,6 +101,30 @@ class TestMergeTotal(unittest.TestCase):
 
     def test_empty_series(self):
         self.assertEqual(merge_total_krw({"COIN": [], "KR": [], "US": []}, self.FX), [])
+
+
+class TestChartRowsPaper(unittest.TestCase):
+    """페이퍼 시장(KR_ICHIMOKU)은 TOTAL·공통시작 제외 + 자기 시작일 앵커."""
+    FX = [(D(2026, 1, 1), 1000.0), (D(2026, 6, 1), 1000.0)]
+    MARKETS = {
+        "COIN": [(D(2026, 1, 1), 100.0, None), (D(2026, 6, 1), 150.0, None)],
+        "KR": [(D(2026, 1, 1), 100.0, None), (D(2026, 6, 1), 120.0, None)],
+        "US": [(D(2026, 1, 1), 10.0, None), (D(2026, 6, 1), 11.0, None)],
+        "KR_ICHIMOKU": [(D(2026, 5, 1), 1e8, None), (D(2026, 6, 1), 1.1e8, None)],  # 늦은 합류
+    }
+
+    def test_paper_marker(self):
+        self.assertIn("KR_ICHIMOKU", PAPER_MARKETS)
+
+    def test_paper_self_anchored_and_excluded_from_total(self):
+        rows = {r["key"]: r for r in chart_rows(self.MARKETS, self.FX)}
+        # 페이퍼는 자기 첫날(5/1)=0%에서 출발, +10% 상승
+        self.assertEqual(rows["KR_ICHIMOKU"]["points"][0], (D(2026, 5, 1), 0.0))
+        self.assertAlmostEqual(rows["KR_ICHIMOKU"]["ret"], 10.0)
+        # TOTAL은 실운용(COIN+KR+US×fx)만 — 1억대 페이퍼가 섞이지 않음
+        self.assertLess(rows["TOTAL"]["last_value"], 1e6)
+        # 실운용 시리즈는 공통 시작일(1/1)에 앵커
+        self.assertEqual(rows["KR"]["points"][0], (D(2026, 1, 1), 0.0))
 
 
 if __name__ == "__main__":

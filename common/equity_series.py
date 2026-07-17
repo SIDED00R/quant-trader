@@ -10,7 +10,7 @@ import bisect
 from datetime import datetime, timedelta, timezone
 
 from common.clickhouse_client import create_client
-from common.equity_snapshot import KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(조회 콜러가 쓰기 모듈을 몰라도 되게)
+from common.equity_snapshot import ICHIMOKU_ACCOUNT, KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(조회 콜러가 쓰기 모듈을 몰라도 되게)
 
 
 def _since(days: int):
@@ -120,24 +120,30 @@ def rebase_pct(points: list[tuple], start) -> list[tuple]:
     return [(start, 0.0)] + [(p[0], (float(p[1]) / base - 1.0) * 100.0) for p in after]
 
 
-ORDER = ["TOTAL", "COIN", "KR", "US"]
+ORDER = ["TOTAL", "COIN", "KR", "KR_ICHIMOKU", "US"]
+# 페이퍼(가상 자금) 시장 — 실운용 TOTAL·공통 시작일 산정에서 제외하고, 자기 시작일 기준으로 리베이스한다.
+PAPER_MARKETS = frozenset({"KR_ICHIMOKU"})
 
 
 def chart_rows(markets: dict[str, list], fx: list[tuple]) -> list[dict]:
-    """시장 시계열 → 차트 행(TOTAL 합성 + 공통 시작일 0% 리베이스 + 수익률 + 마지막 원값).
+    """시장 시계열 → 차트 행(TOTAL 합성 + 0% 리베이스 + 수익률 + 마지막 원값).
 
-    포인트<2 시리즈(앵커뿐 = 공통 시작 이후 관측 없음) 제외.
-    SVG(scripts/render_equity_chart)·텔레그램 PNG(common/equity_chart_telegram) 렌더 공용.
+    포인트<2 시리즈(앵커뿐 = 시작 이후 관측 없음) 제외.
+    실운용 시장(COIN/KR/US)은 공통 시작일에 앵커 → 같은 시점 출발. 페이퍼 시장(KR_ICHIMOKU)은
+    합류가 늦어 공통 시작일에 데이터가 없으므로 자기 첫 관측일에 자체 앵커(전체 곡선을 뒤로 당기지 않음).
+    TOTAL은 실운용 시장만 합산(가상 자금 제외). SVG·텔레그램 PNG 렌더 공용.
     """
-    start = common_start(markets)
+    real = {m: p for m, p in markets.items() if m not in PAPER_MARKETS}
+    start = common_start(real)
     if start is None:
         return []
     merged = dict(markets)
-    merged["TOTAL"] = merge_total_krw(markets, fx)
+    merged["TOTAL"] = merge_total_krw(real, fx)
     rows = []
     for key in ORDER:
         pts = merged.get(key) or []
-        pct = rebase_pct(pts, start)
+        anchor = pts[0][0] if (key in PAPER_MARKETS and pts) else start   # 페이퍼=자기 시작일 앵커
+        pct = rebase_pct(pts, anchor)
         if len(pct) < 2:
             continue
         rows.append({"key": key, "points": pct, "ret": pct[-1][1],

@@ -364,6 +364,12 @@ services:
     <<: *batch-trade
     command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
 
+  # ── 온디맨드 KR 일목 주간 페이퍼 매매 (평일 15:00 KST, stock-trade-once 뒤) — 주봉 구름 신호 → Postgres 시뮬 체결 ──
+  # 실계좌 없음: paper_ledger가 orders/executions/positions에 기록. 주간 마커 키 KR_ICHIMOKU(ML 'KR'과 격리). ML 전략과 자산곡선 비교용.
+  kr-ichimoku-trade-once:
+    <<: *batch-trade
+    command: python -m trading.strategy.kr_ichimoku_trade_once --live --max-positions 30
+
   # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기+연구 수집기(KRX 증분·FRED·PIT 멤버십·상폐 메타), #204) ──
   maintenance-once:
     <<: *batch-trade
