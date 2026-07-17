@@ -55,7 +55,7 @@ def _load_rows(days: int) -> list[dict]:
 def _caption(rows: list[dict], now=None) -> str:
     """한글 요약 캡션 — 이미지 라벨이 ASCII라 한글 명칭·통화 상세는 여기서 전달."""
     now = now or datetime.now(timezone.utc)
-    head = f"📈 자산 추이 — 기준일=100 ({now.strftime('%Y-%m-%d %H:%M')} UTC)"
+    head = f"📈 자산 추이 — 공통 시작일=0% 수익률 ({now.strftime('%Y-%m-%d %H:%M')} UTC)"
     parts = [f"{LABELS_KO[r['key']]} {_money(r['currency'], r['last_value'])} ({r['ret']:+.1f}%)"
              for r in rows]
     return head + "\n" + " · ".join(parts)
@@ -70,7 +70,7 @@ def _render_png(rows: list[dict]) -> bytes:
     f_title = ImageFont.load_default(size=26)
     f_leg = ImageFont.load_default(size=19)
     f_axis = ImageFont.load_default(size=16)
-    d.text((PAD_L, 24), "quant-trader | equity index (base=100)", font=f_title, fill=INK)   # ASCII만(내장 폰트 글리프 한계)
+    d.text((PAD_L, 24), "quant-trader | return since common start (%)", font=f_title, fill=INK)   # ASCII만(내장 폰트 글리프 한계)
     lx = PAD_L
     for r in rows:
         d.rectangle([lx, 76, lx + 26, 82], fill=SERIES[r["key"]])
@@ -89,7 +89,11 @@ def _render_png(rows: list[dict]) -> bytes:
         v = v0 + (v1 - v0) * g / 3
         yy = y(v)
         d.line([PAD_L, yy, W - PAD_R, yy], fill=GRID, width=1)
-        d.text((PAD_L - 10, yy - 9), f"{v:.1f}", font=f_axis, fill=MUTED, anchor="ra")
+        d.text((PAD_L - 10, yy - 9), f"{v:+.1f}%", font=f_axis, fill=MUTED, anchor="ra")
+    if v0 <= 0.0 <= v1:   # 0% 기준선(손익 경계) — 앵커 0%라 항상 범위 안
+        y0 = y(0.0)
+        for xx in range(PAD_L, W - PAD_R, 10):   # pillow 대시 미지원 → 수동 점선
+            d.line([xx, y0, min(xx + 5, W - PAD_R), y0], fill=MUTED, width=1)
     dates_sorted = sorted(set(ds))
     for g in range(4):
         target = d0 + (d1 - d0) * g / 3

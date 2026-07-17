@@ -287,7 +287,7 @@
 
 <div id="view-equity" hidden>
   <div class="panel full">
-    <h2>자산 추이 <span class="tag">기준일=100 · 일 1포인트</span></h2>
+    <h2>자산 추이 <span class="tag">공통 시작일=0% 수익률 · 일 1포인트</span></h2>
     <div class="eq-head">
       <div class="seg" id="eqRangeSeg">
         <button type="button" data-days="30">30일</button>
@@ -758,14 +758,34 @@ async function appendLiveEquity(h){
     upsert("TOTAL", last("COIN") + last("KR") + last("US") * h.fx_latest);
 }
 
+// 공통 시작일 = 데이터가 있는 전 시장이 관측을 시작한 날(늦게 합류한 시장 기준 — 서버 TOTAL 합성과 동일 원칙).
+function eqCommonStart(){
+  const firsts = ["COIN", "KR", "US"].map(k => {
+    const raw = ((equityData[k] || {}).points || []).filter(p => p.equity > 0);
+    return raw.length ? raw[0].date : null;
+  }).filter(Boolean);
+  return firsts.length ? firsts.reduce((a, b) => a > b ? a : b) : null;
+}
+
+// 공통 시작일 값=0% 수익률 리베이스 — 기준값은 start 이전(포함) 마지막 관측(forward-fill), 앵커 (start, 0%).
+function eqRebase(raw, start){
+  let base = null; const after = [];
+  for(const p of raw){ if(p.date <= start) base = p.equity; else after.push(p); }
+  if(!(base > 0)) return null;
+  return [{ t: Date.parse(start), v: base, n: 0 }]
+    .concat(after.map(p => ({ t: Date.parse(p.date), v: p.equity, n: (p.equity / base - 1) * 100 })));
+}
+
 function eqSeriesView(){
   if(!equityData) return [];
+  const start = eqCommonStart();
+  if(!start) return [];
   return EQ_SERIES.map(s => {
+    if(!eqOn[s.key]) return null;
     const raw = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
-    if(raw.length < 2 || !eqOn[s.key]) return null;
-    const base = raw[0].equity;
-    return { ...s, color: cssv(s.css),
-      pts: raw.map(p => ({ t: Date.parse(p.date), v: p.equity, n: p.equity / base * 100 })) };
+    const pts = raw.length ? eqRebase(raw, start) : null;
+    if(!pts || pts.length < 2) return null;
+    return { ...s, color: cssv(s.css), pts };
   }).filter(Boolean);
 }
 
@@ -791,14 +811,19 @@ function drawEquityChart(){
   const t0 = Math.min(...ts), t1 = Math.max(...ts);
   let n0 = Math.min(...ns), n1 = Math.max(...ns);
   const padN = Math.max((n1 - n0) * 0.08, 0.5); n0 -= padN; n1 += padN;
-  const top = 14, bot = h - 22, padL = 44, padR = 16;
+  const top = 14, bot = h - 22, padL = 52, padR = 16;
   const x = t => padL + (w - padL - padR) * (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0));
   const y = n => bot - (bot - top) * ((n - n0) / (n1 - n0));
   ctx.strokeStyle = cssv("--line"); ctx.fillStyle = cssv("--faint"); ctx.font = "10px ui-monospace"; ctx.lineWidth = 1;
   for(let g = 0; g <= 3; g++){
     const n = n0 + (n1 - n0) * g / 3, yy = y(n);
     ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(w - padR, yy); ctx.stroke();
-    ctx.fillText(n.toFixed(1), 4, yy - 2);
+    ctx.fillText((n >= 0 ? "+" : "") + n.toFixed(1) + "%", 4, yy - 2);
+  }
+  if(n0 <= 0 && 0 <= n1){                                    // 0% 기준선(손익 경계 — 모든 시리즈의 출발점)
+    const y0 = y(0);
+    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = cssv("--muted");
+    ctx.beginPath(); ctx.moveTo(padL, y0); ctx.lineTo(w - padR, y0); ctx.stroke(); ctx.restore();
   }
   ctx.textAlign = "center";
   for(let g = 0; g <= 3; g++){
@@ -832,9 +857,11 @@ function drawEquityChart(){
 function renderEquityLegend(){
   const el = document.getElementById("eqLegend"); if(!el) return;
   if(!equityData){ el.innerHTML = ""; return; }
+  const start = eqCommonStart();
   el.innerHTML = EQ_SERIES.map(s => {
-    const pts = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
-    const ret = pts.length > 1 ? (pts[pts.length-1].equity / pts[0].equity - 1) * 100 : null;
+    const raw = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
+    const reb = raw.length && start ? eqRebase(raw, start) : null;
+    const ret = reb && reb.length > 1 ? reb[reb.length-1].n : null;
     const cls = ret == null ? "muted" : ret > 0 ? "up" : ret < 0 ? "down" : "muted";
     return `<button type="button" class="eq-key ${eqOn[s.key] ? "" : "off"}" data-k="${s.key}">
       <i style="background:${cssv(s.css)}"></i>${s.label}
@@ -851,13 +878,15 @@ function renderEquityCards(){
     el.innerHTML = `<div class="cell"><span class="k muted">자산 이력을 불러오지 못했습니다</span></div>`;
     return;
   }
+  const start = eqCommonStart();
   el.innerHTML = EQ_SERIES.map(s => {
     const d = equityData[s.key] || {};
     const pts = (d.points || []).filter(p => p.equity > 0);
     if(!pts.length) return `<div class="cell"><div class="k">${s.label}</div>
       <div class="val muted" style="font-size:13px">기록 대기</div></div>`;
     const lastP = pts[pts.length-1];
-    const ret = pts.length > 1 ? (lastP.equity / pts[0].equity - 1) * 100 : null;
+    const reb = start ? eqRebase(pts, start) : null;
+    const ret = reb && reb.length > 1 ? reb[reb.length-1].n : null;
     const cls = ret == null ? "" : ret > 0 ? "up" : ret < 0 ? "down" : "";
     return `<div class="cell"><div class="k">${s.label}</div>
       <div class="val">${eqMoney(d.currency, lastP.equity)}</div>
@@ -886,7 +915,7 @@ function initEquityView(){
       const p = eqNearest(s.pts, eqHoverT); if(!p) return "";
       return `<span style="display:inline-block;width:12px;height:3px;border-radius:2px;background:${s.color};margin-right:6px;vertical-align:middle"></span>` +
         `${s.label} <span class="num">${eqMoney(s.key === "US" ? "USD" : "KRW", p.v)}</span>` +
-        ` <span class="num muted">(${p.n >= 100 ? "+" : ""}${(p.n - 100).toFixed(1)}%)</span>`;
+        ` <span class="num muted">(${p.n >= 0 ? "+" : ""}${p.n.toFixed(1)}%)</span>`;
     }).filter(Boolean).join("<br>");
     tip.style.display = "block";
     tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
