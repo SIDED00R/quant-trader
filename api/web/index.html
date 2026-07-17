@@ -586,14 +586,19 @@ async function loadWatchlist(){
     el.innerHTML = items.length ? items.map(wlCard).join("")
       : `<div class="muted" style="padding:8px">없음 — 위에서 검색해 ★로 추가하세요</div>`;
     bindWl(el);
-  } catch(e){}
+  } catch(e){
+    document.getElementById("wlSaved").innerHTML =
+      `<div class="muted" style="padding:8px">불러오기 실패 — 새로고침 또는 재로그인</div>`;
+  }
 }
+const wlEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 function wlCard(it){
   const star = it.watched === false ? "☆" : "★";
   const on = it.watched === false ? "" : "on";
-  const nm = it.name ? `${it.name} ` : "";
-  return `<div class="ticker" data-m="${it.market}" data-s="${it.symbol}">
-    <div>${nm}<span class="num">${it.symbol}</span> <span class="tag">${it.market}</span></div>
+  const nm = it.name ? `${wlEsc(it.name)} ` : "";
+  return `<div class="ticker" data-m="${wlEsc(it.market)}" data-s="${wlEsc(it.symbol)}">
+    <div>${nm}<span class="num">${wlEsc(it.symbol)}</span> <span class="tag">${wlEsc(it.market)}</span></div>
     <button class="wl-star ${on}" style="background:none;border:none;cursor:pointer;font-size:18px">${star}</button></div>`;
 }
 function bindWl(container){

@@ -57,7 +57,6 @@ def _stock_names_step() -> int:
     return 0 if refresh_clickhouse(create_client()) else 1
 
 
-
 _UNIVERSE_DIR = Path(__file__).resolve().parents[1] / "backtest" / "universe"
 _DAYS = 2600   # 풀 재백필 기간 — 연구·초기 시딩과 동일(~7.1년)
 

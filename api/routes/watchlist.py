@@ -8,7 +8,7 @@ import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from api.security import current_account_id
 from common.postgres_client import pool
@@ -31,6 +31,15 @@ def _client():
 class ToggleBody(BaseModel):
     market: Literal["KR", "US"]
     symbol: str = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def _valid_symbol(self):
+        s = self.symbol.strip()   # 검색 경로와 대칭 형식 검증(비티커 페이로드·XSS 저장 차단)
+        if self.market == "KR" and not _KR_CODE.match(s):
+            raise ValueError("KR 심볼은 6자리 코드")
+        if self.market == "US" and not _US_TICKER.match(s):
+            raise ValueError("US 심볼은 티커 형식")
+        return self
 
 
 def _norm(s: str) -> str:
@@ -61,7 +70,7 @@ def merge_search_results(rows: list, watched: set, q: str) -> list:
     if not res:                                                  # 사전 히트 0 + 티커 형태 → 합성행(미시딩·미스여도 등록 가능)
         if _KR_CODE.match(q):
             res.insert(0, {"market": "KR", "symbol": q, "name": None, "watched": ("KR", q) in watched})
-        elif _US_TICKER.match(q) and not q.isdigit():
+        elif _US_TICKER.match(q):                                # 첫 글자가 알파벳이라 숫자열과 배타
             res.insert(0, {"market": "US", "symbol": up, "name": None, "watched": ("US", up) in watched})
     return res[:20]
 

@@ -102,6 +102,6 @@ def resolve(index: dict, q: str):
     # 사전 미스 → 티커 형태면 직행(KR 6자리 / US 알파)
     if _KR_CODE.match(q):
         return ("KR", q, q)
-    if _US_TICKER.match(q) and not q.isdigit():
+    if _US_TICKER.match(q):                                     # 첫 글자가 알파벳이라 숫자열과 배타
         return ("US", up, up)
     return None
