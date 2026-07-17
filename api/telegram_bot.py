@@ -1,7 +1,7 @@
-"""텔레그램 /차트 봇 (단일 책임: Bot API long-poll → 봉차트 응답). 상시 서비스(수집 VM·app 이미지).
+"""텔레그램 /chart 봇 (단일 책임: Bot API long-poll → 봉차트 응답). 상시 서비스(수집 VM·app 이미지).
 
 인바운드는 Telegram Bot API getUpdates long-poll(httpx) — 발신용 MTProto 유저세션(notify_telegram)과
-분리해 세션 충돌을 피한다. 흐름: `/차트 <종목명|티커>` → 종목 해석(common.stock_names) → 일봉 온디맨드
+분리해 세션 충돌을 피한다. 흐름: `/chart <종목명|티커>`(한글 `/차트` 별칭) → 종목 해석(common.stock_names) → 일봉 온디맨드
 fetch(common.toss_daily — 수집 VM 로컬 CH엔 주식 데이터 없음) → 렌더(common.symbol_chart, KR=주봉+일목
 구름 / US=일봉) → Bot API sendPhoto. TELEGRAM_ALLOWED_CHAT_IDS 화이트리스트(비면 전면 거부). 절대 크래시
 안 함(예외는 백오프 후 계속). 종목명 인덱스는 /app/.namecache/names.json(주간 갱신, 실패 시 stale 유지) —
@@ -27,13 +27,13 @@ _API = "https://api.telegram.org/bot{token}/{method}"
 _CACHE = os.getenv("NAMECACHE_PATH", "/app/.namecache/names.json")
 _CACHE_TTL = 7 * 24 * 3600
 _KR_FETCH_DAYS, _US_FETCH_DAYS = 1000, 220
-_HELP = ("📈 사용법: /차트 <종목명 또는 티커>\n"
-         "예) /차트 삼성전자 · /차트 005930 · /차트 AAPL\n"
+_HELP = ("📈 사용법: /chart <종목명 또는 티커>  (한글 /차트 도 됨)\n"
+         "예) /chart 삼성전자 · /chart 005930 · /chart AAPL\n"
          "국장=주봉+일목 구름 · 미장=일봉")
 
 
 def parse_command(text: str):
-    """텍스트 → ('chart', 질의) | ('help', '') | None. `/차트`·`/chart`(@봇명 허용)·`/help`·`/start`."""
+    """텍스트 → ('chart', 질의) | ('help', '') | None. `/chart`·`/차트`(@봇명 허용)·`/help`·`/start`."""
     if not text or not text.strip():
         return None
     parts = text.strip().split(maxsplit=1)

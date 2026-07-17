@@ -223,9 +223,11 @@ infra/terraform/
   # 드라이런: sudo DISK_MAX=1 bash infra/collector-healthcheck.sh → 🟠 수신 확인, 재실행 시 쿨다운 억제 확인,
   #           sudo rm /var/tmp/collector-healthcheck.state 로 리셋
   ```
-- **텔레그램 `/차트` 봇(수집 VM 상시 `telegram-bot` 서비스)**: BotFather 봇으로 `/차트 <종목명|티커>` → 봉차트(KR 주봉+일목·US 일봉) 응답. 1회 셋업:
+- **텔레그램 `/chart` 봇(수집 VM 상시 `telegram-bot` 서비스)**: BotFather 봇으로 `/chart <종목명|티커>`(한글 `/차트` 별칭) → 봉차트(KR 주봉+일목·US 일봉) 응답. 1회 셋업:
   ```bash
-  # ① BotFather로 봇 생성 → 토큰 획득. 본인이 봇에게 아무 메시지 전송 후 chat_id 확인:
+  # ① BotFather로 봇 생성 → 토큰 획득. (선택) BotFather /setcommands 로 명령 등록 — 자동완성 메뉴용:
+  #    chart - 종목 봉차트 조회   (텔레그램 명령 등록은 ASCII만 허용 → /chart 만 등록 가능, /차트는 타이핑 시에만 동작)
+  # 본인이 봇에게 아무 메시지 전송 후 chat_id 확인:
   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | python -c "import sys,json;print([u['message']['chat']['id'] for u in json.load(sys.stdin)['result'] if 'message' in u])"
   # ② telegram-env 시크릿에 2줄 추가(기존 키 유지 + append) — startup의 ^TELEGRAM_ prefix 병합으로 자동 반영:
   #    TELEGRAM_BOT_TOKEN=123456:ABC...  /  TELEGRAM_ALLOWED_CHAT_IDS=<chat_id>  (새 버전 add)
