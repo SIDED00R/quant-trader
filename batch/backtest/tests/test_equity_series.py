@@ -1,30 +1,53 @@
-"""자산 시계열 합성 검증 (merge_total_krw/normalize/_fx_at — 순수 함수, DB/네트워크 없음).
+"""자산 시계열 합성 검증 (merge_total_krw/common_start/rebase_pct/_fx_at — 순수 함수, DB/네트워크 없음).
 
 TOTAL 합성 계약: 참여 시장 전부 관측 시작 후부터 · 결측일 forward-fill · US는 usdkrw 환산 ·
 US 참여인데 환율 없으면 빈 리스트(부분 합산 착시 방지) · KRW 시장만이면 환율 없이도 합산.
+리베이스 계약: 공통 시작일(=늦게 합류한 시장의 첫날) 값=0% · 기준값은 start 이전 마지막 관측(forward-fill) ·
+첫 포인트는 앵커 (start, 0.0) — 모든 시리즈가 같은 시점·같은 값에서 출발.
 """
 import unittest
 from datetime import date
 
-from common.equity_series import _fx_at, merge_total_krw, normalize
+from common.equity_series import _fx_at, common_start, merge_total_krw, rebase_pct
 
 D = date
 
 
-class TestNormalize(unittest.TestCase):
-    def test_first_point_is_100(self):
-        pts = normalize([(D(2026, 7, 1), 200.0), (D(2026, 7, 2), 220.0)])
-        self.assertEqual(pts[0][1], 100.0)
-        self.assertAlmostEqual(pts[1][1], 110.0)
+class TestCommonStart(unittest.TestCase):
+    def test_max_of_first_dates(self):
+        markets = {
+            "COIN": [(D(2026, 6, 28), 10.0, None), (D(2026, 7, 2), 12.0, None)],
+            "KR": [(D(2026, 7, 1), 100.0, None)],
+            "US": [],                                     # 데이터 없는 시장은 무시
+        }
+        self.assertEqual(common_start(markets), D(2026, 7, 1))
+
+    def test_empty_markets(self):
+        self.assertIsNone(common_start({"COIN": [], "KR": [], "US": []}))
+
+
+class TestRebasePct(unittest.TestCase):
+    def test_anchor_zero_and_signed_pct(self):
+        pts = rebase_pct([(D(2026, 7, 1), 200.0), (D(2026, 7, 2), 220.0), (D(2026, 7, 3), 190.0)],
+                         D(2026, 7, 1))
+        self.assertEqual(pts[0], (D(2026, 7, 1), 0.0))    # 앵커 = 시작점 0%
+        self.assertAlmostEqual(pts[1][1], 10.0)           # 수익 +
+        self.assertAlmostEqual(pts[2][1], -5.0)           # 손실 −
+
+    def test_forward_fill_base_from_earlier_history(self):
+        # 시작이 빠른 시장 — 공통 시작일에 정확한 관측이 없어도 직전 값(250)이 기준.
+        pts = rebase_pct([(D(2026, 6, 28), 250.0), (D(2026, 7, 2), 275.0)], D(2026, 7, 1))
+        self.assertEqual(pts[0], (D(2026, 7, 1), 0.0))
+        self.assertAlmostEqual(pts[1][1], 10.0)           # 275/250 − 1
 
     def test_empty_and_zero_base(self):
-        self.assertEqual(normalize([]), [])
-        self.assertEqual(normalize([(D(2026, 7, 1), 0.0)]), [])
+        self.assertEqual(rebase_pct([], D(2026, 7, 1)), [])
+        self.assertEqual(rebase_pct([(D(2026, 7, 1), 0.0)], D(2026, 7, 1)), [])
 
     def test_accepts_cash_column(self):
         # (date, equity, cash) 3튜플도 그대로 소화
-        pts = normalize([(D(2026, 7, 1), 100.0, 40.0), (D(2026, 7, 2), 150.0, 40.0)])
-        self.assertAlmostEqual(pts[1][1], 150.0)
+        pts = rebase_pct([(D(2026, 7, 1), 100.0, 40.0), (D(2026, 7, 2), 150.0, 40.0)], D(2026, 7, 1))
+        self.assertAlmostEqual(pts[1][1], 50.0)
 
 
 class TestFxAt(unittest.TestCase):

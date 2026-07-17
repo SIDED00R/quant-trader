@@ -91,32 +91,55 @@ def merge_total_krw(series: dict[str, list], fx: list[tuple]) -> list[tuple]:
     return out
 
 
-def normalize(points: list[tuple]) -> list[tuple]:
-    """첫 포인트=100 지수화 [(date, index)] — 통화가 달라도 한 축에서 수익률 비교."""
-    if not points:
+def common_start(markets: dict[str, list]):
+    """데이터가 있는 전 시장이 관측을 시작한 날(max of first dates) — 없으면 None.
+
+    TOTAL 합성(merge_total_krw)과 동일 원칙: 늦게 합류한 시장의 시작일을 공통 기준으로 삼아
+    모든 시리즈가 같은 시점에서 출발하게 한다(시장 합류 시점의 계단·기준 착시 방지).
+    """
+    firsts = [pts[0][0] for pts in markets.values() if pts]
+    return max(firsts) if firsts else None
+
+
+def rebase_pct(points: list[tuple], start) -> list[tuple]:
+    """공통 시작일 값=0% 기준 수익률 [(date, pct)] — 수익 +, 손실 −.
+
+    기준값 = start 이전(포함) 마지막 관측(forward-fill; start 이전 이력은 기준 산출에만 쓰고 버린다).
+    첫 포인트는 앵커 (start, 0.0) — 모든 시리즈가 같은 시점·같은 값(0%)에서 출발한다.
+    기준값이 없거나 0 이하이면 빈 리스트.
+    """
+    base = None
+    after = []
+    for p in points:
+        if p[0] <= start:
+            base = float(p[1])
+        else:
+            after.append(p)
+    if base is None or base <= 0:
         return []
-    base = float(points[0][1])
-    if base <= 0:
-        return []
-    return [(p[0], float(p[1]) / base * 100.0) for p in points]
+    return [(start, 0.0)] + [(p[0], (float(p[1]) / base - 1.0) * 100.0) for p in after]
 
 
 ORDER = ["TOTAL", "COIN", "KR", "US"]
 
 
 def chart_rows(markets: dict[str, list], fx: list[tuple]) -> list[dict]:
-    """시장 시계열 → 차트 행(TOTAL 합성 + 정규화 + 수익률 + 마지막 원값). 포인트<2 시리즈 제외.
+    """시장 시계열 → 차트 행(TOTAL 합성 + 공통 시작일 0% 리베이스 + 수익률 + 마지막 원값).
 
+    포인트<2 시리즈(앵커뿐 = 공통 시작 이후 관측 없음) 제외.
     SVG(scripts/render_equity_chart)·텔레그램 PNG(common/equity_chart_telegram) 렌더 공용.
     """
+    start = common_start(markets)
+    if start is None:
+        return []
     merged = dict(markets)
     merged["TOTAL"] = merge_total_krw(markets, fx)
     rows = []
     for key in ORDER:
         pts = merged.get(key) or []
-        idx = normalize(pts)
-        if len(idx) < 2:
+        pct = rebase_pct(pts, start)
+        if len(pct) < 2:
             continue
-        rows.append({"key": key, "points": idx, "ret": idx[-1][1] - 100.0,
+        rows.append({"key": key, "points": pct, "ret": pct[-1][1],
                      "last_value": float(pts[-1][1]), "currency": "USD" if key == "US" else "KRW"})
     return rows

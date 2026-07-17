@@ -21,16 +21,27 @@ def _markets():
 
 
 class TestPrepareRows(unittest.TestCase):
-    def test_total_and_normalization(self):
+    def test_total_and_rebase(self):
         rows = prepare_rows(_markets(), FX)
         self.assertEqual([r["key"] for r in rows], ["TOTAL", "COIN", "KR", "US"])
         coin = next(r for r in rows if r["key"] == "COIN")
-        self.assertAlmostEqual(coin["points"][0][1], 100.0)
+        self.assertAlmostEqual(coin["points"][0][1], 0.0)   # 공통 시작일 앵커 = 0%
         self.assertAlmostEqual(coin["ret"], 10.0)
         self.assertEqual(coin["value_text"], "₩110")
         us = next(r for r in rows if r["key"] == "US")
         self.assertEqual(us["value_text"], "$1")          # USD 표기
         self.assertAlmostEqual(us["ret"], -10.0)
+
+    def test_common_start_aligns_series(self):
+        # 코인이 먼저 시작 — 공통 시작일(=KR/US 첫날)로 리베이스되고 이전 이력은 기준값으로만 쓰인다.
+        m = _markets()
+        m["COIN"] = [(D(2026, 6, 28), 80.0, None)] + m["COIN"]   # 6/28 이력 추가
+        rows = prepare_rows(m, FX)
+        coin = next(r for r in rows if r["key"] == "COIN")
+        self.assertEqual(coin["points"][0], (D(2026, 7, 1), 0.0))   # 6/28이 아니라 공통 시작일에서 출발
+        self.assertAlmostEqual(coin["ret"], 10.0)                    # 기준=7/1 값 100 (6/28의 80 아님)
+        starts = {r["points"][0][0] for r in rows}
+        self.assertEqual(starts, {D(2026, 7, 1)})                    # 전 시리즈 동일 시점 출발
 
     def test_short_series_dropped(self):
         m = _markets()
@@ -58,6 +69,8 @@ class TestBuildSvg(unittest.TestCase):
         self.assertEqual(svg.count("<polyline"), 4)
         self.assertIn(THEMES["light"]["surface"], svg)
         self.assertIn(THEMES["light"]["series"]["KR"], svg)
+        self.assertIn('stroke-dasharray="4 3"', svg)      # 0% 기준선(손익 경계)
+        self.assertIn("+", svg)                           # y축 ±% 라벨
 
     def test_placeholder_when_empty(self):
         svg = build_svg([], THEMES["dark"], "2026-07-14 01:00 UTC")

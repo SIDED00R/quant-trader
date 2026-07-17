@@ -1,7 +1,7 @@
 """README 자산 차트 렌더 (단일 책임: equity_snapshots → 통합 수익률 SVG 라이트/다크 2벌).
 
 stdlib만으로 SVG를 문자열 조립한다(matplotlib 등 플로팅 의존 도입 금지 — 이미지 비대·디스크 사고 예방).
-시리즈 = 전체(KRW 환산)+코인+국장+미장, 시작일=100 정규화(통화 상이 해소), 범례에 현재값·수익률%.
+시리즈 = 전체(KRW 환산)+코인+국장+미장 — 전 시장 공통 시작일=0% 리베이스(수익 +/손실 −, 통화 상이 해소), 범례에 현재값·수익률%.
 데이터가 없어도 placeholder SVG를 항상 출력한다(README 깨진 이미지 방지). 매매 VM startup이
 잡 종료 후 실행해 charts/*.svg 생성 → assets 브랜치 발행(infra/trade-vm-startup.sh).
 
@@ -64,7 +64,7 @@ def build_svg(rows: list[dict], theme: dict, updated: str) -> str:
         f'<rect width="{W}" height="{H}" rx="12" fill="{theme["surface"]}"/>'
         f'<text x="{PAD_L}" y="34" font-size="17" font-weight="700" fill="{theme["ink"]}">시장별 자산 추이</text>'
         f'<text x="{PAD_L}" y="54" font-size="11.5" fill="{theme["muted"]}">'
-        f'기준일=100 · 코인/국장/미장 + 전체(달러는 FRED USD/KRW 환산) · 매매 잡 종료 시 자동 갱신 — {updated}</text>'
+        f'공통 시작일=0% 수익률(+수익/−손실) · 코인/국장/미장 + 전체(달러는 FRED USD/KRW 환산) · 매매 잡 종료 시 자동 갱신 — {updated}</text>'
     )
     if not rows:
         return (head + f'<text x="{W / 2}" y="{H / 2 + 14}" font-size="14" fill="{theme["muted"]}" '
@@ -98,7 +98,12 @@ def build_svg(rows: list[dict], theme: dict, updated: str) -> str:
         grid.append(f'<line x1="{PAD_L}" y1="{yy:.1f}" x2="{W - PAD_R}" y2="{yy:.1f}" '
                     f'stroke="{theme["grid"]}" stroke-width="1"/>'
                     f'<text x="{PAD_L - 8}" y="{yy - 3:.1f}" font-size="10.5" fill="{theme["muted"]}" '
-                    f'text-anchor="end">{v:.1f}</text>')
+                    f'text-anchor="end">{v:+.1f}%</text>')
+    # 0% 기준선(손익 경계) — 모든 시리즈의 출발점이라 항상 범위 안에 있다(앵커 0%).
+    if v0 <= 0.0 <= v1:
+        y0 = y(0.0)
+        grid.append(f'<line x1="{PAD_L}" y1="{y0:.1f}" x2="{W - PAD_R}" y2="{y0:.1f}" '
+                    f'stroke="{theme["muted"]}" stroke-width="1" stroke-dasharray="4 3"/>')
     span_days = d1 - d0
     fmt = "%m/%d" if span_days <= 200 else "%Y-%m"
     dates_sorted = sorted(set(ds))
