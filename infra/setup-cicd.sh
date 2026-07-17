@@ -113,6 +113,16 @@ upsert trade-vm-maintenance-sweep "0 5 * * 6"     "Etc/UTC"
 echo "── 9. 매매 VM 메타데이터 즉시 반영 (새 KR 잡이 구 분기표로 발화하는 일 방지)"
 gcloud compute instances add-metadata coin-trade-vm --project $P --zone=$Z \
   --metadata-from-file startup-script="$(dirname "$0")/trade-vm-startup.sh" --quiet
+# 머신타입 보장: e2-standard-2(공유코어)는 US 장 마감 시간대(19시 UTC) us-central1-a에서 ZONE_RESOURCE_POOL_EXHAUSTED로
+# start가 반복 실패(#260 — 07-16 US 매매 누락). 전용코어 n2d-standard-2(동급 2vCPU/8GB, 전 존 가용)로 교체해 고갈을 회피한다.
+# 온디맨드 VM이라 평소 TERMINATED — set-machine-type만 적용하고 start는 하지 않는다(스케줄러가 기동; 켜두면 스케줄 매매가 막힘).
+TRADE_MT=$(gcloud compute instances describe coin-trade-vm --project $P --zone=$Z --format='value(machineType.scope(machineTypes))' 2>/dev/null || true)
+if [ -n "$TRADE_MT" ] && [ "$TRADE_MT" != "n2d-standard-2" ]; then
+  echo "  매매 VM 머신타입 $TRADE_MT → n2d-standard-2 (존 용량 부족 회피)"
+  TRADE_STATUS=$(gcloud compute instances describe coin-trade-vm --project $P --zone=$Z --format='value(status)' 2>/dev/null || true)
+  [ "$TRADE_STATUS" = "RUNNING" ] && gcloud compute instances stop coin-trade-vm --project $P --zone=$Z --quiet
+  gcloud compute instances set-machine-type coin-trade-vm --project $P --zone=$Z --machine-type=n2d-standard-2 --quiet
+fi
 
 echo "── 10. 수집 VM(coin-trader-vm) 메타데이터(collector startup) + e2-small 축소(최초 1회만 stop/resize/start; 이미 small이면 no-op)"
 gcloud compute instances add-metadata coin-trader-vm --project $P --zone=$Z \
