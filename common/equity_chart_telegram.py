@@ -43,6 +43,7 @@ def _load_rows(days: int) -> list[dict]:
         markets = {
             "COIN": fetch_coin_series_total(conn, days),
             "KR": fetch_market_series(conn, "KR", KIS_ACCOUNT, days),
+            "KR_ICHIMOKU": fetch_market_series(conn, "KR", ICHIMOKU_ACCOUNT, days),
             "US": fetch_market_series(conn, "US", KIS_ACCOUNT, days),
         }
     try:

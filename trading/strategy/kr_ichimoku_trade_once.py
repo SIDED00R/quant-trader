@@ -5,7 +5,7 @@
 계정 'kr_ichimoku'(auto_trade=FALSE, 시드 1억). 주간 마커 키 'KR_ICHIMOKU'(ML의 'KR'과 격리).
 
 신호(주봉, 9/26/52·선행26, 무룩어헤드=진행 주 부분봉 제외):
-  진입 = 종가>구름상단 AND 전환>기준 · 청산 = 전환<기준(데드크로스, --exit-rule) 또는 종가<=구름상단.
+  진입 = 종가>구름상단 AND 전환>기준 · 청산 = --exit-rule 택일(tk_cross=전환<기준 데드크로스[기본] / cloud=종가<=구름상단).
 캡 있는 실운용 적응: 최대 max-positions 종목, 종목당 예산=평가자산/max, 슬롯 초과 시 돌파강도 상위 우선.
 체결가 = 최신 일봉 종가(백테스트=주 종가와 미세 차이 — 월요일 실행분이라 문서화). 무재시도·동기.
 
@@ -27,7 +27,7 @@ from common.postgres_client import close_pool, open_pool, pool
 from common.stock_ohlc import daily_ohlc
 from common.stock_price import latest_closes
 from trading.portfolio import paper_ledger
-from trading.strategy.notify_messages import error_message, stock_message
+from trading.strategy.notify_messages import error_message, ichimoku_message
 from trading.strategy.weekly_marker import mark_week_done, week_done
 
 MARKET_KEY = "KR_ICHIMOKU"     # 주간 마커 키(ML 'KR'과 격리)
@@ -209,7 +209,7 @@ def main(argv=None) -> int:
         print(f"  skip: {r['skipped']}")
     for o in r.get("placed", []):
         print("  ", o)
-    notify_telegram.send(stock_message("KR 일목(페이퍼)", r, live=a.live))
+    notify_telegram.send(ichimoku_message("KR 일목(페이퍼)", r, live=a.live))
     return 0
 
 

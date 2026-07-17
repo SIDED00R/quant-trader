@@ -16,8 +16,8 @@ def _iso_key(d):
 def weekly_bars(daily, drop_week_of=None):
     """일봉 [(date, o, h, l, c[, v])] 오름차순 → 주봉 [(week_end_date, o, h, l, c, v)] 오름차순.
 
-    drop_week_of(date)가 주어지고 그 날짜가 속한 ISO 주가 마지막이면 (미완성) 주봉을 제거한다 —
-    진행 중인 주의 부분봉으로 신호를 내지 않기 위함(무룩어헤드).
+    drop_week_of(date)가 주어지면 그 날짜가 속한 ISO 주의 주봉을 제거한다(위치 무관 — 실무상 today의
+    주는 항상 마지막 그룹 = 진행 중 부분봉). 진행 주 부분봉으로 신호를 내지 않기 위함(무룩어헤드).
     """
     groups = {}
     order = []

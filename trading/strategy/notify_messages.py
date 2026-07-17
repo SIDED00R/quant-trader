@@ -57,6 +57,32 @@ def stock_message(market_label: str, r: dict, live: bool) -> str:
     return "\n".join(lines)
 
 
+def ichimoku_message(market_label: str, r: dict, live: bool) -> str:
+    """KR 일목 페이퍼 매매 결과 문안. stock_message와 달리 **마커를 체결 여부와 무관하게 기록**하는
+    잡 전용 — "체결 0건→미기록·재시도" 오보를 피한다(실행 성공=그 주 완료). r=execute() 반환 dict.
+    """
+    lines = [_header(market_label, dry_run=not live)]
+    if r.get("skipped"):
+        lines.append(f"매매하지 않음 — {r['skipped']}")
+        return "\n".join(lines)
+    lines.append(f"bar={r.get('bar')} 진입후보 {len(r.get('targets') or [])} / "
+                 f"매수 {len(r.get('buys') or [])} / 청산 {len(r.get('sells') or [])}")
+    if not live:
+        lines.append("계획만 산출(주문 없음)")
+        return "\n".join(lines)
+    placed = r.get("placed") or []
+    if not placed:
+        lines.append("매매 없음 — 신규 진입·청산 대상 없음(이번주 완료 기록)")
+        return "\n".join(lines)
+    filled = sum(1 for o in placed if o.get("filled"))
+    for o in placed:
+        side = "매도" if o.get("side") == "SELL" else "매수"
+        mark = "체결" if o.get("filled") else f"미체결({o.get('msg')})"
+        lines.append(f"· {side} {o.get('symbol')} {o.get('qty', 0)}주 — {mark}")
+    lines.append(f"요약: 체결 {filled}/{len(placed)}건 · 이번주 완료 기록 · 주문 전 현금 {r.get('cash', 0):,.0f}")
+    return "\n".join(lines)
+
+
 def coin_message(decisions: list, rejected: int, targets: dict, dry_run: bool,
                  balances: dict | None = None) -> str:
     """코인 일일 매매 결과 문안. decisions 항목은 symbol/action/quantity/price/reason(+executed)."""
