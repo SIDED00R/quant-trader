@@ -1,16 +1,16 @@
-"""종목명 사전 (단일 책임: 티커↔이름 조회·질의 해석). app 이미지 안전(httpx만).
+"""종목명 사전 (단일 책임: 티커↔이름 조회·질의 해석). app 이미지 안전(런타임 외부호출 0).
 
-US=SEC company_tickers.json(신뢰) · KR=KRX 정보데이터시스템 전종목 기본정보(비공식·best-effort).
-정확한 티커 입력은 사전 없이도 `resolve`가 처리한다 — 사전 로딩이 실패해도 `/차트 005930`·`/차트 AAPL`은
-항상 동작하고, KR 이름검색(`/차트 삼성전자`)만 열화된다. 시장별 fetch는 서로 독립 실패 허용.
+종목명 사전은 repo에 번들된 `common/refdata/stock_names.json`을 로드한다 — FinanceDataReader로 KR 전종목
+(KRX) + US(NASDAQ/NYSE/AMEX)를 1회 생성해 커밋한 정적 맵이다. KRX/SEC 실시간 엔드포인트가 세션·UA
+제약으로 불안정(각각 400 LOGOUT·403)해 런타임 의존을 제거했다. 갱신은 `scripts/refresh_stock_names.py`
+재실행(상장 변화는 느려 가끔이면 충분). 정확한 티커/코드 입력은 사전 없이도 `resolve`가 처리한다 —
+사전 로딩이 실패해도 `/차트 005930`·`/차트 AAPL`은 항상 동작하고, 이름검색(`/차트 삼성전자`)만 열화된다.
 """
+import json
+import os
 import re
 
-import httpx
-
-SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-KRX_URL = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
-_UA = "quant-trader/1.0 (research; contact via repo)"
+_BUNDLED = os.path.join(os.path.dirname(__file__), "refdata", "stock_names.json")
 _KR_CODE = re.compile(r"^\d{6}$")
 _US_TICKER = re.compile(r"^[A-Za-z][A-Za-z0-9.\-]{0,9}$")
 
@@ -19,47 +19,25 @@ def _norm(s: str) -> str:
     return "".join(str(s).split()).lower()
 
 
-def fetch_us_names() -> list[tuple[str, str]]:
-    """[(ticker, name)] — SEC company_tickers.json(title). User-Agent 필수(SEC 정책)."""
-    r = httpx.get(SEC_TICKERS_URL, headers={"User-Agent": _UA}, timeout=20)
-    r.raise_for_status()
-    out = []
-    for v in r.json().values():
-        t, nm = str(v.get("ticker", "")).strip().upper(), str(v.get("title", "")).strip()
-        if t and nm:
-            out.append((t, nm))
-    return out
-
-
-def fetch_kr_names() -> list[tuple[str, str]]:
-    """[(6자리코드, 한글약명)] — KRX 전종목 기본정보(코스피 STK + 코스닥 KSQ). 비공식 엔드포인트."""
-    out = []
-    for mkt in ("STK", "KSQ"):
-        r = httpx.post(KRX_URL, headers={"User-Agent": _UA, "Referer": "http://data.krx.co.kr/"},
-                       data={"bld": "dbms/MDC/STAT/standard/MDCSTAT01901", "mktId": mkt}, timeout=20)
-        r.raise_for_status()
-        for row in r.json().get("OutBlock_1", []):
-            code, nm = str(row.get("ISU_SRT_CD", "")).strip(), str(row.get("ISU_ABBRV", "")).strip()
-            if _KR_CODE.match(code) and nm:
-                out.append((code, nm))
-    return out
-
-
 def fetch_all() -> dict:
-    """{"KR": [...], "US": [...]} — 시장별 독립 실패 허용(한쪽 실패가 다른 쪽 안 지움)."""
-    out = {"KR": [], "US": []}
-    for mkt, fn in (("US", fetch_us_names), ("KR", fetch_kr_names)):
-        try:
-            out[mkt] = fn()
-        except Exception as e:
-            print(f"[stock-names] {mkt} 조회 실패(비치명): {type(e).__name__}: {e}")
-    return out
+    """{"KR": [(코드, 이름)], "US": [(티커, 이름)]} — repo 번들 사전 로드(런타임 외부호출 0).
+
+    파일 부재·파손 시 빈 사전 반환(비치명 — 티커/코드 경로는 resolve가 사전 없이도 처리).
+    """
+    try:
+        with open(_BUNDLED, encoding="utf-8") as f:
+            b = json.load(f)
+        return {"KR": [(str(c), str(nm)) for c, nm in b.get("KR", [])],
+                "US": [(str(t).upper(), str(nm)) for t, nm in b.get("US", [])]}
+    except Exception as e:
+        print(f"[stock-names] 번들 사전 로드 실패(비치명): {type(e).__name__}: {e}")
+        return {"KR": [], "US": []}
 
 
 def refresh_clickhouse(ch) -> int:
     """fetch_all → ClickHouse stock_names upsert(ReplacingMergeTree 멱등). 적재 행수. ch=create_client()."""
     names = fetch_all()
-    rows = [[sym.upper() if market == "US" else sym, market, nm, "SEC" if market == "US" else "KRX"]
+    rows = [[sym.upper() if market == "US" else sym, market, nm, "FDR"]
             for market, pairs in names.items() for sym, nm in pairs]
     if not rows:
         return 0

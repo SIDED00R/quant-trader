@@ -52,7 +52,7 @@ def _us_membership_step() -> int:
 
 
 def _stock_names_step() -> int:
-    from common.clickhouse_client import create_client   # 대시보드 관심종목 검색용 종목명 사전(US=SEC·KR=KRX)
+    from common.clickhouse_client import create_client   # 대시보드 관심종목 검색용 종목명 사전(repo 번들 FDR)
     from common.stock_names import refresh_clickhouse
     return 0 if refresh_clickhouse(create_client()) else 1
 
@@ -97,7 +97,7 @@ def main(argv=None) -> int:
         ("FRED 매크로", _fred_step),
         ("KR 상폐 메타", _kr_delisted_step),
         ("US 지수 PIT 멤버십", _us_membership_step),
-        ("종목명 사전(SEC·KRX)", _stock_names_step),   # 대시보드 관심종목 검색용 stock_names 갱신
+        ("종목명 사전(FDR)", _stock_names_step),   # 대시보드 관심종목 검색용 stock_names 갱신(repo 번들 → CH)
         ("데이터 신선도 점검", lambda: verify_freshness.main(["--notify"])),   # 마지막 — 임계 낡음/빔 → 🔴 + 이상 시 상세 텔레그램
     ]
     lines, failed = [], 0
