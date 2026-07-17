@@ -56,7 +56,7 @@ jobs:
           EOF
           # 프로덕션 앱 이미지는 batch/ 제외 — 상시 경로의 batch.* import는 배포 후 즉사(CLAUDE.md 경계)
           if grep -rn --include='*.py' -E '^(from|import) batch' common streaming api trading \
-             | grep -vE 'stock_trade_once|us_trade_once|stock_trade_common'; then
+             | grep -vE 'stock_trade_once|us_trade_once|stock_trade_common|kr_ichimoku_trade_once'; then
             echo '경계 위반: 프로덕션 상시 경로가 batch.*를 import'; exit 1
           fi
           echo "BOUNDARY OK"
