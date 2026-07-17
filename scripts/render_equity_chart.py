@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from common.equity_series import (
+    ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
     chart_rows,
     fetch_coin_series_total,
@@ -24,14 +25,15 @@ from common.postgres_client import close_pool, open_pool, pool
 W, H = 920, 420
 PAD_L, PAD_R, PAD_T, PAD_B = 52, 20, 96, 42
 FONT = "-apple-system,'Segoe UI','Malgun Gothic',sans-serif"
-LABELS = {"TOTAL": "전체(KRW)", "COIN": "코인", "KR": "국장", "US": "미장"}
-WIDTHS = {"TOTAL": 3.0, "COIN": 2.0, "KR": 2.0, "US": 2.0}
-# 시리즈 색 — 대시보드(index.html --coin/--kr/--us)와 동일 세트(CVD 검증 통과). 전체=잉크 굵은 선.
+LABELS = {"TOTAL": "전체(KRW)", "COIN": "코인", "KR": "국장", "KR_ICHIMOKU": "국장 일목", "US": "미장"}
+WIDTHS = {"TOTAL": 3.0, "COIN": 2.0, "KR": 2.0, "KR_ICHIMOKU": 2.0, "US": 2.0}
+DASHES = {"KR_ICHIMOKU": "6 4"}   # 페이퍼(가상) 시리즈는 점선 — 국장(실계좌) 실선과 구분
+# 시리즈 색 — 대시보드(index.html --coin/--kr/--us)와 동일 세트(CVD 검증 통과). 전체=잉크 굵은 선. 국장 일목=핑크.
 THEMES = {
     "light": {"surface": "#ffffff", "ink": "#1f2328", "muted": "#59636e", "grid": "#e7ebf0",
-              "series": {"TOTAL": "#1f2328", "COIN": "#0d9488", "KR": "#4a3aa7", "US": "#eb6834"}},
+              "series": {"TOTAL": "#1f2328", "COIN": "#0d9488", "KR": "#4a3aa7", "KR_ICHIMOKU": "#bf3989", "US": "#eb6834"}},
     "dark": {"surface": "#0d1117", "ink": "#e6edf3", "muted": "#8d96a0", "grid": "#262c33",
-             "series": {"TOTAL": "#e6edf3", "COIN": "#0d9488", "KR": "#9085e9", "US": "#d95926"}},
+             "series": {"TOTAL": "#e6edf3", "COIN": "#0d9488", "KR": "#9085e9", "KR_ICHIMOKU": "#db61a2", "US": "#d95926"}},
 }
 
 
@@ -116,8 +118,9 @@ def build_svg(rows: list[dict], theme: dict, updated: str) -> str:
     lines = []
     for r in rows:
         color, width = s[r["key"]], WIDTHS[r["key"]]
+        dash = f' stroke-dasharray="{DASHES[r["key"]]}"' if r["key"] in DASHES else ""
         lines.append(f'<polyline points="{_polyline(r["points"], x, y)}" fill="none" stroke="{color}" '
-                     f'stroke-width="{width}" stroke-linejoin="round" stroke-linecap="round"/>')
+                     f'stroke-width="{width}" stroke-linejoin="round" stroke-linecap="round"{dash}/>')
         ed, ev = r["points"][-1]
         lines.append(f'<circle cx="{x(ed):.1f}" cy="{y(ev):.1f}" r="6" fill="{theme["surface"]}"/>'
                      f'<circle cx="{x(ed):.1f}" cy="{y(ev):.1f}" r="4" fill="{color}"/>')
@@ -133,6 +136,7 @@ def load_markets(days: int) -> tuple[dict, list]:
             markets = {
                 "COIN": fetch_coin_series_total(conn, days),
                 "KR": fetch_market_series(conn, "KR", KIS_ACCOUNT, days),
+                "KR_ICHIMOKU": fetch_market_series(conn, "KR", ICHIMOKU_ACCOUNT, days),
                 "US": fetch_market_series(conn, "US", KIS_ACCOUNT, days),
             }
     finally:

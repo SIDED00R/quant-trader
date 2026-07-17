@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from common import notify_telegram
 from common.equity_series import (
+    ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
     chart_rows,
     fetch_coin_series_total,
@@ -26,9 +27,9 @@ from common.postgres_client import open_pool, pool
 W, H = 1200, 560
 PAD_L, PAD_R, PAD_T, PAD_B = 78, 30, 112, 58
 INK, MUTED, GRID, SURFACE = "#1f2328", "#59636e", "#e7ebf0", "#ffffff"
-SERIES = {"TOTAL": "#1f2328", "COIN": "#0d9488", "KR": "#4a3aa7", "US": "#eb6834"}  # README 라이트 세트와 동일
-WIDTHS = {"TOTAL": 5, "COIN": 3, "KR": 3, "US": 3}
-LABELS_KO = {"TOTAL": "전체", "COIN": "코인", "KR": "국장", "US": "미장"}
+SERIES = {"TOTAL": "#1f2328", "COIN": "#0d9488", "KR": "#4a3aa7", "KR_ICHIMOKU": "#bf3989", "US": "#eb6834"}  # README 라이트 세트와 동일
+WIDTHS = {"TOTAL": 5, "COIN": 3, "KR": 3, "KR_ICHIMOKU": 3, "US": 3}
+LABELS_KO = {"TOTAL": "전체", "COIN": "코인", "KR": "국장", "KR_ICHIMOKU": "국장일목", "US": "미장"}
 
 
 def _money(currency: str, v: float) -> str:

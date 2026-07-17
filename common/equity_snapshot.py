@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from common.postgres_client import open_pool, pool
 
 KIS_ACCOUNT = "kis"
+ICHIMOKU_ACCOUNT = "kr_ichimoku"   # KR 일목 페이퍼 전략(실주문 없는 시뮬 장부) — market='KR'·별도 account_id로 곡선 분리
 
 _UPSERT = (
     "INSERT INTO equity_snapshots (snap_date, market, account_id, currency, cash, positions_value, equity) "

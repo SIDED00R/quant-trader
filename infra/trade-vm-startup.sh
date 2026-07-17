@@ -4,7 +4,7 @@
 #   → UTC 부팅시각 분기로 1회 매매 → 자산 차트 발행(equity-chart → assets 브랜치) → poweroff(self-stop). (자기완결 — 수집 VM과 크로스VM 터널 없음)
 # 분기표(스케줄러와 정합):
 #   UTC 04·05    → 데이터 유지보수(maintenance-once) ← 매월 첫 토요일 04:00 UTC + 스위퍼 05:00(월간화는 startup이 날짜 가드)
-#   UTC 06·07    → KR 주식(stock-trade-once)  ← kr-close 15:00 KST + sweep 15:10 KST (06:00/06:10 UTC, 평일)
+#   UTC 06·07    → KR 주식(stock-trade-once) + KR 일목 페이퍼(kr-ichimoku-trade-once)  ← kr-close 15:00 KST + sweep 15:10 KST (06:00/06:10 UTC, 평일)
 #   UTC 19·20·21 → US 주식(us-trade-once)     ← us-close 15:00 ET + sweep 15:15 ET (EDT 19:00/15·EST 20:00/15, 평일)
 #   그 외(01·02) → 코인(trade-once)           ← daily 01:00 + sweep 02:00 UTC (매일)
 #   (07·21은 부팅지연 여유. 임의 시각 수동 start는 코인 분기 — 목표 수렴형이라 무해)
@@ -183,9 +183,12 @@ case "$BOOT_HOUR" in
     ;;
   06|07)
     # KR 마감 30분 전(15:00 KST). 평일 가드(수동 주말 부팅 방어) — 주간 주기는 주간 마커가 보장.
+    # 두 KR 전략 병행: ML 챔피언(KIS 모의) → 일목 페이퍼(시뮬 장부). 마커 키가 달라 서로 독립, 앞 잡 실패해도 뒤 잡 진행(set -e 없음).
     if [ "$BOOT_DOW" -le 5 ]; then
       docker compose --profile trade run $(build_flag stock-trade-once "$BATCH_IMG") --rm stock-trade-once 2>&1 | tee -a /var/log/stock-trade.log
       notify_fail "KR 주식" "${PIPESTATUS[0]}" /var/log/stock-trade.log
+      docker compose --profile trade run $(build_flag kr-ichimoku-trade-once "$BATCH_IMG") --rm kr-ichimoku-trade-once 2>&1 | tee -a /var/log/kr-ichimoku.log
+      notify_fail "KR 일목(페이퍼)" "${PIPESTATUS[0]}" /var/log/kr-ichimoku.log
     fi
     ;;
   19|20|21)

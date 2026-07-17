@@ -10,7 +10,7 @@
     --text:#e9edf4; --muted:#7a8494; --faint:#4b5566;
     --up:#f6465d; --down:#4d8dff;                       /* 시장: 한국 관례(상승=빨강·하락=파랑) */
     --algo:#2dd4bf; --algo-deep:#0f9e8e; --algo-glow:rgba(45,212,191,.22); --cash:#5b6677;
-    --coin:#0d9488; --kr:#9085e9; --us:#d95926;         /* 자산 곡선 시리즈(전체=--text) — CVD 검증 통과 세트 */
+    --coin:#0d9488; --kr:#9085e9; --kr-ichi:#db61a2; --us:#d95926;   /* 자산 곡선 시리즈(전체=--text) — CVD 검증 통과 세트. 국장일목=핑크(페이퍼) */
     --bg-grad:radial-gradient(1200px 500px at 80% -10%, #131a26 0%, transparent 60%);
     --field:#0a0d13;
     --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
@@ -21,7 +21,7 @@
     --text:#161b26; --muted:#5d6675; --faint:#9aa4b4;
     --up:#dc2f49; --down:#2767d8;
     --algo:#0d9488; --algo-deep:#0f766e; --algo-glow:rgba(13,148,136,.16); --cash:#8b94a4;
-    --coin:#0d9488; --kr:#4a3aa7; --us:#eb6834;
+    --coin:#0d9488; --kr:#4a3aa7; --kr-ichi:#bf3989; --us:#eb6834;
     --bg-grad:radial-gradient(1100px 460px at 82% -12%, #e3ecf5 0%, transparent 60%);
     --field:#f6f8fb;
   }
@@ -720,9 +720,10 @@ const EQ_SERIES = [
   { key:"TOTAL", label:"전체", css:"--text", width:2.6 },
   { key:"COIN",  label:"코인", css:"--coin", width:1.8 },
   { key:"KR",    label:"국장", css:"--kr",   width:1.8 },
+  { key:"KR_ICHIMOKU", label:"국장 일목", css:"--kr-ichi", width:1.8, dash:[6,4], paper:true },  // 페이퍼(가상)—자기 시작일 앵커
   { key:"US",    label:"미장", css:"--us",   width:1.8 },
 ];
-const eqOn = { TOTAL:true, COIN:true, KR:true, US:true };
+const eqOn = { TOTAL:true, COIN:true, KR:true, KR_ICHIMOKU:true, US:true };
 const eqMoney = (cur, v) => cur === "USD" ? usd(v) : won(v);
 
 async function loadEquity(){
@@ -767,6 +768,13 @@ function eqCommonStart(){
   return firsts.length ? firsts.reduce((a, b) => a > b ? a : b) : null;
 }
 
+// 시리즈별 앵커 시작일 — 페이퍼(가상 자금, 늦은 합류)는 자기 첫 관측일, 실운용 시장은 공통 시작일.
+function eqStartFor(s, globalStart){
+  if(!s.paper) return globalStart;
+  const raw = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
+  return raw.length ? raw[0].date : null;
+}
+
 // 공통 시작일 값=0% 수익률 리베이스 — 기준값은 start 이전(포함) 마지막 관측(forward-fill), 앵커 (start, 0%).
 function eqRebase(raw, start){
   let base = null; const after = [];
@@ -779,11 +787,11 @@ function eqRebase(raw, start){
 function eqSeriesView(){
   if(!equityData) return [];
   const start = eqCommonStart();
-  if(!start) return [];
   return EQ_SERIES.map(s => {
     if(!eqOn[s.key]) return null;
     const raw = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
-    const pts = raw.length ? eqRebase(raw, start) : null;
+    const st = eqStartFor(s, start);
+    const pts = (raw.length && st) ? eqRebase(raw, st) : null;
     if(!pts || pts.length < 2) return null;
     return { ...s, color: cssv(s.css), pts };
   }).filter(Boolean);
@@ -836,7 +844,9 @@ function drawEquityChart(){
     ctx.beginPath();
     s.pts.forEach((p, i) => i ? ctx.lineTo(x(p.t), y(p.n)) : ctx.moveTo(x(p.t), y(p.n)));
     ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.setLineDash(s.dash || []);                           // 페이퍼 시리즈는 점선 구분
     ctx.stroke();
+    ctx.setLineDash([]);
     const e = s.pts[s.pts.length - 1];                       // 끝점 마커 + 서피스 링(겹침 가독)
     ctx.beginPath(); ctx.arc(x(e.t), y(e.n), 6, 0, 7); ctx.fillStyle = surface; ctx.fill();
     ctx.beginPath(); ctx.arc(x(e.t), y(e.n), 4, 0, 7); ctx.fillStyle = s.color; ctx.fill();
@@ -860,7 +870,8 @@ function renderEquityLegend(){
   const start = eqCommonStart();
   el.innerHTML = EQ_SERIES.map(s => {
     const raw = ((equityData[s.key] || {}).points || []).filter(p => p.equity > 0);
-    const reb = raw.length && start ? eqRebase(raw, start) : null;
+    const st = eqStartFor(s, start);
+    const reb = raw.length && st ? eqRebase(raw, st) : null;
     const ret = reb && reb.length > 1 ? reb[reb.length-1].n : null;
     const cls = ret == null ? "muted" : ret > 0 ? "up" : ret < 0 ? "down" : "muted";
     return `<button type="button" class="eq-key ${eqOn[s.key] ? "" : "off"}" data-k="${s.key}">
@@ -885,7 +896,8 @@ function renderEquityCards(){
     if(!pts.length) return `<div class="cell"><div class="k">${s.label}</div>
       <div class="val muted" style="font-size:13px">기록 대기</div></div>`;
     const lastP = pts[pts.length-1];
-    const reb = start ? eqRebase(pts, start) : null;
+    const st = eqStartFor(s, start);
+    const reb = st ? eqRebase(pts, st) : null;
     const ret = reb && reb.length > 1 ? reb[reb.length-1].n : null;
     const cls = ret == null ? "" : ret > 0 ? "up" : ret < 0 ? "down" : "";
     return `<div class="cell"><div class="k">${s.label}</div>

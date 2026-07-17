@@ -103,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_decisions_run ON trade_decisions (account_id, run
 -- 주간 리밸런싱 멱등 마커: 평일 스케줄(휴장·실패 재시도)에서 한 주 1회만 실제 매매하도록 보장.
 -- 그 주 완료 시 1행 기록 → 같은 주 후속 평일 부팅은 skip. (market, iso_week)로 중복 차단.
 CREATE TABLE IF NOT EXISTS weekly_rebalance (
-    market    TEXT NOT NULL,                          -- 'US' | 'KR'
+    market    TEXT NOT NULL,                          -- 'US' | 'KR' | 'KR_ICHIMOKU'(일목 페이퍼 — 'KR'과 격리)
     iso_week  TEXT NOT NULL,                           -- ISO 주차 'YYYY-Www'(거래소 로컬 날짜 기준)
     done_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (market, iso_week)
@@ -113,9 +113,16 @@ INSERT INTO accounts (account_id, krw_balance)
 VALUES ('demo', 10000000)
 ON CONFLICT (account_id) DO NOTHING;
 
+-- KR 일목 페이퍼 전략 계정: 실주문 없이 시뮬 장부(orders/executions/positions)로만 기록(trading/portfolio/paper_ledger).
+-- auto_trade=FALSE 유지 필수 — trade_once가 auto_trade=TRUE 계정으로 코인을 매매하므로 이 계정이 코인에 끌려가면 안 됨.
+-- 초기 1억(KIS 모의계좌 규모) — 자산곡선은 %-리베이스라 절대값 무관하나 정수주 사이징 granularity 확보.
+INSERT INTO accounts (account_id, krw_balance)
+VALUES ('kr_ichimoku', 100000000)
+ON CONFLICT (account_id) DO NOTHING;
+
 -- 시장별 평가자산 스냅샷: 각 매매 잡이 종료 시 하루 1행 upsert(common/equity_snapshot.py).
 -- 대시보드 '자산' 탭(/equity/history)과 README 차트(scripts/render_equity_chart.py)의 원천.
--- account_id: COIN=accounts.account_id, KR/US='kis'(단일 KIS 모의계좌) — accounts FK 없음(의도).
+-- account_id: COIN=accounts.account_id, KR/US='kis'(단일 KIS 모의계좌), KR 일목 페이퍼='kr_ichimoku'(별도 곡선) — accounts FK 없음(의도).
 -- snap_date=UTC 달력일. 같은 날 재실행(스위퍼·US 다중 부팅)은 PK upsert로 마지막 실행이 승리.
 CREATE TABLE IF NOT EXISTS equity_snapshots (
     ts               TIMESTAMPTZ NOT NULL DEFAULT now(),
