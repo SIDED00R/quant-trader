@@ -4,14 +4,12 @@
 분리해 세션 충돌을 피한다. 흐름: `/chart <종목명|티커>`(한글 `/차트` 별칭) → 종목 해석(common.stock_names) → 일봉 온디맨드
 fetch(common.toss_daily — 수집 VM 로컬 CH엔 주식 데이터 없음) → 렌더(common.symbol_chart, KR=주봉+일목
 구름 / US=일봉) → Bot API sendPhoto. TELEGRAM_ALLOWED_CHAT_IDS 화이트리스트(비면 전면 거부). 절대 크래시
-안 함(예외는 백오프 후 계속). 종목명 인덱스는 /app/.namecache/names.json(주간 갱신, 실패 시 stale 유지) —
-정확 티커는 사전 무관하게 항상 동작.
+안 함(예외는 백오프 후 계속). 종목명 인덱스는 repo 번들 사전(common.stock_names)에서 로드 —
+정확 티커/코드는 사전 무관하게 항상 동작.
 
 실행: python -m api.telegram_bot  (토큰 미설정이면 유휴 — restart 루프 방지)
 """
 import io
-import json
-import os
 import sys
 import time
 import traceback
@@ -24,8 +22,6 @@ from common.symbol_chart import chart_for_symbol
 from common.toss_daily import fetch_daily
 
 _API = "https://api.telegram.org/bot{token}/{method}"
-_CACHE = os.getenv("NAMECACHE_PATH", "/app/.namecache/names.json")
-_CACHE_TTL = 7 * 24 * 3600
 _KR_FETCH_DAYS, _US_FETCH_DAYS = 1000, 220
 _HELP = ("📈 사용법: /chart <종목명 또는 티커>  (한글 /차트 도 됨)\n"
          "예) /chart 삼성전자 · /chart 005930 · /chart AAPL\n"
@@ -72,22 +68,8 @@ def send_photo(token: str, chat_id, png: bytes, caption: str) -> None:
 
 
 def load_index() -> dict:
-    """종목명 인덱스 — 신선한 파일 캐시가 있으면 사용, 아니면 재fetch 후 저장(실패 시 빈 인덱스)."""
-    if os.path.exists(_CACHE) and time.time() - os.path.getmtime(_CACHE) < _CACHE_TTL:
-        try:
-            with open(_CACHE, encoding="utf-8") as f:
-                return stock_names.build_index(json.load(f))
-        except Exception:
-            pass
-    names = stock_names.fetch_all()
-    if names.get("KR") or names.get("US"):
-        try:
-            os.makedirs(os.path.dirname(_CACHE), exist_ok=True)
-            with open(_CACHE, "w", encoding="utf-8") as f:
-                json.dump(names, f, ensure_ascii=False)
-        except Exception as e:
-            print(f"[chart-bot] 이름캐시 저장 실패(비치명): {e}")
-    return stock_names.build_index(names)
+    """종목명 검색 인덱스 — repo 번들 사전(common.stock_names)에서 로드(이미지 포함, 즉시)."""
+    return stock_names.build_index(stock_names.fetch_all())
 
 
 def handle_chart(query: str, index: dict):
@@ -142,7 +124,6 @@ def main() -> int:
         while True:                       # exit 0 시 restart:unless-stopped 루프 방지 → 유휴 대기
             time.sleep(3600)
     index = load_index()
-    idx_at = time.time()
     offset, backoff = 0, 1
     print(f"[chart-bot] 시작 — 허용 chat {len(TELEGRAM_ALLOWED_CHAT_IDS)}개, 종목명 {len(index.get('rows', []))}개")
     with httpx.Client(timeout=70) as client:
@@ -156,8 +137,6 @@ def main() -> int:
                         _handle_update(token, upd, index)
                     except Exception:
                         traceback.print_exc()
-                if time.time() - idx_at > _CACHE_TTL:       # 주간 인덱스 갱신
-                    index, idx_at = load_index(), time.time()
                 backoff = 1
             except Exception as e:                           # 409(다중 소비자)·네트워크 등 → 백오프 후 계속(크래시 금지)
                 print(f"[chart-bot] poll 오류(재시도): {type(e).__name__}: {e}")
