@@ -17,7 +17,7 @@
 | **OLAP** | ClickHouse — 틱/캔들(1분·일봉)/분석 |
 | **API·대시보드** | FastAPI + Grafana (+ Caddy 자동 HTTPS) |
 | **전략** | [주식] LightGBM 횡단면 챔피언(KR=OHLCV+DART 펀더 / US=+13F·섹터) 주간 top-N · [코인] 일봉 저회전 추세추종 앙상블(5/40·10/60·20/100), walk-forward·Deflated Sharpe 검증 |
-| **배포** | GCP **2-VM** — 상시 **틱 수집 VM(collector, e2-small)** + 온디맨드 **매매 VM(자기완결·로컬 DB)**(스케줄러 8잡: 코인 매일 10:00 KST / KR 평일 15:00 KST / US 평일 15:00 ET / 데이터 유지보수 매월 첫 토 04:00 UTC + 각 스위퍼 재시도) · 매매 VM on/off·대시보드는 별도 `gcp-cost-controller`(텔레그램) 담당 · main 머지 시 CI/CD 자동배포 |
+| **배포** | GCP **2-VM** — 상시 **틱 수집 VM(collector, e2-small)** + 온디맨드 **매매 VM(c2d-standard-2, 자기완결·로컬 DB)**(스케줄러 8잡: 코인 매일 10:00 KST / KR 평일 15:00 KST / US 평일 15:00 ET / 데이터 유지보수 매월 첫 토 04:00 UTC + 각 스위퍼 재시도) · 매매 VM on/off·대시보드는 별도 `gcp-cost-controller`(텔레그램) 담당 · main 머지 시 CI/CD 자동배포 |
 | **주식 브로커/데이터** | KIS(모의 체결 KR+US·수동주문) · 토스(일봉 데이터) · 키움(틱·인증) |
 
 ### 운용 성과 — 시장별 자산 추이 (자동 갱신)
@@ -238,7 +238,7 @@ docker compose --profile batch run --rm reeval
 
 ## 8. 배포
 
-GCP **2-VM** — 상시 수집 VM(e2-small, 수집·저장만) + 온디맨드 매매 VM(자기완결 로컬 DB, 대시보드 모드 겸용). Cloud Scheduler **8잡**(메인 4+기동실패 재시도 스위퍼 4)이 같은 VM을 기동(부팅 시각으로 분기): 코인 **매일 10:00 KST**, KR 주식 **평일 15:00 KST**, US 주식 **평일 15:30 ET**(마감 30분 전, DST 자동), 데이터 유지보수 **매월 첫 토요일 04:00 UTC**. 각 잡 후 자가 종료(상시 비용 ~$13/월). **main 머지 = 자동 배포**(GitHub Actions → Artifact Registry → 양 VM). 절차는 [DEPLOY.md](DEPLOY.md).
+GCP **2-VM** — 상시 수집 VM(e2-small, 수집·저장만) + 온디맨드 매매 VM(c2d-standard-2, 자기완결 로컬 DB, 대시보드 모드 겸용). Cloud Scheduler **8잡**(메인 4+기동실패 재시도 스위퍼 4)이 같은 VM을 기동(부팅 시각으로 분기): 코인 **매일 10:00 KST**, KR 주식 **평일 15:00 KST**, US 주식 **평일 15:30 ET**(마감 30분 전, DST 자동), 데이터 유지보수 **매월 첫 토요일 04:00 UTC**. 각 잡 후 자가 종료(상시 비용 ~$13/월). **main 머지 = 자동 배포**(GitHub Actions → Artifact Registry → 양 VM). 절차는 [DEPLOY.md](DEPLOY.md).
 
 **매 실행 텔레그램 통보**: 각 매매 잡이 결과(매수 내역 전부 또는 '매매하지 않음'+사유)와 오류를 텔레그램(MTProto, `common/notify_telegram`)으로 발송한다 — 스킵 실행도 발송하므로 **알림 부재 = 장애 신호**. 코인 데일리 잡은 **자산 곡선 차트(PNG 사진) 1장/일**도 함께 발송한다(`common/equity_chart_telegram`) — VM·대시보드 없이 텔레그램에서 자산 흐름 확인. 잡이 뜨기도 전에 죽는 실패(이미지 빌드 등)는 startup의 `notify_fail` 폴백이 로그 꼬리와 함께 발송(exit 70='파이썬이 이미 통보' 센티널). 자격증명은 Secret Manager `telegram-env`(발급: `scripts/telegram_login.py`). **수동주문 실패**(예약 실행 포함, `api/stock_order_executor`)와 **CI 배포 실패**(`notify-failure` 잡)도 같은 채널로 통보된다. 코인 잡은 **일봉 신선도 게이트**(최신봉 3일 초과 시 매매 대신 오류 통보 — 주식 경로의 7일 게이트와 동일 원칙)를 거친다.
 
