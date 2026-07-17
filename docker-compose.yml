@@ -253,6 +253,22 @@ services:
     profiles: ["app", "data", "collector"]
     command: python -m streaming.sink.tick_clickhouse
 
+  # ── 텔레그램 /차트 봇 (profile: collector — 수집 VM 상시. Bot API getUpdates는 단일 소비자만: 인스턴스 1개 엄수) ──
+  # app 이미지(httpx+pillow). 주식 데이터는 Toss 온디맨드 fetch(수집 VM 로컬 CH엔 주식 없음). 로컬 DB·kafka 비접속.
+  telegram-bot:
+    <<: *app
+    container_name: telegram-bot
+    profiles: ["collector"]
+    depends_on: []
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOWED_CHAT_IDS: ${TELEGRAM_ALLOWED_CHAT_IDS:-}
+      TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}
+      TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
+    volumes:
+      - namecache:/app/.namecache      # 종목명 JSON 캐시(주간 갱신 — 재시작 시 KRX/SEC 재호출 방지)
+    command: python -m api.telegram_bot
+
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
     <<: *app
@@ -451,6 +467,7 @@ volumes:
   refcache:        # #218 참조캐시(cusip_map·corp_map·sic_map) — 사실상 불변, 영속
   cache13f:        #       13F 분기 zip
   insidercache:    #       insider 분기 zip
+  namecache:       #       텔레그램 /차트 봇 종목명 사전(KRX/SEC) 주간 캐시
   grafanadata:
   caddydata:
   caddyconfig:
