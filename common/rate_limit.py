@@ -28,7 +28,6 @@ _DEFAULT_RATES: dict[str, float] = {
     "kiwoom:tr": 1,
     # Telegram (공식: 개별 채팅 ~1 msg/s): 매매 알림은 하루 수 건이라 보수값으로 충분.
     "telegram:send": 1,
-    "telegram:bot": 1,       # 인바운드 /차트 봇 응답(Bot API sendMessage/sendPhoto)
 }
 
 
