@@ -18,7 +18,8 @@ permissions:
 
 env:
   PROJECT: coin-auto-trader-jvfhgq
-  ZONE: us-central1-a
+  ZONE: us-central1-a          # 수집 VM(coin-trader-vm, 상시)
+  TRADE_ZONE: asia-northeast3-a  # 매매 VM(coin-trade-vm) — 서울 리전(us-central1 용량 고갈 회피, #266)
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 
 jobs:
@@ -146,7 +147,7 @@ jobs:
           service_account: github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
       - run: |
-          gcloud compute instances add-metadata coin-trade-vm --project "$PROJECT" --zone "$ZONE" \
+          gcloud compute instances add-metadata coin-trade-vm --project "$PROJECT" --zone "$TRADE_ZONE" \
             --metadata-from-file startup-script=infra/trade-vm-startup.sh
 
   # 어느 잡이든 실패 시 텔레그램 통보 — CI 실패가 GitHub 이메일에만 묻히지 않게 매매 알림과 채널 일원화.

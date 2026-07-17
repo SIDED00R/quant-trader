@@ -7,6 +7,10 @@
 > - **아키텍처**: 수집 VM(상시, e2-small, `--profile collector` 수집·저장만) + **매매 VM(온디맨드·자기완결 로컬 DB, Cloud Scheduler 8잡: 코인 매일 01:00 UTC·KR 15:00 KST·US 15:00 ET 장마감 전·월간 유지보수 첫 토요일, 기동→동기 배치→자가종료)**. 라이브 매매 = trade_once/stock_trade_once/us_trade_once. Kafka는 데이터 팬아웃만. **상시 비용 ~$13/월**.
 > - 대시보드 = 매매 VM 온디맨드 모드(`https://jh-quantlab.duckdns.org` 구글 OAuth, SSH 터널 폴백). 모델 출처 = `docs/model.md`. 상세 = `DEPLOY.md` 상단.
 > - 계정 초기화 완료(본인 2계정 → ₩10M). 주식은 KIS 모의계좌(KR+US 통합).
+> - **⏳ 운영 후속 (2026-07-17, #266)**: 매매 VM을 `us-central1-a` → 서울 `asia-northeast3-a`/`e2-standard-2`로 이전 완료(존 용량 고갈 회피). **[내일 할 일] us-central1 백업 자원 삭제** — 서울 첫 실스케줄 매매 성공 확인 후:
+>   - 고아 디스크 `coin-trade-vm`·`coin-trade-vm-qxl1` (us-central1-a, 각 20GB)
+>   - 스냅샷 `coin-trade-vm-premigrate` · 머신이미지 `coin-trade-vm-mi`
+>   - `gcloud compute disks delete coin-trade-vm coin-trade-vm-qxl1 --zone=us-central1-a`; `gcloud compute snapshots delete coin-trade-vm-premigrate`; `gcloud compute machine-images delete coin-trade-vm-mi` (월 ~$3-4 절감)
 
 ## 0단계 — 토대: 백테스트 & 성과측정 하니스  (#46 / PR #47)
 - [x] ClickHouse 틱 replay 백테스트 엔진 (`backtest/datasource.py` + `engine.py` + `run.py`) — 기간/심볼 지정 replay
