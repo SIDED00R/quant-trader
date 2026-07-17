@@ -85,6 +85,10 @@ TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "")        # 숫자 문자열
 TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "")      # StringSession(비밀)
 TELEGRAM_TARGET = os.getenv("TELEGRAM_TARGET", "me")      # 수신 대상(기본 me=나에게 보내기)
+# 인바운드 /차트 봇(api/telegram_bot) — BotFather 봇 토큰. 발신용 유저세션과 분리(세션 충돌 회피).
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+# 봇 명령 허용 chat_id 화이트리스트(쉼표구분). 비면 전면 거부(안전 기본).
+TELEGRAM_ALLOWED_CHAT_IDS = {int(x) for x in os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "").replace(" ", "").split(",") if x.lstrip("-").isdigit()}
 
 # ── 구글 OAuth / 세션 인증 ──
 # GOOGLE_CLIENT_ID/SECRET 가 모두 설정되면 OAuth 인증 활성. 미설정 시 비활성(로컬 개발).

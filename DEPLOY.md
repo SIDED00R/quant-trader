@@ -223,6 +223,18 @@ infra/terraform/
   # 드라이런: sudo DISK_MAX=1 bash infra/collector-healthcheck.sh → 🟠 수신 확인, 재실행 시 쿨다운 억제 확인,
   #           sudo rm /var/tmp/collector-healthcheck.state 로 리셋
   ```
+- **텔레그램 `/차트` 봇(수집 VM 상시 `telegram-bot` 서비스)**: BotFather 봇으로 `/차트 <종목명|티커>` → 봉차트(KR 주봉+일목·US 일봉) 응답. 1회 셋업:
+  ```bash
+  # ① BotFather로 봇 생성 → 토큰 획득. 본인이 봇에게 아무 메시지 전송 후 chat_id 확인:
+  curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | python -c "import sys,json;print([u['message']['chat']['id'] for u in json.load(sys.stdin)['result'] if 'message' in u])"
+  # ② telegram-env 시크릿에 2줄 추가(기존 키 유지 + append) — startup의 ^TELEGRAM_ prefix 병합으로 자동 반영:
+  #    TELEGRAM_BOT_TOKEN=123456:ABC...  /  TELEGRAM_ALLOWED_CHAT_IDS=<chat_id>  (새 버전 add)
+  # ③ 봇의 온디맨드 일봉 fetch용 toss-env를 수집 VM SA에 바인딩(주입은 startup의 toss-env 블록이 수행):
+  gcloud secrets add-iam-policy-binding toss-env --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"
+  # ④ 수집 VM 재부팅(또는 .env 수동 병합 후) `docker compose --profile collector up -d telegram-bot`
+  # 주의: Bot API getUpdates는 단일 소비자만 허용 — 로컬 테스트는 반드시 별도 테스트 토큰 사용(운영 토큰 동시 폴링 시 409).
+  # 주의: Toss 토큰은 클라이언트당 1개 — 봇/매매 잡이 같은 client_id면 상호 무효화 가능(봇은 401 자가재발급, 잡은 다음 부팅 회복).
+  ```
 - **매매 VM 절대 워치독**: startup 시작 직후 `shutdown -P +90`(유지보수 분기 +360, 대시보드 +120으로 재예약) — 어떤 단계가 행이어도 과금 상한. 정상 경로는 말미 `poweroff`가 선행돼 무해.
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
   1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.
