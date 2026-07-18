@@ -167,10 +167,11 @@ def execute(live: bool, max_positions: int, exit_rule: str) -> dict:
                                "filled_qty": qty if res == "applied" else 0, "msg": res})
         mark_week_done(MARKET_KEY, today)               # 페이퍼 체결은 동기·결정적 → 완료 기록(0건=이미 정렬)
 
+    bought = [o["symbol"] for o in placed if o.get("side") == "BUY" and o.get("filled")]   # 실제 체결분만
     return {"bar": str(freshest), "cash": float(cash_amt),
             "targets": p["targets"], "buys": [s for s, _, _ in p["buys"]],
             "sells": [s for s, _, _ in p["sells"]], "placed": placed, "skipped": None,
-            "buy_bars": [(s, hist[s]) for s, _, _ in p["buys"] if hist.get(s)]}   # 신규 매수 차트용 일봉
+            "buy_bars": [(s, hist[s]) for s in bought if hist.get(s)]}   # 체결된 신규 매수 차트용 일봉
 
 
 def snapshot() -> None:
@@ -191,9 +192,13 @@ def send_entry_charts(buy_bars: list) -> None:
     """
     if not buy_bars:
         return
-    from common import stock_names
-    from common.symbol_chart import chart_for_symbol
-    idx = stock_names.build_index(stock_names.fetch_all())
+    try:                                                        # 셋업 실패도 비치명(체결은 이미 끝난 뒤)
+        from common import stock_names
+        from common.symbol_chart import chart_for_symbol
+        idx = stock_names.build_index(stock_names.fetch_all())
+    except Exception as e:
+        print(f"[kr-ichimoku] 차트 셋업 실패(비치명): {type(e).__name__}: {e}")
+        return
     for sym, bars in buy_bars:
         try:
             hit = stock_names.resolve(idx, sym)
