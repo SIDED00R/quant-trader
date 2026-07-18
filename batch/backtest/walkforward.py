@@ -6,7 +6,7 @@
 워밍업으로 OOS 데이터를 잃지 않으면서 룩어헤드를 차단한다.
 
 다중 시도(그리드 N개) 선택편향은 **Deflated Sharpe**로 보정해 OOS 합성수익의 유의도를 보고한다.
-대상은 저회전 추세 전략(strategy/trend.py) — 상위 타임프레임(--bar-min, 기본 일봉)에서 평가한다.
+대상은 저회전 추세 전략(trading/strategy/plugins/trend.py) — 상위 타임프레임(--bar-min, 기본 일봉)에서 평가한다.
 """
 import argparse
 import statistics

@@ -13,6 +13,7 @@ import sys
 from datetime import date
 
 from batch.rawdata._krx_session import require_login, stock
+from batch.rawdata._parse import to_float as _f
 from common.clickhouse_client import create_client
 from common.marketdata.symbols import get_kr_symbols
 
@@ -21,13 +22,6 @@ _FLOW_COLS = ["date", "symbol", "investor", "net_value", "net_volume"]
 _HOLD_COLS = ["date", "symbol", "listed_shares", "held_shares", "holding_ratio", "limit_shares", "exhaustion_rate"]
 _SHORT_COLS = ["date", "symbol", "short_volume", "total_volume", "short_volume_ratio",
                "short_balance_qty", "short_balance_value", "market_cap", "short_balance_ratio"]
-
-
-def _f(x) -> float:
-    try:
-        return float(x)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def _trading_days(start: str, end: str) -> list:

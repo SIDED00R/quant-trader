@@ -141,7 +141,7 @@ STRATEGY_DEADCROSS_EXIT = os.getenv("STRATEGY_DEADCROSS_EXIT", "false").strip().
 # 업비트 최소 주문 금액(이 금액 미만 매수는 스킵). 정본은 여기(config) — sma_trader가 재-export하고 sma/disciplined가 경유 import.
 MIN_ORDER_KRW = Decimal(os.getenv("MIN_ORDER_KRW", "5000"))
 
-# ── 저회전 추세추종 전략 (3단계, strategy/trend.py) ──
+# ── 저회전 추세추종 전략 (3단계, trading/strategy/plugins/trend.py) ──
 # 일봉(상위 타임프레임) 기준 long-or-cash. 가드는 초(秒)가 아닌 **봉 수**로 둔다(일봉=1봉/일).
 TREND_SHORT = int(os.getenv("TREND_SHORT", "10"))            # 단기 SMA(봉)
 TREND_LONG = int(os.getenv("TREND_LONG", "40"))             # 장기 SMA(봉). 단기>장기=상승추세→보유

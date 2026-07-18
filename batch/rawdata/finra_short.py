@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 
 import httpx
 
+from batch.rawdata._parse import to_float as _flt
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
 from common.marketdata.symbols import get_us_symbols
@@ -24,13 +25,6 @@ _URL = "https://cdn.finra.org/equity/otcmarket/biweekly/shrt{ymd}.csv"
 _COLS = ["date", "symbol", "short_volume", "total_volume", "short_volume_ratio",
          "short_balance_qty", "short_balance_value", "market_cap", "short_balance_ratio",
          "market", "source"]
-
-
-def _flt(s: str) -> float:
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return 0.0
 
 
 def _parse(csv_text: str, universe: set) -> list:

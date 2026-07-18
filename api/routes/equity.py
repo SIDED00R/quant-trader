@@ -1,7 +1,7 @@
 """자산 곡선 조회 라우트 (단일 책임: equity_snapshots 시장별 시계열 + 전체(KRW 환산) 서빙).
 
 각 매매 잡이 종료 시 남긴 일 단위 평가자산을 돌려준다 — 코인=로그인 세션 계정,
-KR/US=단일 KIS 모의계좌('kis'). TOTAL은 common/equity_series가 합성(US는 FRED usdkrw 환산),
+KR/US=단일 KIS 모의계좌('kis'). TOTAL은 common/equity/equity_series가 합성(US는 FRED usdkrw 환산),
 환율이 없으면 TOTAL만 빈 리스트로 내려간다. 날짜=UTC 달력일 ISO(decisions 라우트와 동일 규약).
 """
 from fastapi import APIRouter, Depends
