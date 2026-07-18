@@ -7,7 +7,7 @@
 
 ```bash
 # 최근 2년치 1분봉을 5대 메이저에 대해 받아 data/candles 에 캐시 (1회, 이후 재사용)
-.venv/Scripts/python -m batch.backtest.backfill --unit 1 --days 730
+.venv/Scripts/python -m batch.candles.backfill --unit 1 --days 730
 ```
 
 증분 재실행 가능: 캐시가 있으면 최신 방향(newest~now)과 과거 방향(oldest~cutoff)을 모두 보충한다.
@@ -58,7 +58,7 @@
 ## 4) 테스트 (네트워크/Docker 불필요 — 합성 데이터)
 
 ```bash
-.venv/Scripts/python -m pytest batch/backtest/tests/ -q
+.venv/Scripts/python -m pytest tests/ -q
 ```
 
 ## 설계 (라이브와의 정합/차이)

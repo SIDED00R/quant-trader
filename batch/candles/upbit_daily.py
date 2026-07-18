@@ -11,7 +11,7 @@ import httpx
 
 from common.constants import COLUMNS_CANDLES, HTTP_PAGE
 from common.http_client import get_json
-from batch.backtest.upbit_candles import _parse_dt
+from batch.candles.upbit_candles import _parse_dt
 
 _URL = "https://api.upbit.com/v1/candles/days"
 _PAGE = HTTP_PAGE

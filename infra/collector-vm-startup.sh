@@ -82,5 +82,5 @@ printf '*/30 * * * * root bash /opt/coin-auto-trader/infra/collector-healthcheck
 chmod 644 /etc/cron.d/collector-healthcheck
 
 # 틱 아카이브의 candles_1d는 틱 집계로 채워진다(가동 이후부터). 과거 코인 일봉 시딩이 필요하면(1회):
-#   docker compose --profile batch run --rm reeval python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
+#   docker compose --profile batch run --rm reeval python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200
 echo "STARTUP_DONE"

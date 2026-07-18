@@ -11,7 +11,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
-from batch.backtest.refresh_stock_daily import refresh
+from batch.candles.refresh_stock_daily import refresh
 from common import notify_telegram
 from common.broker import kis_balance
 from common.equity.equity_snapshot import record_stock_snapshot

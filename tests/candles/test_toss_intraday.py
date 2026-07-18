@@ -2,7 +2,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from batch.backtest.toss_intraday import _row, _ts_utc
+from batch.candles.toss_intraday import _row, _ts_utc
 
 
 class TestTossIntradayRow(unittest.TestCase):

@@ -116,7 +116,7 @@ def main(argv=None) -> int:
     sample_sec = 86400.0 if args.ch_table == "candles_1d" else 60.0
     bars = list(load_clickhouse_candles(symbols=symbols, table=args.ch_table))
     if not bars:
-        print("[reeval] 0봉 — 먼저 백필: python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH",
+        print("[reeval] 0봉 — 먼저 백필: python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH",
               file=sys.stderr)
         return 1
     open_pool()

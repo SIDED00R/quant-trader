@@ -3,7 +3,7 @@
 업비트 REST로 받아 data/candles/<unit>m/*.csv에 둔 과거 분봉을 ClickHouse candles_1m으로 옮긴다.
 ReplacingMergeTree라 재실행 멱등. 대용량(종목당 ~100만행)이라 배치 단위로 스트리밍 insert한다.
 사전조건: docker compose up -d clickhouse + python -m scripts.init_db.
-예) .venv/Scripts/python -m batch.backtest.csv_to_clickhouse --symbols KRW-BTC,KRW-ETH --unit 1
+예) .venv/Scripts/python -m batch.candles.csv_to_clickhouse --symbols KRW-BTC,KRW-ETH --unit 1
 """
 import argparse
 import csv
@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
 from common.constants import COLUMNS_CANDLES
-from batch.backtest.upbit_candles import cache_path
+from batch.candles.upbit_candles import cache_path
 
 _COLUMNS = COLUMNS_CANDLES
 _BATCH = 100_000

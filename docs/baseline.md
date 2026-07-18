@@ -118,7 +118,7 @@ OOS가 −31.5%로 잘못 나왔으나, 적대적 코드리뷰로 발견·수정
 
 ### 표본 확대 (ClickHouse candles_1d, BTC/ETH 6.6년)
 2년 한계를 풀려 업비트 일봉을 ClickHouse `candles_1d`에 장기 백필(BTC/ETH 2019-11 ~ 2026-06, 2,399봉)하고 재측정.
-재현: `python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200` →
+재현: `python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2200` →
 `python -m batch.backtest.walkforward --source clickhouse --ch-table candles_1d --symbols KRW-BTC,KRW-ETH`
 
 | 측정 | 표본 | OOS 합성 | 양수 fold | OOS Sharpe | 유의도 |

@@ -319,7 +319,7 @@ services:
     command: python -m trading.relay.order_relay
 
   # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
-  # 라이브와 분리: `docker compose run --rm reeval python -m batch.backtest.reeval_weights [--dry-run]`.
+  # 라이브와 분리: `docker compose run --rm reeval python -m batch.jobs.reeval_weights [--dry-run]`.
   # 스케줄 미배선(수동 전용) — trade-vm-startup은 이 서비스를 backfill_daily 러너로만 재사용한다.
   # ENSEMBLE_ADAPTIVE=false 기본이라 라이브는 균등가중 운용(적응 루프는 휴면 설계 자산). kafka 불요(postgres+clickhouse만).
   reeval:
@@ -341,7 +341,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-    command: python -m batch.backtest.reeval_weights
+    command: python -m batch.jobs.reeval_weights
 
   # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
   # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=매매 VM 로컬 postgres/clickhouse(127.0.0.1):

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest import mock
 
 from common import http_client as _hc
-from batch.backtest import upbit_daily as ud
+from batch.candles import upbit_daily as ud
 
 
 def _candle(date_str, close):

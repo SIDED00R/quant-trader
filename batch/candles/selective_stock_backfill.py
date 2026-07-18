@@ -12,8 +12,8 @@
 """
 from datetime import datetime, timezone
 
-from batch.backtest import backfill_stock_daily
-from batch.backtest.toss_daily import fetch_daily
+from batch.candles import backfill_stock_daily
+from common.marketdata.toss_daily import fetch_daily
 from common.clickhouse_client import create_client
 
 _STALE_DAYS = 20                 # 최신 봉이 이보다 오래되면 refresh 누락으로 보고 전체 재백필

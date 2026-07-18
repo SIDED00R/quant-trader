@@ -1,13 +1,13 @@
 """분봉 백필 실행 (단일 책임: CLI → upbit_candles.backfill).
 
-예) .venv/Scripts/python -m batch.backtest.backfill --unit 1 --days 730 --symbols KRW-BTC,KRW-ETH
+예) .venv/Scripts/python -m batch.candles.backfill --unit 1 --days 730 --symbols KRW-BTC,KRW-ETH
 업비트 REST에서 과거 분봉을 받아 로컬 캐시(기본 data/candles)에 저장한다. 이후 백테스트는 캐시를 읽는다.
 """
 import argparse
 import sys
 
 from common.config import SYMBOLS
-from batch.backtest.upbit_candles import backfill
+from batch.candles.upbit_candles import backfill
 
 
 def main(argv=None) -> int:

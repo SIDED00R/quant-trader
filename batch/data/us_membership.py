@@ -58,7 +58,7 @@ def main(argv=None) -> int:
     ch = create_client()
     with httpx.Client(timeout=30, headers=_UA, follow_redirects=True) as client:
         store_sp500(client, ch)
-    # NASDAQ-100 PIT: 무료 정형소스 부재 → 현재구성(batch/backtest/universe/nasdaq100.txt) 근사는 보류, 한계 명시
+    # NASDAQ-100 PIT: 무료 정형소스 부재 → 현재구성(batch/universe/nasdaq100.txt) 근사는 보류, 한계 명시
     print("[membership] 주의: NASDAQ-100 PIT은 무료 소스 부재로 미적재(현재구성만, 한계). S&P500은 PIT 정확.")
     return 0
 

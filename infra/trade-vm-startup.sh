@@ -204,7 +204,7 @@ case "$BOOT_HOUR" in
     SYMS=$(grep -E '^ENSEMBLE_SYMBOLS=' .env | cut -d= -f2- 2>/dev/null); SYMS="${SYMS:-KRW-BTC,KRW-ETH}"
     # 백필 실패는 매매를 죽이지 않는다(기존 신선 데이터로 목표 수렴). 단 무언 실패(#248: tz버그로 0행 지속→신선도 위반)를
     # 조기 경보한다 — PIPESTATUS[0]=backfill exit(tee 뒤라 라인 exit는 0). `|| true` 대신 코드를 잡아 notify_fail로.
-    docker compose --profile batch run $(build_flag reeval "$BATCH_IMG" batch) --rm reeval python -m batch.backtest.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
+    docker compose --profile batch run $(build_flag reeval "$BATCH_IMG" batch) --rm reeval python -m batch.candles.backfill_daily --symbols "$SYMS" --days 400 2>&1 | tee -a /var/log/trade-once.log
     notify_fail "코인 백필" "${PIPESTATUS[0]}" /var/log/trade-once.log
     # 환율(usdkrw) 일일 갱신 — 자산 곡선 '전체(KRW 환산)'용(월간 유지보수만으론 최대 한 달 지연).
     # 실패해도 매매·차트는 진행(직전 환율 forward-fill 캐리) — 실패 통보의 정본은 월간 _fred_step.

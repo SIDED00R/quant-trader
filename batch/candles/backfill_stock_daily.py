@@ -1,6 +1,6 @@
 """주식 일봉 장기 백필 실행 (단일 책임: CLI → toss_daily → ClickHouse stock_candles_1d).
 
-예) .venv/Scripts/python -m batch.backtest.backfill_stock_daily --symbols 005930,000660,AAPL --days 2000
+예) .venv/Scripts/python -m batch.candles.backfill_stock_daily --symbols 005930,000660,AAPL --days 2000
 토스증권 일봉(KR/US)을 받아 ClickHouse stock_candles_1d에 적재한다(주식 백테스트 입력).
 사전조건: docker compose up -d clickhouse + python -m scripts.init_db (stock_candles_1d 생성),
 .env에 TOSS_CLIENT_ID/SECRET 설정.
@@ -8,7 +8,8 @@
 import argparse
 import sys
 
-from batch.backtest.toss_daily import fetch_daily, upsert_clickhouse
+from batch.candles.toss_daily_load import upsert_clickhouse
+from common.marketdata.toss_daily import fetch_daily
 from common.clickhouse_client import create_client
 
 _DEFAULT_SYMBOLS = "005930,000660,AAPL"   # CLI 기본값(수동 백필용 샘플). KR=6자리 숫자, US=티커.

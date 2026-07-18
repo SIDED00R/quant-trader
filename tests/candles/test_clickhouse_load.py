@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from datetime import timezone
 
-from batch.backtest import csv_to_clickhouse as c2c
+from batch.candles import csv_to_clickhouse as c2c
 from batch.backtest.datasource import load_clickhouse_candles
 from tests.candles.test_upbit_candles import _write
 
@@ -22,7 +22,7 @@ class TestCsvToClickhouse(unittest.TestCase):
             # ts_ms=60000 → 1970-01-01T00:01:00 UTC, close=100
             from tests.candles.test_upbit_candles import _write_rows
             _write_rows(d, "KRW-BTC", 1, [[60000, "99", "110", "98", "100", "5", "x"]])
-            from batch.backtest.upbit_candles import cache_path
+            from batch.candles.upbit_candles import cache_path
             rows = list(c2c._rows(cache_path(d, "KRW-BTC", 1), "KRW-BTC"))
             self.assertEqual(len(rows), 1)
             sym, ws, o, h, lo, cl, v = rows[0]

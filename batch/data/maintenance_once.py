@@ -18,8 +18,8 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-from batch.backtest import selective_stock_backfill
-from batch.backtest.refresh_stock_daily import alive_symbols
+from batch.candles import selective_stock_backfill
+from batch.candles.refresh_stock_daily import alive_symbols
 from batch.data import (earnings, factor_returns, finra_short, fundamentals,
                         insider, kr_fundamentals, sec_13f, sec_sector,
                         verify_freshness)
@@ -57,7 +57,7 @@ def _stock_names_step() -> int:
     return 0 if refresh_clickhouse(create_client()) else 1
 
 
-_UNIVERSE_DIR = Path(__file__).resolve().parents[1] / "backtest" / "universe"
+_UNIVERSE_DIR = Path(__file__).resolve().parents[1] / "universe"
 _DAYS = 2600   # 풀 재백필 기간 — 연구·초기 시딩과 동일(~7.1년)
 
 

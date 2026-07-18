@@ -111,7 +111,7 @@
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
   1. 연구 ClickHouse → 프로드 ClickHouse로 4테이블(`stock_candles_1d`·`fundamentals_quarterly`·`institutional_13f`·`stock_meta`) 복사. SSH 터널로 두 CH에 접속해 `clickhouse_connect`로 조회→삽입.
   2. 활성 유니버스 전체 재백필(수정주가 기준 통일):
-     `python -m batch.backtest.backfill_stock_daily --symbols-file <kospi200+kosdaq150+sp500+nasdaq100 결합 파일> --days 2600`
+     `python -m batch.candles.backfill_stock_daily --symbols-file <kospi200+kosdaq150+sp500+nasdaq100 결합 파일> --days 2600`
      신규 종목 편입도 이 CLI로 수행한다(`refresh_stock_daily`는 이미 활성인 종목의 증분만 갱신, 신규 편입은 다루지 않음).
 
 ### 접속 (SSH 터널)

@@ -263,7 +263,7 @@ kafka_project/
 - `trading.strategy.runners.live_ensemble` → `.commander` (strategy.signals)
 - `.commander` → `trading.relay` → `trading.engine` → `trading.portfolio` (orders → executions → 잔고)
 - candles_1d 완성 → `trading.strategy.runners.trade_once` (일 1회 온디맨드 배치)
-- candles_1d(전기간) → `batch.backtest.reeval_weights` (가중치 재평가)
+- candles_1d(전기간) → `batch.jobs.reeval_weights` (가중치 재평가)
 
 ---
 

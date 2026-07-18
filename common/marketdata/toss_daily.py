@@ -1,6 +1,6 @@
 """토스증권 일봉 fetch (단일 책임: REST /api/v1/candles → 정규화 rows). app 이미지 안전(batch 비의존).
 
-batch/backtest/toss_daily.py에서 이동 — 텔레그램 차트 봇(app 이미지·수집 VM)이 주식 로컬 CH 없이
+batch/candles/toss_daily_load.py에서 이동 — 텔레그램 차트 봇(app 이미지·수집 VM)이 주식 로컬 CH 없이
 온디맨드로 일봉을 받기 위함. CH 적재(upsert_clickhouse)는 배치 책임이라 batch 측에 잔류하고 fetch만 이곳에 둔다.
 응답 timestamp는 KR/US 모두 KST(+09:00) → 현지 날짜만 취해 00:00 UTC window_start로 정규화(하루 1행). 수정주가.
 401(클라이언트당 유효 토큰 1개 제약 — 다른 워커의 재발급으로 무효화 가능)은 강제 재발급 후 1회 재시도한다.

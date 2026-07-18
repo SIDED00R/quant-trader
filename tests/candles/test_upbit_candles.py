@@ -15,8 +15,8 @@ from unittest import mock
 import httpx
 
 from common import http_client as _hc
-from batch.backtest import upbit_candles as uc
-from batch.backtest.upbit_candles import _HEADER, cache_path, load
+from batch.candles import upbit_candles as uc
+from batch.candles.upbit_candles import _HEADER, cache_path, load
 
 
 def _write(cache_dir, market, unit, rows):

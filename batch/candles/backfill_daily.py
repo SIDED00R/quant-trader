@@ -1,6 +1,6 @@
 """일봉 장기 백필 실행 (단일 책임: CLI → upbit_daily → ClickHouse candles_1d).
 
-예) .venv/Scripts/python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2000
+예) .venv/Scripts/python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH --days 2000
 업비트 일봉을 받아 ClickHouse candles_1d에 적재한다(저회전 추세 전략의 장기 백테스트용).
 사전조건: docker compose up -d clickhouse + python -m scripts.init_db (candles_1d 생성).
 """
@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
 from common.marketdata.upbit_markets import fetch_krw_markets
-from batch.backtest.upbit_daily import fetch_daily, upsert_clickhouse
+from batch.candles.upbit_daily import fetch_daily, upsert_clickhouse
 
 
 def main(argv=None) -> int:

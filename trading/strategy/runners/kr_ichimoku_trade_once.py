@@ -10,14 +10,14 @@
 체결가 = 최신 일봉 종가(백테스트=주 종가와 미세 차이 — 월요일 실행분이라 문서화). 무재시도·동기.
 매매 후 신규 매수(구름 돌파 진입) 종목의 주봉+일목 차트를 텔레그램 사진으로 발송한다(비치명, /차트 봇 렌더러 재사용).
 
-Dockerfile.batch(trade) 전용 — batch.backtest.refresh_stock_daily/toss_daily 의존(app 이미지 제외 경로).
+Dockerfile.batch(trade) 전용 — batch.candles.refresh_stock_daily/toss_daily 의존(app 이미지 제외 경로).
 """
 import argparse
 import sys
 import traceback
 from decimal import Decimal
 
-from batch.backtest.refresh_stock_daily import alive_symbols, refresh
+from batch.candles.refresh_stock_daily import alive_symbols, refresh
 from common import notify_telegram
 from common.clickhouse_client import create_client
 from common.config import FEE_RATE, STOCK_SELL_TAX_RATE
@@ -117,7 +117,8 @@ def _refresh_held(live: bool) -> None:
         held = list(paper_ledger.positions(conn, ICHIMOKU_ACCOUNT))
     if not held:
         return
-    from batch.backtest.toss_daily import fetch_daily, upsert_clickhouse
+    from batch.candles.toss_daily_load import upsert_clickhouse
+    from common.marketdata.toss_daily import fetch_daily
     client = create_client()
     for s in held:
         try:
