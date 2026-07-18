@@ -104,7 +104,7 @@ PARTITION BY market
 ORDER BY (symbol, date, feature);
 
 -- US 펀더멘털 원본(SEC EDGAR companyfacts). 롱 포맷·vintage 보존(정정공시 대비 filed_date별 보관).
--- point-in-time: 사용 시 filed_date ≤ 거래일 게이팅. batch/data/fundamentals.py가 적재(재실행 멱등).
+-- point-in-time: 사용 시 filed_date ≤ 거래일 게이팅. batch/rawdata/fundamentals.py가 적재(재실행 멱등).
 CREATE TABLE IF NOT EXISTS fundamentals_quarterly (
     symbol       LowCardinality(String),
     concept      LowCardinality(String),   -- shares|equity|assets|net_income|revenue|op_cashflow
@@ -120,7 +120,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, concept, period_end, filed_date);
 
 -- 매크로 시계열(FRED). 전 종목 공통 레짐 피처(금리·수익률곡선·VIX·환율·유가). 휴일 전일캐리(ffill).
--- batch/data/fred.py가 적재(FRED_API_KEY 필요). 일별 증분: 재실행 시 최신 추가(멱등).
+-- batch/rawdata/fred.py가 적재(FRED_API_KEY 필요). 일별 증분: 재실행 시 최신 추가(멱등).
 CREATE TABLE IF NOT EXISTS macro_daily (
     date     Date,
     dgs10    Float64,  dgs2  Float64,  dgs3mo Float64,
@@ -133,7 +133,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY date;
 
 -- 지수 PIT 멤버십(종목별 편입~편출 구간)·편입편출 이벤트. 생존편향 부분해결 + 이벤트 신호.
--- S&P500은 PIT 정확(GitHub fja05680). batch/data/us_membership.py 적재. 재실행 멱등.
+-- S&P500은 PIT 정확(GitHub fja05680). batch/rawdata/us_membership.py 적재. 재실행 멱등.
 CREATE TABLE IF NOT EXISTS index_membership (
     symbol      LowCardinality(String),
     index_name  LowCardinality(String),   -- SP500 | NASDAQ100 | KOSPI200 | KOSDAQ150
@@ -157,7 +157,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (index_name, date, symbol);
 
 -- US 13F 기관보유(SEC DERA, 분기). 우리 512종목만(CUSIP 필터). 보유기관수·총주식수가 robust 신호.
--- VALUE는 2023Q1부터 천$→$ 단위변경 → 보조. batch/data/sec_13f.py 적재. 재실행 멱등.
+-- VALUE는 2023Q1부터 천$→$ 단위변경 → 보조. batch/rawdata/sec_13f.py 적재. 재실행 멱등.
 CREATE TABLE IF NOT EXISTS institutional_13f (
     symbol       LowCardinality(String),
     period_end   Date,
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS institutional_13f (
 ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, period_end);
 
--- US 섹터(SEC SIC). 산업모멘텀(indmom)·sector-neutral 피처용. batch/data/sec_sector.py 적재.
+-- US 섹터(SEC SIC). 산업모멘텀(indmom)·sector-neutral 피처용. batch/rawdata/sec_sector.py 적재.
 CREATE TABLE IF NOT EXISTS stock_meta (
     symbol      LowCardinality(String),
     sic         String,
@@ -183,7 +183,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY symbol;
 
 -- ── KR 외부데이터(KRX 정보데이터시스템, pykrx 로그인). 전부 KR 전용 변수(US 구조적 부재). ──
--- 모두 batch/data/krx.py가 종목별 1패스로 적재(재실행 멱등). 발표 지연 주의 — 사용 시 시프트.
+-- 모두 batch/rawdata/krx.py가 종목별 1패스로 적재(재실행 멱등). 발표 지연 주의 — 사용 시 시프트.
 
 -- KR 투자자별 순매수(12분류). 롱 포맷(투자자 차원) — 외국인/기관/개인 등이 핵심 수급 신호.
 -- value=순매수금액(원), volume=순매수수량(주). EOD 장마감(~18시) 확정 → t일은 t종가 이후 게이팅.
@@ -265,7 +265,7 @@ ORDER BY (market, symbol);
 -- ── 신규 무료 데이터(주식 퀀트 공용) ──
 
 -- 팩터 일간 수익률(Ken French Data Library). 수익 귀인(내 엣지가 알파냐 팩터노출이냐) + 팩터중립 피처.
--- 롱 포맷(팩터 차원) — region으로 US/글로벌/KR(추후) 확장. batch/data/factor_returns.py 적재. 재실행 멱등.
+-- 롱 포맷(팩터 차원) — region으로 US/글로벌/KR(추후) 확장. batch/rawdata/factor_returns.py 적재. 재실행 멱등.
 -- ret = 일간 수익률(소수). 원본 CSV는 %표기 → /100 저장. RF도 동일 축에 factor='rf'로 보관.
 CREATE TABLE IF NOT EXISTS factor_returns_daily (
     date        Date32,                                -- Date32(1900~): Ken French 팩터는 1926년부터 → Date(1970~) 범위 밖 방지
@@ -280,7 +280,7 @@ ORDER BY (region, factor, date);
 
 -- 내부자 거래(SEC Form 3/4/5, DERA insider-transactions 분기 데이터셋). 내부자 매수/매도 신호.
 -- ISSUERTRADINGSYMBOL로 티커 직접 획득(13F와 달리 OpenFIGI 불필요). filed_date로 PIT 게이팅.
--- batch/data/insider.py 적재. trans_code: P(매수)·S(매도)·A(수여)·M(옵션행사)·F(세금納주식)·G(증여) 등.
+-- batch/rawdata/insider.py 적재. trans_code: P(매수)·S(매도)·A(수여)·M(옵션행사)·F(세금納주식)·G(증여) 등.
 CREATE TABLE IF NOT EXISTS insider_transactions (
     symbol             LowCardinality(String),
     trans_date         Date,                      -- 거래일(TRANS_DATE)
@@ -301,7 +301,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 ORDER BY (symbol, trans_date, accession, trans_sk);
 
 -- 실적 발표일 캘린더. US=SEC 8-K Item 2.02(실적) 접수일, KR=DART 실적공시 rcept_dt.
--- 용도: 실적 전후 매매 마스킹(갭 리스크 회피) + 실적발표후표류(PEAD) 신호. batch/data/earnings.py 적재.
+-- 용도: 실적 전후 매매 마스킹(갭 리스크 회피) + 실적발표후표류(PEAD) 신호. batch/rawdata/earnings.py 적재.
 CREATE TABLE IF NOT EXISTS earnings_calendar (
     symbol        LowCardinality(String),
     market        LowCardinality(String),          -- US | KR

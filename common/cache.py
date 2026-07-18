@@ -1,6 +1,6 @@
 """JSON 파일 캐시 헬퍼 (단일 책임: 안전한 load/dump — file handle leak 방지).
 
-batch/data·features의 산재한 `json.load(open(...))`/`json.dump(.., open(..))`(with 미사용)를 통합.
+batch/rawdata·features의 산재한 `json.load(open(...))`/`json.dump(.., open(..))`(with 미사용)를 통합.
 """
 import json
 import os

@@ -16,15 +16,15 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from common.config import FEE_RATE, INITIAL_BALANCE, SYMBOLS
-from common.market_hours import is_market_open, periods_per_year as ppy_fn
+from common.marketdata.market_hours import is_market_open, periods_per_year as ppy_fn
 from batch.backtest.account import BacktestAccount
 from batch.backtest.datasource import load_clickhouse_candles
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.metrics import SECONDS_PER_YEAR, _sharpe_from_returns, deflated_sharpe
-from batch.backtest.upbit_candles import load as load_candle_cache
-from trading.strategy.ensemble import EnsembleStrategy
-from trading.strategy.trend import TrendStrategy
+from batch.candles.upbit_candles import load as load_candle_cache
+from trading.strategy.plugins.ensemble import EnsembleStrategy
+from trading.strategy.plugins.trend import TrendStrategy
 
 _GRID_SHORT = [5, 10, 20]
 _GRID_LONG = [30, 40, 60]
@@ -294,13 +294,13 @@ def main(argv=None) -> int:
         print(f"[wf] 데이터 로드 실패: {e}", file=sys.stderr)
         return 2
     if not bars:
-        hint = ("python -m batch.backtest.backfill_daily --symbols KRW-BTC,KRW-ETH" if args.source == "clickhouse"
-                else "python -m batch.backtest.backfill --days {} --unit {}".format(args.days, args.unit))
+        hint = ("python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH" if args.source == "clickhouse"
+                else "python -m batch.candles.backfill --days {} --unit {}".format(args.days, args.unit))
         print(f"[wf] 0봉 — 먼저 백필: {hint}", file=sys.stderr)
         return 1
     factory = None
     if args.strategy not in ("trend", "ensemble"):   # 임의 등록 전략 → 고정구성 factory(fold별 새 인스턴스)
-        from trading.strategy.registry import get_strategy
+        from trading.strategy.core.registry import get_strategy
         if args.source == "clickhouse":
             bar_min = 1 if args.ch_table in ("candles_1m", "stock_candles_1m") else 1440
         else:

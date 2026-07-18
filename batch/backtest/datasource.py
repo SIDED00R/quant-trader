@@ -4,7 +4,7 @@ candles 테이블(symbol, window_start, ..., close)을 전역 시간순(window_s
 BTick(종가)을 yield한다. 봉 종가를 가격 시계열로 쓴다(라이브 aggregator가 적재하는 1분봉과 동일 소스).
 table=candles_1d면 장기 일봉(backfill_daily 적재본) — 저회전 추세 전략의 장기 백테스트용.
 table=stock_candles_1d면 주식 일봉(toss_daily 적재본, KR+US), table=stock_candles_1m면 주식 분봉(인트라데이) — 모두 동일 스키마(symbol/window_start/close).
-업비트 REST 직접 수집/캐시는 backtest.upbit_candles 가 담당한다(소스는 run.py --source로 선택).
+업비트 REST 직접 수집/캐시는 batch.candles.upbit_candles 가 담당한다(소스는 run.py --source로 선택).
 ReplacingMergeTree 중복은 FINAL로 정리.
 """
 from decimal import Decimal

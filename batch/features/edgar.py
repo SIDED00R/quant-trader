@@ -3,8 +3,8 @@
 배선된 진입점은 저장소 파생: fundamentals_quarterly·institutional_13f → 일별 피처
 (daily_fundamentals_from_store·daily_13f_from_store, JSON 재파싱 없이 빠름).
 원본 적재용 companyfacts 페치·태그 정의(fetch_companyfacts·_entries·_SHARES 등)는
-batch.data.fundamentals 가 사용하고, ticker_cik_map은 batch.data.fundamentals·batch.data.sec_sector·
-batch.data.earnings가 공유한다(lru_cache로 실행 내 1회). JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
+batch.rawdata.fundamentals 가 사용하고, ticker_cik_map은 batch.rawdata.fundamentals·batch.rawdata.sec_sector·
+batch.rawdata.earnings가 공유한다(lru_cache로 실행 내 1회). JSON 캐시는 common.cache. SEC 예절: User-Agent + ≤10req/s.
 
 **point-in-time**: 각 거래일 d는 filed_date ≤ d 인 공시값만 사용(as-of backward) → look-ahead 차단.
 - instant 계정(상장주식수·자본·자산): 최신 filed≤d 값.
@@ -121,7 +121,7 @@ def daily_fundamentals_from_store(panel: pd.DataFrame, log=print) -> pd.DataFram
         "SELECT symbol, concept, period_end, filed_date, duration_d, value "
         "FROM fundamentals_quarterly FINAL").result_rows
     if not rows:
-        log("[edgar] fundamentals_quarterly 비어있음 — batch.data.fundamentals 먼저 실행")
+        log("[edgar] fundamentals_quarterly 비어있음 — batch.rawdata.fundamentals 먼저 실행")
         return pd.DataFrame()
     cf = pd.DataFrame(rows, columns=["symbol", "concept", "period_end", "filed_date", "duration_d", "value"])
     cf["filed_date"] = pd.to_datetime(cf["filed_date"]); cf["period_end"] = pd.to_datetime(cf["period_end"])

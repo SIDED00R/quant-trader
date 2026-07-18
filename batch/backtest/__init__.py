@@ -2,6 +2,6 @@
 
 업비트 1분봉(종가)을 전역 시간순으로 replay해 전략을 시뮬레이션하고(지연=0 이상화),
 라이브 engine/portfolio와 동일한 체결·수수료·평단 수학으로 성과지표를 산출한다.
-데이터원은 업비트 REST 캐시(backtest.upbit_candles) 또는 ClickHouse candles_1m(backtest.datasource)다.
+데이터원은 업비트 REST 캐시(batch.candles.upbit_candles) 또는 ClickHouse candles_1m(batch.backtest.datasource)다.
 결정 수학은 strategy 구현(SMAStrategy 등)이 sma_trader 순수 함수를 재사용해 라이브와 발산을 최소화한다.
 """

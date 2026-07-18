@@ -10,7 +10,7 @@ import concurrent.futures
 from fastapi import APIRouter, HTTPException
 
 from api.cache import cache_get, cache_get_stale, cache_set, refresh_in_background
-from common import kis_balance
+from common.broker import kis_balance
 
 router = APIRouter(prefix="/stocks")
 

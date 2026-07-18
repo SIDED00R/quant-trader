@@ -6,7 +6,7 @@
   .venv/Scripts/python -m batch.backtest.run --source clickhouse --symbols KRW-BTC --start "2026-06-01 00:00:00"
 예) 주식 일봉(토스 적재본)으로 백테스트:
   .venv/Scripts/python -m batch.backtest.run --source clickhouse --ch-table stock_candles_1d --symbols 005930 --strategy ensemble --sample-sec 86400
-업비트 소스는 사전 백필 필요: python -m batch.backtest.backfill --days 730 --symbols KRW-BTC,KRW-ETH
+업비트 소스는 사전 백필 필요: python -m batch.candles.backfill --days 730 --symbols KRW-BTC,KRW-ETH
 """
 import argparse
 import subprocess
@@ -49,9 +49,9 @@ from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.metrics import compute_metrics
 from batch.backtest.report import print_summary, write_outputs
-from batch.backtest.upbit_candles import load as load_candle_cache
-from common.market_hours import is_market_open, periods_per_year
-from trading.strategy.registry import available, get_strategy
+from batch.candles.upbit_candles import load as load_candle_cache
+from common.marketdata.market_hours import is_market_open, periods_per_year
+from trading.strategy.core.registry import available, get_strategy
 
 
 def _regular_session_only(candles):
@@ -165,7 +165,7 @@ def main(argv=None) -> int:
     if engine.n_bars == 0:
         if args.source == "upbit":
             print("[backtest] 0봉 — 캐시가 비었습니다. 먼저 백필: "
-                  "python -m batch.backtest.backfill --days {} --unit {}".format(args.days, args.unit), file=sys.stderr)
+                  "python -m batch.candles.backfill --days {} --unit {}".format(args.days, args.unit), file=sys.stderr)
         else:
             print(f"[backtest] 0봉 — ClickHouse {args.ch_table}/기간/심볼을 확인하세요.", file=sys.stderr)
         return 1

@@ -97,8 +97,8 @@ x-batch-trade: &batch-trade
     TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
   volumes:                          # 참조캐시·분기 zip 영속 — 월간 콜드 스타트 방지(#218).
     - refcache:/app/batch/.refcache             # cusip_map·corp_map·sic_map (불변 참조)
-    - cache13f:/app/batch/data/.13f_cache       # 13F 분기 zip (확정분기 불변)
-    - insidercache:/app/batch/data/.insider_cache
+    - cache13f:/app/batch/rawdata/.13f_cache       # 13F 분기 zip (확정분기 불변)
+    - insidercache:/app/batch/rawdata/.insider_cache
     # .edgar_cache(companyfacts)·.dart_cache(보고서)는 콜드 — SEC 조건부GET 미지원·정정 반영 위해 매월 재수신
 
 services:
@@ -265,7 +265,7 @@ services:
       TELEGRAM_ALLOWED_CHAT_IDS: ${TELEGRAM_ALLOWED_CHAT_IDS:-}
       TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}
       TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
-    command: python -m api.telegram_bot   # 종목명 사전은 이미지 번들(common/refdata) — 별도 캐시 볼륨 불요
+    command: python -m api.telegram_bot   # 종목명 사전은 이미지 번들(common/marketdata/refdata) — 별도 캐시 볼륨 불요
 
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
@@ -306,12 +306,12 @@ services:
   ensemble-signals:
     <<: *app
     container_name: ensemble-signals
-    command: python -m trading.strategy.live_ensemble    # candles_1d 워밍업 → 일봉 마감마다 strategy.signals 발행
+    command: python -m trading.strategy.runners.live_ensemble    # candles_1d 워밍업 → 일봉 마감마다 strategy.signals 발행
 
   commander:
     <<: *app
     container_name: commander
-    command: python -m trading.strategy.commander        # strategy.signals 소비 → 목표비중 모의주문(place_order)
+    command: python -m trading.strategy.runners.commander        # strategy.signals 소비 → 목표비중 모의주문(place_order)
 
   relay:
     <<: *app
@@ -319,7 +319,7 @@ services:
     command: python -m trading.relay.order_relay
 
   # ── 부하 재평가 배치 (profile: batch — 온디맨드, backtest 포함 이미지) ──
-  # 라이브와 분리: `docker compose run --rm reeval python -m batch.backtest.reeval_weights [--dry-run]`.
+  # 라이브와 분리: `docker compose run --rm reeval python -m batch.jobs.reeval_weights [--dry-run]`.
   # 스케줄 미배선(수동 전용) — trade-vm-startup은 이 서비스를 backfill_daily 러너로만 재사용한다.
   # ENSEMBLE_ADAPTIVE=false 기본이라 라이브는 균등가중 운용(적응 루프는 휴면 설계 자산). kafka 불요(postgres+clickhouse만).
   reeval:
@@ -341,7 +341,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-    command: python -m batch.backtest.reeval_weights
+    command: python -m batch.jobs.reeval_weights
 
   # ── 온디맨드 1회 매매 (profile: trade — 매매 VM에서 스케줄러로 기동) ──
   # 메인 앱 이미지(portfolio/strategy/common 포함, backtest 불요). DB 접근=매매 VM 로컬 postgres/clickhouse(127.0.0.1):
@@ -364,30 +364,30 @@ services:
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
       TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
-    command: python -m trading.strategy.trade_once
+    command: python -m trading.strategy.runners.trade_once
 
   # ── 온디맨드 주식 주간 모의 리밸런싱 (평일 15:00 KST, 마감 30분 전) — ML 챔피언 스코어→KIS 모의주문 ──
   # 스타트업이 부팅시각(UTC 06·07)으로 분기 실행, 주간 마커가 주 1회 보장. 공통 설정은 x-batch-trade 앵커.
   stock-trade-once:
     <<: *batch-trade
-    command: python -m trading.strategy.stock_trade_once --live --top-n 10 --max-orders 5
+    command: python -m trading.strategy.runners.stock_trade_once --live --top-n 10 --max-orders 5
 
   # ── 온디맨드 US 주간 모의 리밸런싱 (평일 15:00 ET, 마감 1시간 전) — KR판의 US 대응 ──
   # 차이: USD·해외 잔고/지정가주문(시장가 불가)·거래소 라우팅+체결추격. 스타트업이 UTC 부팅시각(19·20·21)으로만 실행.
   us-trade-once:
     <<: *batch-trade
-    command: python -m trading.strategy.us_trade_once --live --top-n 20 --max-orders 5
+    command: python -m trading.strategy.runners.us_trade_once --live --top-n 20 --max-orders 5
 
   # ── 온디맨드 KR 일목 주간 페이퍼 매매 (평일 15:00 KST, stock-trade-once 뒤) — 주봉 구름 신호 → Postgres 시뮬 체결 ──
   # 실계좌 없음: paper_ledger가 orders/executions/positions에 기록. 주간 마커 키 KR_ICHIMOKU(ML 'KR'과 격리). ML 전략과 자산곡선 비교용.
   kr-ichimoku-trade-once:
     <<: *batch-trade
-    command: python -m trading.strategy.kr_ichimoku_trade_once --live --max-positions 30
+    command: python -m trading.strategy.runners.kr_ichimoku_trade_once --live --max-positions 30
 
   # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기+연구 수집기(KRX 증분·FRED·PIT 멤버십·상폐 메타), #204) ──
   maintenance-once:
     <<: *batch-trade
-    command: python -m batch.data.maintenance_once
+    command: python -m batch.jobs.maintenance_once
 
   # ── 자산 차트 렌더 (profile: trade — 매매 잡 후 startup이 실행, charts/*.svg 생성 → assets 브랜치 발행) ──
   # 앱 이미지(scripts/ 포함 — batch 이미지엔 없음). DB=매매 VM 로컬(127.0.0.1), 출력은 호스트 ./charts 바인드.
@@ -427,7 +427,7 @@ services:
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
       TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
-    command: python -m common.watchlist_chart_telegram
+    command: python -m common.chart.watchlist_chart_telegram
 
   api:
     <<: *app

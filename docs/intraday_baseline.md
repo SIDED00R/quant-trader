@@ -12,7 +12,7 @@
 ## 2. 사전 백필
 ```bash
 docker compose up -d clickhouse && python -m scripts.init_db
-python -m batch.backtest.backfill_stock_intraday --symbols 005930,000660,035720,005380,AAPL,MSFT,NVDA --days 365
+python -m batch.candles.backfill_stock_intraday --symbols 005930,000660,035720,005380,AAPL,MSFT,NVDA --days 365
 ```
 (~5/s rate limit: 50종목 1년 ≈ ~2시간. 종목·기간은 subset부터.)
 
@@ -122,7 +122,7 @@ python -m batch.backtest.walkforward --source clickhouse --ch-table stock_candle
 → **모든 모멘텀 config가 DSR≥0.99**, 룩백(40~120)·N(10~30) 전반에서 안정 = **과적합 아님**(30종목의 −33~+108% 요동은 소표본 잡음이었다). 리버설은 일관되게 약함(모멘텀이 진짜 효과라는 경제적 정합성). **현실 슬리피지 5~20bps에서 양 시장 DSR≥0.95 생존.** breadth(통계 power)가 빠졌던 조각이었다.
 **미해결 교란(아래 §6) 통제 전까지 수치 자체는 과대로 본다.**
 
-*재현:* 유니버스 = `batch/backtest/universe/*.txt`(2026-06-27 스냅샷). 백필 `python -m batch.backtest.backfill_stock_daily --symbols-file batch/backtest/universe/<idx>.txt --days 2600`(856/864 적재). 검증 = 시장별(KR/US) `stock_candles_1d` 로드 → `run_walkforward`(IS 365·OOS 180·STEP 180일, `XSMomentumStrategy(bar_min=1440, ...)`, `max_weight=1` 풀투자, `FillModel(slippage_bps=)`).
+*재현:* 유니버스 = `batch/universe/*.txt`(2026-06-27 스냅샷). 백필 `python -m batch.candles.backfill_stock_daily --symbols-file batch/universe/<idx>.txt --days 2600`(856/864 적재). 검증 = 시장별(KR/US) `stock_candles_1d` 로드 → `run_walkforward`(IS 365·OOS 180·STEP 180일, `XSMomentumStrategy(bar_min=1440, ...)`, `max_weight=1` 풀투자, `FillModel(slippage_bps=)`).
 
 ## 6. 결론 & 한계 (정직)
 - **"1분 단위 매매" 가설은 기각** — 비용(특히 국내 매도세 0.20%)이 모든 1분봉 전략을 죽인다(실측 −100%). 빈도는 1분이 아니라 **일/저회전**이어야 한다.

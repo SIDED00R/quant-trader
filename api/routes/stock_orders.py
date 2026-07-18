@@ -1,7 +1,7 @@
 """수동 주식 주문 라우트 (단일 책임: 즉시/예약 주식 주문 접수·조회·취소).
 
 접수만 담당 — 실행은 api.stock_order_executor(lifespan 백그라운드)가 scheduled_at 도래 시
-common.kis_chase.place_and_chase로 수행한다. 시장시간은 검증하지 않는다(장외면 KIS 거부가
+common.broker.kis_chase.place_and_chase로 수행한다. 시장시간은 검증하지 않는다(장외면 KIS 거부가
 detail에 남고 상태 FAILED). scheduled_at: naive 입력은 KST로 간주, 미지정 = 즉시(now).
 """
 from datetime import datetime

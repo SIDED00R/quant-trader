@@ -23,7 +23,7 @@ from common.config import (
 )
 from common.constants import HTTP_MAX_BACKOFF
 from common.kafka_client import create_producer
-from common.kiwoom_client import get_access_token
+from common.broker.kiwoom_client import get_access_token
 from common.schemas import Tick
 
 MAX_BACKOFF = HTTP_MAX_BACKOFF

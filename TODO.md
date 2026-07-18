@@ -20,10 +20,10 @@
 - [x] **현 SMA 전략 baseline 측정** → 2년·5종목 1분봉: **누적 −97.97%, 거래 46,212건, 수수료 8.3M(자본 83%)** — 과매매·수수료가 주범 (`docs/baseline.md`)
 
 ## 1단계 — 전략 추상화 (플러그인 구조)  (#48 / PR #49)
-- [x] `strategy/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
-- [x] SMA 로직을 `strategy/sma.py`의 `SMAStrategy`로 추출 (sma_trader 순수 함수 재사용, Kafka/DB 비의존)
+- [x] `strategy/core/base.py`: `Strategy` ABC + `Broker`/`MarketTick` 프로토콜 (신호+사이징+청산을 on_tick에 캡슐화)
+- [x] SMA 로직을 `strategy/plugins/sma.py`의 `SMAStrategy`로 추출 (sma_trader 순수 함수 재사용, Kafka/DB 비의존)
 - [x] 백테스트 회귀: 추출 전 골든 동일 재현 + 청산 4경로(STOP/TAKE/TRAIL/DEADCROSS) 가드 (무행동 변경 증명)
-- [x] 전략 레지스트리(`strategy/registry.py`) + 백테스트 `--strategy`(레지스트리·`--strategy`는 백테스트 전용 — 라이브는 고정 앙상블 `LiveEnsemble`(부하 specs 하드코딩 `_DEFAULT_SPECS`), `ENSEMBLE_SYMBOLS`는 종목 유니버스)
+- [x] 전략 레지스트리(`strategy/core/registry.py`) + 백테스트 `--strategy`(레지스트리·`--strategy`는 백테스트 전용 — 라이브는 고정 앙상블 `LiveEnsemble`(부하 specs 하드코딩 `_DEFAULT_SPECS`), `ENSEMBLE_SYMBOLS`는 종목 유니버스)
 - 참고: 라이브 `sma_trader.py`는 무수정(채택은 4~5단계). 백테스트는 `SMAStrategy` 채택 → `backtest/strategy.py` 삭제(중복 제거).
 
 ## 1.5단계 — 거래빈도·수수료 제어 (baseline 진단 반영)  (#52)
@@ -35,11 +35,11 @@
 
 ## 2단계 — 후보 알고리즘 분석 & 구현  (#54)
 - [x] 대중적 투자 알고리즘 조사 정리 (RSI / MACD / 볼린저밴드 / 돌파·모멘텀 / 평균회귀) → `docs/algorithms.md`
-- [x] RSI 전략 구현 (`strategy/rsi.py`)
-- [x] MACD 전략 구현 (`strategy/macd.py`)
-- [x] 볼린저밴드 전략 구현 (`strategy/bollinger.py`)
-- [x] 돌파/모멘텀 전략 구현 (`strategy/breakout.py`)
-- [x] 공통 규율 베이스(`strategy/disciplined.py`) + 지표 순수함수(`strategy/indicators.py`) + 레지스트리 등록 + 단위/엔진 테스트
+- [x] RSI 전략 구현 (`strategy/plugins/rsi.py`)
+- [x] MACD 전략 구현 (`strategy/plugins/macd.py`)
+- [x] 볼린저밴드 전략 구현 (`strategy/plugins/bollinger.py`)
+- [x] 돌파/모멘텀 전략 구현 (`strategy/plugins/breakout.py`)
+- [x] 공통 규율 베이스(`strategy/plugins/disciplined.py`) + 지표 순수함수(`strategy/core/indicators.py`) + 레지스트리 등록 + 단위/엔진 테스트
 - [ ] (선택) 평균회귀 등 추가 전략 — 필요 시 동일 `DisciplinedStrategy` 패턴으로 확장
 
 ## 3단계 — 검증 & 저회전 양수수익 전환 (재정의: 딥리서치 #59 기반)
@@ -54,14 +54,14 @@
 - [x] **Deflated Sharpe**(시도 수 N 보정) — `metrics.deflated_sharpe`(Bailey & López de Prado 2014)
 
 ### 3.2 저회전 전략 설계·구현 (#10) ✅
-- [x] **추세추종 long-or-cash**: 일봉 단기/장기 SMA, 상향 보유·하향/극단변동성 현금화(공매도X) — `strategy/trend.py`
+- [x] **추세추종 long-or-cash**: 일봉 단기/장기 SMA, 상향 보유·하향/극단변동성 현금화(공매도X) — `strategy/plugins/trend.py`
 - [x] **변동성 타게팅 사이징**: 진입 비중 = min(상한, 목표변동성/실현변동성). 추세 유지 중 무매매(저회전)
 - [x] **레짐·변동성 필터**: 연율 실현변동성 상한 초과 시 진입 차단·강제 현금
 - [x] **비용 인지**: 수수료 양자화 여유분 예약 사이징 + 추세 반전 청산(왕복비용 ≪ 추세 포착폭). sma_trader/kafka 비의존
 - [ ] (선택·보류) 청산 임계값 OU Monte-Carlo — 현 추세반전 청산으로 충분, 필요 시 후속
 
 ### 데이터 인프라 — ClickHouse 통일 + 장기 표본 (#11 / #12)
-- [x] 업비트 일봉 장기 백필 → `candles_1d`(BTC/ETH/XRP 2019-11~, 6.6년) — `backtest/backfill_daily.py`(`--all-krw` 전체 마켓 지원)
+- [x] 업비트 일봉 장기 백필 → `candles_1d`(BTC/ETH/XRP 2019-11~, 6.6년) — `candles/backfill_daily.py`(`--all-krw` 전체 마켓 지원)
 - [x] datasource `--ch-table`(candles_1m/1d) + run/walkforward `--source clickhouse` 연동
 - [x] CSV 분봉 캐시 → `candles_1m` 적재(523만 행) — 저장소 ClickHouse 통일
 
@@ -78,15 +78,15 @@
 
 ## 4단계 — 지휘관(Commander) 앙상블
 ### 백테스트 앙상블 ✅ — 채택(일관성 우선)
-- [x] `strategy/ensemble.py`: 다중 추세속도 목표비중 가중합 → 합성 목표 주문(Commander 백테스트 구현)
-- [x] `strategy/trend_signal.py`: 추세 결정 코어(래치) 분리 — 실행과 신호 분리, 앙상블 재사용
+- [x] `strategy/plugins/ensemble.py`: 다중 추세속도 목표비중 가중합 → 합성 목표 주문(Commander 백테스트 구현)
+- [x] `strategy/plugins/trend_signal.py`: 추세 결정 코어(래치) 분리 — 실행과 신호 분리, 앙상블 재사용
 - [x] 채택안 = **5/40·10/60·20/100 + band 0.5**(BTC/ETH 6.6년: OOS Sharpe 1.45·양수 65%, 종목별 교차검증 강건)
 - [x] 단일 SMA baseline(−62%) 대비 대폭 개선 + 단일 trend 대비 일관성↑(양수 fold 50%→65%)
 
 ### 라이브 배선 (#61) ✅ 배포됨
 - [x] 신호 스키마/토픽 + `common/schemas.Signal` + config TOPIC_SIGNALS/ENSEMBLE_SYMBOLS
-- [x] 앙상블 신호 워커 `strategy/live_ensemble.py`(candles_1d 워밍업 → 일봉 마감 신호 발행)
-- [x] `strategy/commander.py`: `strategy.signals` → 목표비중 모의주문(place_order, 실거래 아님)
+- [x] 앙상블 신호 워커 `strategy/runners/live_ensemble.py`(candles_1d 워밍업 → 일봉 마감 신호 발행)
+- [x] `strategy/runners/commander.py`: `strategy.signals` → 목표비중 모의주문(place_order, 실거래 아님)
 - [x] docker-compose 서비스화(ensemble-signals/commander, sma_trader 교체) + GCE VM 배포(공개 대시보드)
 - [x] 대시보드 리디자인(터미널·라이트/다크·앙상블 스탠스·순손익(수수료반영)) + `/strategy/ensemble`
 - [x] `aggregator/daily.py`: candles_1m → candles_1d 일일 최신화(대시보드 스탠스 freshness)
@@ -132,10 +132,10 @@
 > 참고: 모의 자금 기준이며 수익 최적화가 목표가 아니라 Kafka 파이프라인 위에서 전략을 붙여보는 학습이 목적이다.
 
 ## 7단계 — 주식 토대
-> **완결** — 체결/계좌 모델·틱 수집기 완료. 키움 기반 매매 계획(단건 주문 왕복·FID 보정·유니버스 선정)은 **폐기**: 체결=KIS(`common/kis_*`), 유니버스=ML 동적 top-N.
+> **완결** — 체결/계좌 모델·틱 수집기 완료. 키움 기반 매매 계획(단건 주문 왕복·FID 보정·유니버스 선정)은 **폐기**: 체결=KIS(`common/broker/kis_*`), 유니버스=ML 동적 top-N.
 - [x] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md` (#102)
 - [x] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. 실서버(모의) 검증 완료 — **아카이브 수집 전용으로 운영**, 매매 활용 계획은 폐기)
-- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/market_hours.py`(`asset_class`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개.
+- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/marketdata/market_hours.py`(`asset_class`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개.
 
 ## 8단계 — 주식 백테스트·라이브 (ML 스코어러로 전환)
 - [x] 주식용 백테스트 하니스 지원 (#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계) — 기준치 선별·유니버스는 ML 트랙(GBDT 챔피언·동적 top-N)으로 대체
@@ -166,7 +166,7 @@
   - [x] 피처 배선 `kr_microstructure.py` + `dataset.py` KR경로 + IC/ablation — #156 / **PR #157**
   - [x] 데이터 적재: KR 미시구조 **2019-05~2026-06 (7년)·344종목**(수급 157만행), DART 펀더 344종목
   - **견고 결론**: KR OHLCV 0.26% → +펀더+미시 **1.21% OOF Rank IC, LS_Sharpe 1.03→1.34**. 방향 일관 양(+)이나 **NW_t~1.0(강≥2 미달)** — KR은 구조적 약신호(US 3.4~3.8% 대비). 공매도 단변량 −7.4%는 full-sample·금지레짐 효과.
-- [x] **PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼(`_krx_session.py`)로 중복 통합 ②README `batch/data` 목록 reconcile(#200에서 완료).
+- [x] **PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼(`_krx_session.py`)로 중복 통합 ②README `batch/rawdata` 목록 reconcile(#200에서 완료).
 - [x] **공매도 금지 레짐 분리 검증** — 신호 실재하나 챔피언(OHLCV+DART)에 흡수·증분 0 → **보류 확정** (`docs/ml_progress.md` §7 task2).
 - [x] KR 챔피언 피처셋 확정 = **OHLCV+DART**(macro·미시 제외, 1.34%/NW_t 1.1) + `baseline_lgbm KR` 기본 반영(플래그 없음=챔피언) (`docs/ml_progress.md` task3a).
 - [ ] (후속) **생존편향 통제**(탈락·상폐 종목 가격 적재) — 절대 IC 과대의 본질, 별도 트랙.

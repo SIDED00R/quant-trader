@@ -18,7 +18,7 @@
 - **결과(US, OOF 5시드6fold)**: 회귀 2.06%/NW_t1.6 → **lambdarank 3.09%/NW_t1.8**. KR은 0.99%/0.67%로 약함(OHLCV만으론 OOS 신호 부족 — KR은 외국인수급 필요 시사).
 
 ## 3. 데이터-우선 전환 + 외부데이터 ablation (핵심)
-- **무엇/왜**: "모델 검증과 무관하게 데이터를 다 수집·저장"(재사용 자산·PIT 소실 방지). `batch/data/` 멱등 수집기로 영구 저장: SEC EDGAR 펀더멘털·FRED 매크로·US PIT멤버십·13F 기관보유·SEC SIC 섹터. **각 외부데이터를 ablation으로 유용성 측정 후 선별.**
+- **무엇/왜**: "모델 검증과 무관하게 데이터를 다 수집·저장"(재사용 자산·PIT 소실 방지). `batch/rawdata/` 멱등 수집기로 영구 저장: SEC EDGAR 펀더멘털·FRED 매크로·US PIT멤버십·13F 기관보유·SEC SIC 섹터. **각 외부데이터를 ablation으로 유용성 측정 후 선별.**
 - **결과(US lambdarank, 누적)**:
   | 추가 | 이유 | Rank IC | NW_t | 판정 |
   |---|---|---|---|---|
@@ -53,7 +53,7 @@
 
 ## 7. KR 외부데이터 수집 + ablation (Issue#150/152/154/156)
 - **무엇/왜**: KR의 OHLCV-only ML이 OOS 약함(§ baseline)이라, "진짜 unlock은 외국인수급·공매도·펀더멘털" 가설을 검증. KRX(pykrx 로그인)·DART(키) 자격증명 확보 후 수집기 구축.
-- **수집기**: `batch/data/krx.py`(수급·공매도·외국인보유 → stock_investor_flow/short/foreign_holding), `kr_index_membership.py`(KOSPI200/KOSDAQ150 PIT), `kr_fundamentals.py`(DART → fundamentals_quarterly, source='DART', US와 동일 규약 plug-in). 피처: `batch/features/kr_microstructure.py`(누설차단 8종) + `dataset.py` KR 경로 배선.
+- **수집기**: `batch/rawdata/krx.py`(수급·공매도·외국인보유 → stock_investor_flow/short/foreign_holding), `kr_index_membership.py`(KOSPI200/KOSDAQ150 PIT), `kr_fundamentals.py`(DART → fundamentals_quarterly, source='DART', US와 동일 규약 plug-in). 피처: `batch/features/kr_microstructure.py`(누설차단 8종) + `dataset.py` KR 경로 배선.
 - **단변량 Rank IC(fwd21d, 2024–2026, 344종목)**: 공매도잔고비율 **−7.4%(NW_t −6.3)**·외국인보유율 +4.1%·외국인순매수20 +3.25%·외국인보유Δ +3.16%·연기금/기관 순매수 −3.9%/−3.5%(역방향). 단 full-sample·공매도금지 레짐 영향 → OOS로 재검증. ⚠ 기관 순매수 단변량은 pension 이중계산(#158) 영향 가능 — 권위는 아래 다변량 ablation.
 - **OOS ablation(purged WF, lambdarank, seed5/fold6, 7y/1474일). pension 이중계산 수정 후 재검증(#158, 현 데이터 기준)**:
   | 모델 | Rank IC(7y) | ICIR | NW_t | LS_Sharpe | LS_mean |

@@ -32,14 +32,14 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install -q -r requirements.txt -r requirements-ml.txt pytest
-      - run: python -m pytest batch/backtest/tests/ -q
+      - run: python -m pytest tests/ -q
       - name: import 스윕 + 프로덕션 경계 검사
         run: |
           python - <<'EOF'
           import importlib, pkgutil
           # KRX 계열은 import 시점에 KRX 로그인(네트워크)을 트리거 → CI에서 제외(수동/연구용).
-          SKIP = {"batch.data._krx_session", "batch.data.krx", "batch.data.krx_bulk",
-                  "batch.data.kr_index_membership", "batch.data.kr_delisted"}
+          SKIP = {"batch.rawdata._krx_session", "batch.rawdata.krx", "batch.rawdata.krx_bulk",
+                  "batch.rawdata.kr_index_membership", "batch.rawdata.kr_delisted"}
           fails = []
           for r in ("common", "streaming", "trading", "api", "batch", "scripts"):
               pkg = importlib.import_module(r)

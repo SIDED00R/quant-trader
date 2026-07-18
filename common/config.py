@@ -59,15 +59,15 @@ FEE_RATE = Decimal(os.getenv("FEE_RATE", "0.0005"))  # 0.05%
 # 주식 매도 거래세(증권거래세+농특세). 2026 KOSPI/KOSDAQ 0.20%. 매수엔 없음·코인=0(국내주식만 적용).
 STOCK_SELL_TAX_RATE = Decimal(os.getenv("STOCK_SELL_TAX_RATE", "0.0020"))
 
-# ── 토스증권 Open API (데이터/조회 전용 — 체결은 KIS 모의, common/kis_*) ──
+# ── 토스증권 Open API (데이터/조회 전용 — 체결은 KIS 모의, common/broker/kis_*) ──
 # 주식 일봉 백필 데이터 소스(백테스트 입력). client_credentials OAuth2, 클라이언트당 토큰 1개.
 TOSS_CLIENT_ID = os.getenv("TOSS_CLIENT_ID", "")
 TOSS_CLIENT_SECRET = os.getenv("TOSS_CLIENT_SECRET", "")
 TOSS_REST_BASE = "https://openapi.tossinvest.com"
 
 # ── 연구 데이터 API 키 (batch 수집기 — 미설정이면 각 수집기가 실행 시점에 raise) ──
-FRED_API_KEY = os.getenv("FRED_API_KEY", "")   # 매크로 시계열(batch/data/fred.py)
-DART_API_KEY = os.getenv("DART_API_KEY", "")   # KR 펀더멘털(batch/data/kr_fundamentals.py)
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")   # 매크로 시계열(batch/rawdata/fred.py)
+DART_API_KEY = os.getenv("DART_API_KEY", "")   # KR 펀더멘털(batch/rawdata/kr_fundamentals.py)
 
 # ── 한국투자증권 KIS (모의 체결 브로커 — KR+US 통합) ──
 # 계좌 1개로 국내/해외 모의 체결. OAuth2 access_token(약 24h). 토큰 재발급 횟수 제한 있어 캐시 필수.

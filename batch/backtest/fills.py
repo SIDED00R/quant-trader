@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from common.config import FEE_RATE, STOCK_SELL_TAX_RATE
-from common.market_hours import asset_class
+from common.marketdata.market_hours import asset_class
 
 QUANT_FEE = Decimal("0.0001")  # engine.execute의 수수료 양자화 단위와 일치
 

@@ -14,7 +14,7 @@ from common.config import KAFKA_BOOTSTRAP_SERVERS, TOPIC_TICKS
 from common.constants import HTTP_MAX_BACKOFF
 from common.kafka_client import create_producer
 from common.schemas import Tick
-from common.symbols import resolve_symbols
+from common.marketdata.symbols import resolve_symbols
 
 UPBIT_WS_URL = "wss://api.upbit.com/websocket/v1"
 MAX_BACKOFF = HTTP_MAX_BACKOFF

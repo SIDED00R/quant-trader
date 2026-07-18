@@ -7,7 +7,7 @@ KR/US=단일 KIS 모의계좌('kis'). TOTAL은 common/equity_series가 합성(US
 from fastapi import APIRouter, Depends
 
 from api.security import current_account_id
-from common.equity_series import (
+from common.equity.equity_series import (
     ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
     PAPER_MARKETS,

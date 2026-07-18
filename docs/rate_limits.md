@@ -69,7 +69,7 @@ rate_limit.acquire("kis", "rest-real" if not KIS_MOCK else "rest-mock",
 - **균등 페이싱(기본)**: `capacity` 기본값 1 → 버스트 없이 `rate`개/초로 고르게. 토큰버킷 `capacity=rate`면 고정 1초 윈도우 경계에서 최대 ~2×rate가 통과할 수 있어, 엄격 한도에선 순간 초과 위험 → 기본은 버스트 없음. 버스트가 필요하면 `TokenBucket(rate, capacity=...)`로 명시.
 - **first-wins**: `(provider, group)` 버킷은 최초 생성 시 rate로 고정. 모드별 한도가 다르면 group을 나눈다(위 예).
 
-배선 완료(`acquire` 호출 위치): `common/kis_account.py`·`common/kis_balance.py`·`common/kis_order.py`·`common/kis_overseas_price.py`(kis:rest), `batch/backtest/toss_intraday.py`(toss:MARKET_DATA_CHART), `common/notify_telegram.py`(telegram:send). 미배선(현재 호출처에 `acquire` 미적용): toss:AUTH(`toss_client`)·upbit:quotation(`upbit_daily`/`upbit_candles`)·kiwoom:tr(`stock_kiwoom`).
+배선 완료(`acquire` 호출 위치): `common/broker/kis_account.py`·`common/broker/kis_balance.py`·`common/broker/kis_order.py`·`common/broker/kis_overseas_price.py`(kis:rest), `batch/candles/toss_intraday.py`(toss:MARKET_DATA_CHART), `common/notify_telegram.py`(telegram:send). 미배선(현재 호출처에 `acquire` 미적용): toss:AUTH(`toss_client`)·upbit:quotation(`upbit_daily`/`upbit_candles`)·kiwoom:tr(`stock_kiwoom`).
 
 ## "Kafka / Airflow로 하면 되나?" — 아니다
 

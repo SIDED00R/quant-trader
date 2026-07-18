@@ -2,13 +2,13 @@
 
 주식탭 상단 칩용 — '이번주 자동매매가 실제로 됐는지'를 사이트에서 즉시 확인한다
 (2026-07 초 VM 기동실패로 매매가 조용히 유실됐던 사고의 가시성 부재 해소).
-weekly_rebalance 마커는 trade-once류가 체결 성공 시에만 기록(trading.strategy.weekly_marker).
+weekly_rebalance 마커는 trade-once류가 체결 성공 시에만 기록(trading.strategy.runners.weekly_marker).
 """
 from fastapi import APIRouter
 
-from common.market_holidays import market_today
+from common.marketdata.market_holidays import market_today
 from common.postgres_client import pool
-from trading.strategy.weekly_marker import _iso_week
+from trading.strategy.runners.weekly_marker import _iso_week
 
 router = APIRouter(prefix="/stocks")
 
