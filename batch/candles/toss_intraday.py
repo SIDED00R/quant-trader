@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from common.config import TOSS_REST_BASE
+from batch.candles._upsert import upsert
 from common.constants import COLUMNS_STOCK_CANDLES_1M, HTTP_PAGE
 from common.http_client import get_json
 from common.rate_limit import acquire
@@ -80,8 +81,5 @@ def fetch_minute(symbol: str, days: int, req_sleep: float = 0.0, log=print) -> l
 
 
 def upsert_clickhouse(client, rows: list, table: str = "stock_candles_1m") -> int:
-    """rows를 ClickHouse table에 insert. ReplacingMergeTree라 재실행 멱등. 적재 행수 반환."""
-    if not rows:
-        return 0
-    client.insert(table, rows, column_names=_COLUMNS)
-    return len(rows)
+    """rows를 ClickHouse table에 insert(_upsert 공용 코어 — 멱등·적재 행수 반환)."""
+    return upsert(client, rows, table, _COLUMNS)

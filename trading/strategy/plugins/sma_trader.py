@@ -73,3 +73,25 @@ def liquidation_reason(pnl: Decimal, peak: Decimal) -> str | None:
     if peak >= _ARM and pnl <= peak - _GIVEBACK:
         return "TRAIL"
     return None
+
+
+def check_liquidations(st, sym, price, now, broker) -> None:
+    """보유분 청산 검사·실행(손절/익절/트레일링) — 전략 인스턴스 st의 peak/last_exit/entry_time을 갱신.
+
+    SMAStrategy·DisciplinedStrategy가 공유하는 상태 머신(동일 구현 2벌 통합). 청산 판정은 liquidation_reason.
+    """
+    qty = broker.position_qty(sym)
+    avg = broker.position_avg(sym)
+    if qty <= 0 or avg <= 0:
+        st.peak.pop(sym, None)
+        return
+    pnl = price / avg - 1
+    peak = st.peak.get(sym, pnl)
+    if pnl > peak:
+        peak = pnl
+    st.peak[sym] = peak
+    reason = liquidation_reason(pnl, peak)
+    if reason and broker.sell(sym, qty, reason, now):
+        st.last_exit[sym] = now
+        st.peak.pop(sym, None)
+        st.entry_time.pop(sym, None)

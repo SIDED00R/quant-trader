@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from batch.candles._upsert import upsert
 from common.constants import COLUMNS_CANDLES, HTTP_PAGE
 from common.http_client import get_json
 from batch.candles.upbit_candles import _parse_dt
@@ -63,8 +64,5 @@ def fetch_daily(market: str, days: int, complete_until: datetime, req_sleep: flo
 
 
 def upsert_clickhouse(client, rows: list, table: str = "candles_1d") -> int:
-    """rows를 ClickHouse table에 insert. ReplacingMergeTree라 재실행 멱등. 적재 행수 반환."""
-    if not rows:
-        return 0
-    client.insert(table, rows, column_names=_COLUMNS)
-    return len(rows)
+    """rows를 ClickHouse table에 insert(_upsert 공용 코어 — 멱등·적재 행수 반환)."""
+    return upsert(client, rows, table, _COLUMNS)

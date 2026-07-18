@@ -17,30 +17,12 @@ from common.kafka_client import create_consumer
 from common.order_writer import place_order
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
+from trading.portfolio.account_read import cash as _cash, enabled_accounts as _enabled_accounts, positions as _positions
 from trading.strategy.plugins.ensemble import default_loads
 # 리밸런싱 규칙은 공용 정본(rebalance.py)에서 — 백테스트 횡단면과 동일 규칙·테스트 가능. 재export로 기존 import 호환.
 from trading.strategy.core.rebalance import combined_for_bar, decide, _roster_ready
 
 GROUP_ID = "ensemble-commander"
-
-
-def _enabled_accounts():
-    with pool.connection() as conn:
-        return [r[0] for r in conn.execute("SELECT account_id FROM accounts WHERE auto_trade=TRUE").fetchall()]
-
-
-def _positions(acct):
-    with pool.connection() as conn:
-        rows = conn.execute(
-            "SELECT symbol, quantity FROM positions WHERE account_id=%s AND quantity>0",
-            (acct,)).fetchall()
-    return {r[0]: Decimal(str(r[1])) for r in rows}
-
-
-def _cash(acct):
-    with pool.connection() as conn:
-        row = conn.execute("SELECT krw_balance FROM accounts WHERE account_id=%s", (acct,)).fetchone()
-    return Decimal(str(row[0])) if row and row[0] is not None else Decimal(0)
 
 
 def _has_pending(acct, symbol):

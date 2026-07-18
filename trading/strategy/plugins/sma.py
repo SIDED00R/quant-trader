@@ -23,7 +23,7 @@ from common.config import (
 from trading.strategy.core.base import Broker, MarketTick, Strategy
 from trading.strategy.plugins.sma_trader import (
     MIN_ORDER_KRW,
-    liquidation_reason,
+    check_liquidations,
     position_fraction,
     sma_gap,
     sma_state,
@@ -55,7 +55,7 @@ class SMAStrategy(Strategy):
         dq.append(price)
 
         # (1) 보유 포지션 매 틱 청산 우선(손절>익절>트레일링). 워밍업과 무관.
-        self._check_liquidations(sym, price, now, broker)
+        check_liquidations(self, sym, price, now, broker)
 
         # (2) 확인봉으로 확정 추세 갱신
         raw = sma_state(dq)
@@ -77,23 +77,6 @@ class SMAStrategy(Strategy):
             self._enter(sym, price, now, sma_gap(dq), broker)
         elif STRATEGY_DEADCROSS_EXIT and self.state.get(sym) == "SELL" and raw == "SELL":
             self._exit_deadcross(sym, now, broker)
-
-    def _check_liquidations(self, sym, price, now, broker):
-        qty = broker.position_qty(sym)
-        avg = broker.position_avg(sym)
-        if qty <= 0 or avg <= 0:
-            self.peak.pop(sym, None)
-            return
-        pnl = price / avg - 1
-        peak = self.peak.get(sym, pnl)
-        if pnl > peak:
-            peak = pnl
-        self.peak[sym] = peak
-        reason = liquidation_reason(pnl, peak)
-        if reason and broker.sell(sym, qty, reason, now):
-            self.last_exit[sym] = now
-            self.peak.pop(sym, None)
-            self.entry_time.pop(sym, None)
 
     def _enter(self, sym, price, now, gap, broker):
         if now - self.started_at < STRATEGY_WARMUP_SEC:

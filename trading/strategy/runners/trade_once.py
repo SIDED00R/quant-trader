@@ -24,6 +24,7 @@ from common.equity.equity_snapshot import record_snapshot
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
 from common.marketdata.upbit_ticker import latest_prices
+from trading.portfolio.account_read import cash, enabled_accounts, positions
 from trading.portfolio.updater import apply_execution
 from trading.strategy.runners.commander import combined_for_bar, decide
 from trading.strategy.core.decision_record import classify
@@ -49,25 +50,6 @@ def stale_bar_reason(analysis: dict, today) -> str | None:
     if lag > _MAX_STALE_DAYS:
         return f"코인 일봉 신선도 위반 — 최신봉 {max(dates)}({lag}일 경과 > {_MAX_STALE_DAYS}일). 백필 확인"
     return None
-
-
-# ── 계정/시세 읽기 (commander와 일시 중복 — 스트리밍 commander 은퇴 시 통합) ──
-def enabled_accounts():
-    with pool.connection() as conn:
-        return [r[0] for r in conn.execute("SELECT account_id FROM accounts WHERE auto_trade=TRUE").fetchall()]
-
-
-def positions(acct):
-    with pool.connection() as conn:
-        rows = conn.execute(
-            "SELECT symbol, quantity FROM positions WHERE account_id=%s AND quantity>0", (acct,)).fetchall()
-    return {r[0]: Decimal(str(r[1])) for r in rows}
-
-
-def cash(acct):
-    with pool.connection() as conn:
-        row = conn.execute("SELECT krw_balance FROM accounts WHERE account_id=%s", (acct,)).fetchone()
-    return Decimal(str(row[0])) if row and row[0] is not None else Decimal(0)
 
 
 def equity(cash_amt: Decimal, pos: dict, prices: dict) -> Decimal:
