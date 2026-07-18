@@ -19,7 +19,7 @@ import httpx
 
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _CACHE = os.path.join(os.path.dirname(__file__), ".insider_cache")
 _BASE = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets"

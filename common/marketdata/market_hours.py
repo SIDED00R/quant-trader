@@ -46,7 +46,7 @@ def is_market_open(symbol: str, now: datetime | None = None) -> bool:
     """정규장 거래시간 여부. 코인=항상 True. 국내주식=KRX 평일 09:00–15:30 KST,
     미국주식=평일 09:30–16:00 ET(서머타임 zoneinfo 처리).
 
-    공휴일은 여기서 보지 않는다 — 휴장 게이트는 common/market_holidays.py가 주문 경로에서 별도 담당
+    공휴일은 여기서 보지 않는다 — 휴장 게이트는 common/marketdata/market_holidays.py가 주문 경로에서 별도 담당
     (이 함수는 요일·정규장 시간만 판정). 분봉 백테스트의 정규장 필터와 라이브 주문 게이트 양쪽에서 쓴다.
     """
     kind = asset_class(symbol)

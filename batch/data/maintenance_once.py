@@ -53,7 +53,7 @@ def _us_membership_step() -> int:
 
 def _stock_names_step() -> int:
     from common.clickhouse_client import create_client   # 대시보드 관심종목 검색용 종목명 사전(repo 번들 FDR)
-    from common.stock_names import refresh_clickhouse
+    from common.marketdata.stock_names import refresh_clickhouse
     return 0 if refresh_clickhouse(create_client()) else 1
 
 

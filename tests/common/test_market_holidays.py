@@ -2,7 +2,7 @@
 import unittest
 from datetime import date
 
-from common.market_holidays import _KRX, is_market_holiday
+from common.marketdata.market_holidays import _KRX, is_market_holiday
 
 
 class TestKrHolidays2026(unittest.TestCase):

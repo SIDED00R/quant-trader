@@ -1,7 +1,7 @@
 """종목명 사전 검증 (build_index·resolve 우선순위·티커 폴백 — 순수 함수, 네트워크 없음)."""
 import unittest
 
-from common.stock_names import build_index, resolve
+from common.marketdata.stock_names import build_index, resolve
 
 NAMES = {
     "KR": [("005930", "삼성전자"), ("000660", "SK하이닉스")],

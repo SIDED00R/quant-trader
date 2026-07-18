@@ -14,7 +14,7 @@ from batch.features import edgar
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _CACHE = refcache_path("sic_map.json")   # 참조캐시(영속 볼륨) — SIC는 사실상 불변(#218)
 

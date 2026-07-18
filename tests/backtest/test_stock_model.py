@@ -9,7 +9,7 @@ from decimal import Decimal
 from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
-from common.market_hours import (
+from common.marketdata.market_hours import (
     asset_class, is_market_open, is_stock,
     market_open, market_seconds_to_close, periods_per_year,
 )

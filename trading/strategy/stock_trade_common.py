@@ -3,13 +3,13 @@
 stock_trade_once(KR)·us_trade_once(US)가 시장 파라미터만 다른 동일 로직을 공유한다:
 top-N long-or-cash 매매계획·잔고 폴링 체결확인. 시장별로 다른 부분(주문 종류: KR 시장가 vs
 US 해외 지정가+체결추격(kis_chase)·거래소 라우팅)은 각 모듈에 남긴다. 최신 종가 조회는
-common/stock_price.py로 이동(app 이미지 공용). batch.ml.stock_score 의존 → Dockerfile.batch(trade) 전용.
+common/marketdata/stock_price.py로 이동(app 이미지 공용). batch.ml.stock_score 의존 → Dockerfile.batch(trade) 전용.
 """
 import time
 from datetime import datetime, timedelta, timezone
 
 from batch.ml.stock_score import score_latest
-from common.market_holidays import is_market_holiday, market_today
+from common.marketdata.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
 from trading.strategy.weekly_marker import week_done
 

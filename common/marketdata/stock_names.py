@@ -1,6 +1,6 @@
 """종목명 사전 (단일 책임: 티커↔이름 조회·질의 해석). app 이미지 안전(런타임 외부호출 0).
 
-종목명 사전은 repo에 번들된 `common/refdata/stock_names.json`을 로드한다 — FinanceDataReader로 KR 전종목
+종목명 사전은 repo에 번들된 `common/marketdata/refdata/stock_names.json`을 로드한다 — FinanceDataReader로 KR 전종목
 (KRX) + US(NASDAQ/NYSE/AMEX)를 1회 생성해 커밋한 정적 맵이다. KRX/SEC 실시간 엔드포인트가 세션·UA
 제약으로 불안정(각각 400 LOGOUT·403)해 런타임 의존을 제거했다. 갱신은 `scripts/refresh_stock_names.py`
 재실행(상장 변화는 느려 가끔이면 충분). 정확한 티커/코드 입력은 사전 없이도 `resolve`가 처리한다 —

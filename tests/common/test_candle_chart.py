@@ -2,8 +2,8 @@
 import unittest
 from datetime import date, timedelta
 
-from common import ichimoku
-from common.candle_chart import render_candle_chart
+from common.marketdata import ichimoku
+from common.chart.candle_chart import render_candle_chart
 
 
 def _daily(n=140):

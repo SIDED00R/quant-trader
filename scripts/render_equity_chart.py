@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from common.equity_series import (
+from common.equity.equity_series import (
     ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
     chart_rows,

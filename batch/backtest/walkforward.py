@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from common.config import FEE_RATE, INITIAL_BALANCE, SYMBOLS
-from common.market_hours import is_market_open, periods_per_year as ppy_fn
+from common.marketdata.market_hours import is_market_open, periods_per_year as ppy_fn
 from batch.backtest.account import BacktestAccount
 from batch.backtest.datasource import load_clickhouse_candles
 from batch.backtest.engine import BacktestEngine

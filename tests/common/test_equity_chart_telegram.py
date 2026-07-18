@@ -7,8 +7,8 @@ import unittest
 from datetime import date, datetime, timezone
 from unittest.mock import patch
 
-from common import equity_chart_telegram as tg
-from common.equity_series import chart_rows
+from common.chart import equity_chart_telegram as tg
+from common.equity.equity_series import chart_rows
 
 FX = [(date(2026, 7, 1), 1000.0), (date(2026, 7, 2), 1000.0)]
 

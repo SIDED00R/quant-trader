@@ -17,7 +17,7 @@ import httpx
 
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _URL = "https://cdn.finra.org/equity/otcmarket/biweekly/shrt{ymd}.csv"
 # stock_short 삽입 컬럼(KR 전용 컬럼은 0, market/source 명시로 DEFAULT KR/KRX 덮어씀)

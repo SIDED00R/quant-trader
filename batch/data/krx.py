@@ -19,7 +19,7 @@ from datetime import date, timedelta
 
 from batch.data._krx_session import require_login, stock
 from common.clickhouse_client import create_client
-from common.symbols import get_kr_symbols
+from common.marketdata.symbols import get_kr_symbols
 
 _INCR_BUFFER_DAYS = 7   # 증분 시작 버퍼 — 주말·발표지연·재실행 멱등 커버
 

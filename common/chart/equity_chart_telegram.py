@@ -6,7 +6,7 @@ VM·대시보드 없이 텔레그램에서 자산 흐름을 보게 하는 용도
 이미지 내 라벨은 ASCII(TOTAL/COIN/KR/US — pillow 내장 폰트가 한글 미지원), 한글 요약은 캡션이 담당.
 pillow는 지연 import(미설치 환경에서도 모듈 import 안전 — notify_telegram의 telethon과 동일 방침).
 
-수동 실행: python -m common.equity_chart_telegram [--days 365]
+수동 실행: python -m common.chart.equity_chart_telegram [--days 365]
 """
 import argparse
 import io
@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timezone
 
 from common import notify_telegram
-from common.equity_series import (
+from common.equity.equity_series import (
     ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
     chart_rows,

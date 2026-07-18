@@ -20,7 +20,7 @@ from common.constants import (
     KIS_TR_OVERSEAS_BALANCE,
 )
 from common.http_client import get_json
-from common.kis_client import get_access_token
+from common.broker.kis_client import get_access_token
 from common.rate_limit import acquire
 
 

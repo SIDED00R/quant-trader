@@ -21,7 +21,7 @@ _TTL_SEC = 3600
 
 def compute_ensemble() -> list:
     """종목별 앙상블 스탠스 전체 계산(전체 일봉 히스토리 필요 — 느림, 캐시 뒤에서만 호출)."""
-    from common.candles import daily_candles   # CH 의존을 호출 시점으로 지연(backtest 비의존)
+    from common.marketdata.candles import daily_candles   # CH 의존을 호출 시점으로 지연(backtest 비의존)
     out = []
     for sym in ENSEMBLE_SYMBOLS:
         ens = EnsembleStrategy()

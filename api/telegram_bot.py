@@ -1,10 +1,10 @@
 """텔레그램 /chart 봇 (단일 책임: Bot API long-poll → 봉차트 응답). 상시 서비스(수집 VM·app 이미지).
 
 인바운드는 Telegram Bot API getUpdates long-poll(httpx) — 발신용 MTProto 유저세션(notify_telegram)과
-분리해 세션 충돌을 피한다. 흐름: `/chart <종목명|티커>`(한글 `/차트` 별칭) → 종목 해석(common.stock_names) → 일봉 온디맨드
-fetch(common.toss_daily — 수집 VM 로컬 CH엔 주식 데이터 없음) → 렌더(common.symbol_chart, KR=주봉+일목
+분리해 세션 충돌을 피한다. 흐름: `/chart <종목명|티커>`(한글 `/차트` 별칭) → 종목 해석(common.marketdata.stock_names) → 일봉 온디맨드
+fetch(common.marketdata.toss_daily — 수집 VM 로컬 CH엔 주식 데이터 없음) → 렌더(common.chart.symbol_chart, KR=주봉+일목
 구름 / US=일봉) → Bot API sendPhoto. TELEGRAM_ALLOWED_CHAT_IDS 화이트리스트(비면 전면 거부). 절대 크래시
-안 함(예외는 백오프 후 계속). 종목명 인덱스는 repo 번들 사전(common.stock_names)에서 로드 —
+안 함(예외는 백오프 후 계속). 종목명 인덱스는 repo 번들 사전(common.marketdata.stock_names)에서 로드 —
 정확 티커/코드는 사전 무관하게 항상 동작.
 
 실행: python -m api.telegram_bot  (토큰 미설정이면 유휴 — restart 루프 방지)
@@ -16,10 +16,11 @@ import traceback
 
 import httpx
 
-from common import rate_limit, stock_names
+from common import rate_limit
+from common.marketdata import stock_names
 from common.config import TELEGRAM_ALLOWED_CHAT_IDS, TELEGRAM_BOT_TOKEN
-from common.symbol_chart import chart_for_symbol
-from common.toss_daily import fetch_daily
+from common.chart.symbol_chart import chart_for_symbol
+from common.marketdata.toss_daily import fetch_daily
 
 _API = "https://api.telegram.org/bot{token}/{method}"
 _KR_FETCH_DAYS, _US_FETCH_DAYS = 1000, 220
@@ -68,7 +69,7 @@ def send_photo(token: str, chat_id, png: bytes, caption: str) -> None:
 
 
 def load_index() -> dict:
-    """종목명 검색 인덱스 — repo 번들 사전(common.stock_names)에서 로드(이미지 포함, 즉시)."""
+    """종목명 검색 인덱스 — repo 번들 사전(common.marketdata.stock_names)에서 로드(이미지 포함, 즉시)."""
     return stock_names.build_index(stock_names.fetch_all())
 
 

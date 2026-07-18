@@ -53,7 +53,7 @@
 - fold마다 IS에서 (단기,장기) SMA 그리드 중 최선을 고르고 **직후 OOS** 성과만 집계한다.
 - OOS 직전 prime 구간은 **NullBroker로 지표만 priming**(거래 0 보장) → OOS는 새 계좌(initial)로만 평가해 prime 손익이 OOS에 새지 않는다.
 - 출력: fold별 OOS 수익 + 합성수익·양수 fold 수·OOS Sharpe·Deflated Sharpe(시도 수 N 보정) + **OOS 매도 거래세**(주식, 코인=0).
-- 일봉 테이블(`candles_1d`·`stock_candles_1d`)은 `sample_sec=86400`으로 연율화한다. *(연율화 기준일은 `common/market_hours.periods_per_year`로 자산군별 적용 — 코인=365, 주식=252.)*
+- 일봉 테이블(`candles_1d`·`stock_candles_1d`)은 `sample_sec=86400`으로 연율화한다. *(연율화 기준일은 `common/marketdata/market_hours.periods_per_year`로 자산군별 적용 — 코인=365, 주식=252.)*
 
 ## 4) 테스트 (네트워크/Docker 불필요 — 합성 데이터)
 

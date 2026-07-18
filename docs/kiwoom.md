@@ -1,6 +1,6 @@
 # 키움증권 신규 REST API — 주식(STOCK) 확장 토대
 
-> **상태: 미채택·아카이브** — 키움 기반 매매(주문·체결) 계획은 폐기됐다(체결=KIS 확정, `common/kis_*`). 틱 수집기(`stock_kiwoom`)는 수집 VM에서 아카이브 수집으로만 동작한다. §6(한국 시장 메커니즘)은 백테스트·체결 모델의 현행 참조.
+> **상태: 미채택·아카이브** — 키움 기반 매매(주문·체결) 계획은 폐기됐다(체결=KIS 확정, `common/broker/kis_*`). 틱 수집기(`stock_kiwoom`)는 수집 VM에서 아카이브 수집으로만 동작한다. §6(한국 시장 메커니즘)은 백테스트·체결 모델의 현행 참조.
 
 > 7단계(주식 토대)의 단일 출처. 기존 코인 인프라(`docs/model.md`·`docs/baseline.md`)와 동일한 톤·검증 원칙(검증된 사실만 기재, 불확실은 "확인필요"로 명시)을 따른다. 모든 API 사실에는 출처 URL을 인라인으로 단다.
 
@@ -141,27 +141,27 @@
 
 ## 7. 기존 코인 인프라 재사용 매핑
 
-> ⚠️ 이 표는 **7단계 설계 시점의 재사용 계획**이다. 이후 ① 코인 인프라가 `streaming/`(ingester·sink)·`trading/`(engine) 하위로 이동했고(좌측 경로는 그 접두를 붙여 읽는다), ② 주식 체결 경로는 키움이 아닌 **KIS로 확정**(`common/kis_order.py`·읽기 라우트 `api/routes/stocks.py`)됐다 — 우측의 키움 주문 계획(`kiwoom_client` 주문·`stock_orders.py`)은 미채택.
+> ⚠️ 이 표는 **7단계 설계 시점의 재사용 계획**이다. 이후 ① 코인 인프라가 `streaming/`(ingester·sink)·`trading/`(engine) 하위로 이동했고(좌측 경로는 그 접두를 붙여 읽는다), ② 주식 체결 경로는 키움이 아닌 **KIS로 확정**(`common/broker/kis_order.py`·읽기 라우트 `api/routes/stocks.py`)됐다 — 우측의 키움 주문 계획(`kiwoom_client` 주문·`stock_orders.py`)은 미채택.
 
 | 코인(기존) | 주식(신규) | 패턴 |
 |---|---|---|
 | `ingester/upbit_ws.py` → `market.ticks` | `ingester/stock_kiwoom.py` → `stock.ticks` | WS 연결/구독/정규화/발행/지수백오프 미러. 단 LOGIN·토큰·PING echo 추가 |
 | `common/schemas.Tick` | `common/schemas.StockTick`(또는 Tick 재사용) | `_dumps()`(asdict+default=str) 재사용. Decimal 가격/수량+side+trade_ts(UTC ISO)+seq |
-| `common/upbit_markets.py`·`symbols.py` | `common/kiwoom_markets.py`·`stock_symbols.py` | TTL캐시+실패백오프+정적폴백 1:1 미러 |
+| `common/marketdata/upbit_markets.py`·`symbols.py` | `common/kiwoom_markets.py`·`stock_symbols.py` | TTL캐시+실패백오프+정적폴백 1:1 미러 |
 | `common/kafka_client.py` | (그대로) | producer/consumer 팩토리 변경 불필요 |
 | `sink/tick_clickhouse.py` → `ticks` | `sink/stock_tick_clickhouse.py` → `stock_ticks` | parse_row/배치(500/2s)/insert/수동commit 미러, 별도 GROUP_ID |
 | `TOPIC_TICKS="market.ticks"` | `TOPIC_STOCK_TICKS="stock.ticks"` (config.py:19 근처) | kafka-init에 `--partitions 6 --config retention.ms=86400000` 라인 추가(AUTO_CREATE=false) |
 | ClickHouse `ticks` | `stock_ticks`(ReplacingMergeTree, ORDER BY (symbol,seq)) | `db/clickhouse_schema.sql`에 DDL 추가(schema_loader 자동 적용) |
 | Postgres `orders`/`executions`/`positions` | `ADD COLUMN IF NOT EXISTS asset_class TEXT`(+`broker_order_id TEXT`) | 단건 검증엔 컬럼 추가(A안)가 변경 최소. 별 테이블(B안)은 8·9단계 |
 | `engine/matching.py`(Kafka 모의체결) | **우회** — 키움이 외부 체결을 돌려줌 | 주식 주문은 `order_outbox`/relay/engine 경로를 타면 안 됨(코인 엔진이 오소비) |
-| `common/order_writer.place_order` | `common/kiwoom_client.py` + 별도 체결 기록 함수 | 키움 REST 주문 호출→`ord_no`→executions 직접 기록(uuid5 멱등 유지) |
+| `common/order_writer.place_order` | `common/broker/kiwoom_client.py` + 별도 체결 기록 함수 | 키움 REST 주문 호출→`ord_no`→executions 직접 기록(uuid5 멱등 유지) |
 | `api/routes/orders.py` | `api/routes/stock_orders.py`(신규) | orders.py 검증 미러 + 정수수량·장시간·세금 가드. main.py에 include_router 1줄 |
 | `api/web/index.html` 체결 패널 | 주식 체결 패널 1개 + `loadStockExecs()` | refresh() Promise.all에 추가. 평가자산 합산은 자산군 분리 필요(통합은 9단계) |
 
 ### 체결·계좌 모델 확장점 — ✅ 백테스트 반영 완료(#120/PR#121), 라이브 가드는 #5 이월
 - **정수 주문단위**: ✅ 백테스트 `backtest/engine.py`의 `_adjust_qty`(주식 `to_integral_value(ROUND_DOWN)`, <1주 skip 로그; 코인 무영향). 라이브 `place_order`/`stock_orders` 진입부 절사는 단건 주문 검증(#5) 때 적용.
 - **매도 거래세**: ✅ `backtest/fills.py:tax(symbol,price,qty)`(**국내주식만** 0.20%, 미국·코인=0), `account.apply_sell(tax=...)`의 `proceeds=price*qty-fee-tax`, `models.ClosedTrade.sell_tax`. `STOCK_SELL_TAX_RATE` config 추가. 라이브는 키움/KIS 응답의 수수료/세금을 그대로 기록.
-- **장 운영시간 게이트**: ✅ 신규 `common/market_hours.py`(`asset_class`·`is_stock`·`is_market_open(symbol, now=None)` — 코인 항상 True, 국내주식 KRX 평일 09:00–15:30 KST, 미국주식 평일 09:30–16:00 ET 지원). 휴장일 캘린더·라이브 주문 게이트는 #5.
+- **장 운영시간 게이트**: ✅ 신규 `common/marketdata/market_hours.py`(`asset_class`·`is_stock`·`is_market_open(symbol, now=None)` — 코인 항상 True, 국내주식 KRX 평일 09:00–15:30 KST, 미국주식 평일 09:30–16:00 ET 지원). 휴장일 캘린더·라이브 주문 게이트는 #5.
 - **라이브-백테스트 수학 미러링**(account.py 도크스트링 계약): ✅ 백테스트(세금·정수화) 반영, 라이브 미러링은 #5.
 
 ## 8. 종목 유니버스 선정 논의

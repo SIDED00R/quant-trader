@@ -1,9 +1,9 @@
 """캔들차트 렌더 (단일 책임: OHLC[+일목 구름] → PNG bytes, pillow 순수 드로잉).
 
 matplotlib 등 플로팅 의존 금지(레포 관례 — 이미지 비대·디스크 사고 예방). 이미지 내 텍스트는 ASCII만
-(pillow 내장 폰트 한글 미지원 — 한글은 호출부 캡션이 담당, `common/equity_chart_telegram` 선례).
+(pillow 내장 폰트 한글 미지원 — 한글은 호출부 캡션이 담당, `common/chart/equity_chart_telegram` 선례).
 구름(선행스팬 A/B)은 반투명 RGBA 레이어로 그린 뒤 alpha_composite → 그 위 전환/기준선 → 캔들 순.
-`lines`(common.ichimoku.ichimoku_lines 결과, bars와 동일 길이)가 있으면 오버레이, 없으면 캔들만.
+`lines`(common.marketdata.ichimoku.ichimoku_lines 결과, bars와 동일 길이)가 있으면 오버레이, 없으면 캔들만.
 """
 import io
 

@@ -2,7 +2,7 @@
 import unittest
 from datetime import date, timedelta
 
-from common.symbol_chart import chart_for_symbol
+from common.chart.symbol_chart import chart_for_symbol
 
 
 def _daily(n=160):

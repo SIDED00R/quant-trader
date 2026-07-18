@@ -21,7 +21,7 @@ import httpx
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _CACHE = os.path.join(os.path.dirname(__file__), ".13f_cache")
 _LIST = "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"

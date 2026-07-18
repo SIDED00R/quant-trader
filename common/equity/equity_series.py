@@ -10,7 +10,7 @@ import bisect
 from datetime import datetime, timedelta, timezone
 
 from common.clickhouse_client import create_client
-from common.equity_snapshot import ICHIMOKU_ACCOUNT, KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(조회 콜러가 쓰기 모듈을 몰라도 되게)
+from common.equity.equity_snapshot import ICHIMOKU_ACCOUNT, KIS_ACCOUNT  # noqa: F401 — 읽기측 재노출(조회 콜러가 쓰기 모듈을 몰라도 되게)
 
 
 def _since(days: int):

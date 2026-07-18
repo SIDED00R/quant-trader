@@ -14,7 +14,7 @@ from datetime import date
 
 from batch.data._krx_session import require_login, stock
 from common.clickhouse_client import create_client
-from common.symbols import get_kr_symbols
+from common.marketdata.symbols import get_kr_symbols
 
 _FLOW_INV = {"외국인": "foreign", "기관합계": "institution", "연기금": "pension"}
 _FLOW_COLS = ["date", "symbol", "investor", "net_value", "net_volume"]

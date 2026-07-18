@@ -7,7 +7,7 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
-from common.equity_snapshot import ICHIMOKU_ACCOUNT
+from common.equity.equity_snapshot import ICHIMOKU_ACCOUNT
 from trading.strategy.kr_ichimoku_trade_once import MARKET_KEY, plan_trades
 
 TODAY = date(2026, 7, 17)
@@ -72,8 +72,8 @@ class TestSendEntryCharts(unittest.TestCase):
                 raise ValueError("render 실패")     # 한 종목 실패 → 격리, 나머지 계속
             return (b"png", f"{symbol} 캡션")
 
-        with mock.patch("common.symbol_chart.chart_for_symbol", side_effect=fake_chart), \
-             mock.patch("common.stock_names.fetch_all", return_value={"KR": [], "US": []}), \
+        with mock.patch("common.chart.symbol_chart.chart_for_symbol", side_effect=fake_chart), \
+             mock.patch("common.marketdata.stock_names.fetch_all", return_value={"KR": [], "US": []}), \
              mock.patch.object(job.notify_telegram, "send_photo", return_value=True) as sp:
             job.send_entry_charts(buy_bars)
 

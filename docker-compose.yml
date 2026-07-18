@@ -265,7 +265,7 @@ services:
       TELEGRAM_ALLOWED_CHAT_IDS: ${TELEGRAM_ALLOWED_CHAT_IDS:-}
       TOSS_CLIENT_ID: ${TOSS_CLIENT_ID:-}
       TOSS_CLIENT_SECRET: ${TOSS_CLIENT_SECRET:-}
-    command: python -m api.telegram_bot   # 종목명 사전은 이미지 번들(common/refdata) — 별도 캐시 볼륨 불요
+    command: python -m api.telegram_bot   # 종목명 사전은 이미지 번들(common/marketdata/refdata) — 별도 캐시 볼륨 불요
 
   # 주식(키움) 데이터 경로 (7단계) — 코인 ingester/sink와 동일 패턴, 별도 토픽/테이블
   stock-ingester:
@@ -427,7 +427,7 @@ services:
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
       TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
-    command: python -m common.watchlist_chart_telegram
+    command: python -m common.chart.watchlist_chart_telegram
 
   api:
     <<: *app

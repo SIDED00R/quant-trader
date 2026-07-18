@@ -6,7 +6,7 @@ weekly_rebalance 마커는 trade-once류가 체결 성공 시에만 기록(tradi
 """
 from fastapi import APIRouter
 
-from common.market_holidays import market_today
+from common.marketdata.market_holidays import market_today
 from common.postgres_client import pool
 from trading.strategy.weekly_marker import _iso_week
 

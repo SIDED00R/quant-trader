@@ -105,7 +105,7 @@
   ```
 - **관심종목 검색 종목명 첫 시딩(선택)**: CH `stock_names`는 db-init이 테이블만 만들고 실제 이름은 월간 maintenance(`_stock_names_step`)가 채운다. 첫 월간 실행 전 대시보드 이름검색을 쓰려면 매매 VM에서 1회 수동 시딩(없어도 티커 검색·관심종목 등록·`watchlist-charts`는 정상 동작):
   ```bash
-  docker compose --profile trade run --rm maintenance-once python -c "from common.clickhouse_client import create_client; from common.stock_names import refresh_clickhouse; print(refresh_clickhouse(create_client()))"
+  docker compose --profile trade run --rm maintenance-once python -c "from common.clickhouse_client import create_client; from common.marketdata.stock_names import refresh_clickhouse; print(refresh_clickhouse(create_client()))"
   ```
 - **매매 VM 절대 워치독**: startup 시작 직후 `shutdown -P +90`(유지보수 분기 +360, 대시보드 +120으로 재예약) — 어떤 단계가 행이어도 과금 상한. 정상 경로는 말미 `poweroff`가 선행돼 무해.
 - **초기 데이터 시딩 런북**(프로덕션 `stock_candles_1d` 빈 테이블 복구·최초 구축):
@@ -229,7 +229,7 @@ startup 분기표: **04·05→유지보수(토·1~7일 가드) / 06·07→KR / 1
   ```
   기존 읽기 키(`github-deploy-key`, clone/fetch용)와 **분리** — 쓰기 키는 push 스텝에서만 사용(유출 반경 최소화).
 - **환율**: '전체(KRW 환산)' 시리즈용 FRED usdkrw는 코인 데일리 잡이 `batch.data.fred`로 일 1회 갱신(`FRED_API_KEY`=기존 `fred-env` 시크릿, 실패 비치명 — 직전 환율 캐리).
-- **텔레그램 사진**: 같은 곡선을 코인 데일리 잡이 PNG로 렌더해 텔레그램 사진 1장/일 발송(`common/equity_chart_telegram`, 스위퍼 재실행은 trade_once의 '이미 실행됨' 가드가 차단) — VM을 켜지 않고도 자산 흐름 확인.
+- **텔레그램 사진**: 같은 곡선을 코인 데일리 잡이 PNG로 렌더해 텔레그램 사진 1장/일 발송(`common/chart/equity_chart_telegram`, 스위퍼 재실행은 trade_once의 '이미 실행됨' 가드가 차단) — VM을 켜지 않고도 자산 흐름 확인.
 - **확인**: 잡 후 `assets` 브랜치 커밋 1개 + README 이미지 갱신. 렌더/발행 로그는 VM `/var/log/equity-chart.log`(`EQUITY_CHART_PUBLISHED` / `EQUITY_CHART_PUSH_FAILED(비치명)`).
 
 ### 🔔 VM 기동 실패 알림 (Cloud Monitoring)

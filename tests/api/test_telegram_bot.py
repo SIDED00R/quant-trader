@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from api import telegram_bot as bot
-from common.stock_names import build_index
+from common.marketdata.stock_names import build_index
 
 IDX = build_index({"KR": [("005930", "삼성전자")], "US": [("AAPL", "Apple Inc.")]})
 

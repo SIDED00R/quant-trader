@@ -7,8 +7,8 @@ import unittest
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from common import equity_snapshot
-from common.equity_snapshot import KIS_ACCOUNT, record_snapshot, record_stock_snapshot
+from common.equity import equity_snapshot
+from common.equity.equity_snapshot import KIS_ACCOUNT, record_snapshot, record_stock_snapshot
 
 
 def _fake_pool():

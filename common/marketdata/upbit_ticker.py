@@ -4,7 +4,7 @@ trade_once가 마크·주문가로 쓸 코인 현재가. 틱 아카이브(ClickH
 업비트 공개 REST로 조회 → 틱 수집 전용 VM과 온디맨드 매매 VM을 디커플링(매매 VM은 틱 DB 불요).
 인증 불필요. 재시도/백오프는 common.http_client.get_json 재사용.
 
-실행(디버그): PYTHONPATH=. .venv/Scripts/python.exe -m common.upbit_ticker
+실행(디버그): PYTHONPATH=. .venv/Scripts/python.exe -m common.marketdata.upbit_ticker
 """
 from decimal import Decimal
 

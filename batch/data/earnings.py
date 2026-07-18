@@ -17,7 +17,7 @@ import httpx
 from batch.features.edgar import ticker_cik_map
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _SUB = "https://data.sec.gov/submissions/CIK{cik}.json"
 _COLS = ["symbol", "market", "announce_date", "period_end", "form", "source"]

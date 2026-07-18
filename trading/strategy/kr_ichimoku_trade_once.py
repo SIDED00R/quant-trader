@@ -21,12 +21,12 @@ from batch.backtest.refresh_stock_daily import alive_symbols, refresh
 from common import notify_telegram
 from common.clickhouse_client import create_client
 from common.config import FEE_RATE, STOCK_SELL_TAX_RATE
-from common.equity_snapshot import ICHIMOKU_ACCOUNT, record_snapshot
-from common.ichimoku import latest_signal, weekly_bars
-from common.market_holidays import is_market_holiday, market_today
+from common.equity.equity_snapshot import ICHIMOKU_ACCOUNT, record_snapshot
+from common.marketdata.ichimoku import latest_signal, weekly_bars
+from common.marketdata.market_holidays import is_market_holiday, market_today
 from common.postgres_client import close_pool, open_pool, pool
-from common.stock_ohlc import daily_ohlc
-from common.stock_price import latest_closes
+from common.marketdata.stock_ohlc import daily_ohlc
+from common.marketdata.stock_price import latest_closes
 from trading.portfolio import paper_ledger
 from trading.strategy.notify_messages import error_message, ichimoku_message
 from trading.strategy.weekly_marker import mark_week_done, week_done
@@ -193,8 +193,8 @@ def send_entry_charts(buy_bars: list) -> None:
     if not buy_bars:
         return
     try:                                                        # 셋업 실패도 비치명(체결은 이미 끝난 뒤)
-        from common import stock_names
-        from common.symbol_chart import chart_for_symbol
+        from common.marketdata import stock_names
+        from common.chart.symbol_chart import chart_for_symbol
         idx = stock_names.build_index(stock_names.fetch_all())
     except Exception as e:
         print(f"[kr-ichimoku] 차트 셋업 실패(비치명): {type(e).__name__}: {e}")

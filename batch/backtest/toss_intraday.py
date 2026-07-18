@@ -15,7 +15,7 @@ from common.config import TOSS_REST_BASE
 from common.constants import COLUMNS_STOCK_CANDLES_1M, HTTP_PAGE
 from common.http_client import get_json
 from common.rate_limit import acquire
-from common.toss_client import get_access_token
+from common.broker.toss_client import get_access_token
 
 _URL = f"{TOSS_REST_BASE}/api/v1/candles"
 _PAGE = HTTP_PAGE

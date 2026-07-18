@@ -26,7 +26,7 @@ import httpx
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.config import DART_API_KEY
-from common.symbols import get_kr_symbols
+from common.marketdata.symbols import get_kr_symbols
 
 _BASE = "https://opendart.fss.or.kr/api"
 _CACHE = os.path.join(os.path.dirname(__file__), ".dart_cache")

@@ -5,7 +5,7 @@ ISO 주차 키(평일 동일·다음주 분리)·완료판정(체결기반)·NYS
 import unittest
 from datetime import date
 
-from common.market_holidays import is_market_holiday
+from common.marketdata.market_holidays import is_market_holiday
 from trading.strategy.weekly_marker import _iso_week, completed
 
 

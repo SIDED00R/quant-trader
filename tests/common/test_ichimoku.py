@@ -6,7 +6,7 @@
 import unittest
 from datetime import date
 
-from common.ichimoku import ichimoku_lines, latest_signal, weekly_bars
+from common.marketdata.ichimoku import ichimoku_lines, latest_signal, weekly_bars
 
 # 라인 테스트용 (date, o, h, l, c, v) — 라인은 h(idx2)·l(idx3)만 쓴다.
 def _bars(highs, lows, closes=None):

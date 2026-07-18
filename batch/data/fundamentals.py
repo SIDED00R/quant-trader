@@ -19,7 +19,7 @@ from batch.features import edgar
 from common.cache import load_json
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
-from common.symbols import get_us_symbols
+from common.marketdata.symbols import get_us_symbols
 
 _CONCEPTS = {
     "shares": edgar._SHARES, "equity": edgar._EQUITY, "assets": edgar._ASSETS,

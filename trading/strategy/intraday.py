@@ -18,7 +18,7 @@ from common.config import (
     ORB_OPENING_BARS,
     STRATEGY_ORDER_FRACTION_MAX,
 )
-from common.market_hours import seconds_to_close, session_date
+from common.marketdata.market_hours import seconds_to_close, session_date
 from trading.strategy.base import Broker, MarketTick, Strategy
 
 

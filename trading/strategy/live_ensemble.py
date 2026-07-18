@@ -102,8 +102,8 @@ class LiveEnsemble:
 
 
 def _load_history(symbols) -> dict:
-    """candles_1d에서 종목별 (day, close) 시간오름차순 로드(워밍업용). common.candles 사용(backtest 비의존)."""
-    from common.candles import daily_candles
+    """candles_1d에서 종목별 (day, close) 시간오름차순 로드(워밍업용). common.marketdata.candles 사용(backtest 비의존)."""
+    from common.marketdata.candles import daily_candles
     hist: dict = {s: [] for s in symbols}
     for sym, close, ts in daily_candles(symbols):
         if sym in hist:

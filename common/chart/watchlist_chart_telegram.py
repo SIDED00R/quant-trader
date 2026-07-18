@@ -5,7 +5,7 @@
 (없거나 최신봉>STALE_DAYS면 Toss 폴백)로 일봉을 받아 symbol_chart(KR 주봉+일목·US 일봉)로 렌더 후
 기존 유저세션(notify_telegram.send_photo)으로 발송. 종목별 예외 격리·전부 비치명. equity_chart_telegram 선례.
 
-실행: python -m common.watchlist_chart_telegram
+실행: python -m common.chart.watchlist_chart_telegram
 """
 import argparse
 import sys
@@ -13,7 +13,7 @@ from datetime import date
 
 from common import notify_telegram
 from common.postgres_client import close_pool, open_pool, pool
-from common.symbol_chart import chart_for_symbol
+from common.chart.symbol_chart import chart_for_symbol
 
 MAX_SYMBOLS = 20
 STALE_DAYS = 7
@@ -48,7 +48,7 @@ def load_bars(ch, market: str, symbol: str) -> list:
     except Exception as e:
         print(f"[watchlist-charts] {symbol} CH 조회 실패: {type(e).__name__}: {e}")
     if not (daily and (date.today() - daily[-1][0]).days <= STALE_DAYS):     # 없거나 낡음 → Toss 폴백
-        from common.toss_daily import fetch_daily
+        from common.marketdata.toss_daily import fetch_daily
         tr = fetch_daily(symbol, 1000 if market == "KR" else 220, log=lambda *a: None)
         if tr:
             daily = [(r[1].date(), r[2], r[3], r[4], r[5]) for r in tr]

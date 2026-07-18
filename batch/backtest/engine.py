@@ -10,7 +10,7 @@ from decimal import ROUND_DOWN, Decimal
 from batch.backtest.account import BacktestAccount
 from batch.backtest.fills import FillModel
 from batch.backtest.models import ClosedTrade
-from common.market_hours import is_stock
+from common.marketdata.market_hours import is_stock
 
 _log = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Response
 
 from common.clickhouse_client import create_client
-from common.symbols import resolve_symbols
+from common.marketdata.symbols import resolve_symbols
 
 router = APIRouter(prefix="/market")
 

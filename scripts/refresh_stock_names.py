@@ -1,4 +1,4 @@
-"""종목명 번들 재생성 (단일 책임: FDR → common/refdata/stock_names.json 갱신).
+"""종목명 번들 재생성 (단일 책임: FDR → common/marketdata/refdata/stock_names.json 갱신).
 
 로컬 dev 환경 전용(프로덕션 이미지 실행 경로 아님). KRX/SEC 실시간 엔드포인트가 불안정해 종목명은
 repo에 정적 번들로 두고, 상장 변화가 느리므로 가끔만 재생성한다. FinanceDataReader가 필요하다(dev 의존):
@@ -10,7 +10,7 @@ import os
 
 import FinanceDataReader as fdr
 
-OUT = os.path.join(os.path.dirname(__file__), os.pardir, "common", "refdata", "stock_names.json")
+OUT = os.path.join(os.path.dirname(__file__), os.pardir, "common", "marketdata", "refdata", "stock_names.json")
 
 
 def build() -> dict:

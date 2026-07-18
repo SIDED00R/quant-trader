@@ -2,7 +2,7 @@
 import unittest
 from datetime import datetime
 
-from common.watchlist_chart_telegram import MAX_SYMBOLS, select_symbols
+from common.chart.watchlist_chart_telegram import MAX_SYMBOLS, select_symbols
 
 D = datetime
 

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
-from common.upbit_markets import fetch_krw_markets
+from common.marketdata.upbit_markets import fetch_krw_markets
 from batch.backtest.upbit_daily import fetch_daily, upsert_clickhouse
 
 

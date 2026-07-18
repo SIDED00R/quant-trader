@@ -8,7 +8,7 @@ US 참여인데 환율 없으면 빈 리스트(부분 합산 착시 방지) · K
 import unittest
 from datetime import date
 
-from common.equity_series import (
+from common.equity.equity_series import (
     PAPER_MARKETS,
     _fx_at,
     chart_rows,
