@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 import httpx
 
 from common.clickhouse_client import create_client
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
 _URL = "https://cdn.finra.org/equity/otcmarket/biweekly/shrt{ymd}.csv"
@@ -71,7 +71,7 @@ def collect(days: int = 75, log=print) -> int:
     today = date.today()
     total, files = 0, 0
     with httpx.Client(timeout=60, follow_redirects=True,
-                      headers={"User-Agent": SEC_USER_AGENT}) as c:
+                      headers=SEC_UA_HEADERS) as c:
         for n in range(days + 1):                          # 최근 days일 정산일 후보 스캔(404 스킵)
             d = today - timedelta(days=n)
             r = c.get(_URL.format(ymd=d.strftime("%Y%m%d")))

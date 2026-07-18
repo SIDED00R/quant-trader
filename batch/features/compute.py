@@ -9,9 +9,7 @@ import argparse
 import sys
 
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
 from batch.features.ohlcv import compute_features, feature_columns
 from common.clickhouse_client import create_client
 

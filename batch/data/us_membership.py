@@ -11,9 +11,7 @@ import sys
 from datetime import date
 
 import httpx
-from dotenv import load_dotenv
 
-load_dotenv()
 from common.clickhouse_client import create_client
 
 _UA = {"User-Agent": "coin-auto-trader research"}

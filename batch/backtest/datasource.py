@@ -9,27 +9,8 @@ ReplacingMergeTree 중복은 FINAL로 정리.
 """
 from decimal import Decimal
 
-import clickhouse_connect
-
-from common.config import (
-    CLICKHOUSE_DB,
-    CLICKHOUSE_HOST,
-    CLICKHOUSE_HTTP_PORT,
-    CLICKHOUSE_PASSWORD,
-    CLICKHOUSE_USER,
-)
+from common.clickhouse_client import create_client
 from batch.backtest.models import BTick
-
-
-def _client():
-    return clickhouse_connect.get_client(
-        host=CLICKHOUSE_HOST,
-        port=CLICKHOUSE_HTTP_PORT,
-        username=CLICKHOUSE_USER,
-        password=CLICKHOUSE_PASSWORD,
-        database=CLICKHOUSE_DB,
-    )
-
 
 _TABLES = {"candles_1m", "candles_1d", "stock_candles_1d", "stock_candles_1m"}  # 허용 테이블(SQL 식별자 파라미터화 불가 → 화이트리스트로 주입 차단)
 
@@ -42,7 +23,7 @@ def load_clickhouse_candles(symbols=None, start=None, end=None, table="candles_1
     """
     if table not in _TABLES:
         raise ValueError(f"unknown table '{table}'. allowed: {sorted(_TABLES)}")
-    client = _client()
+    client = create_client()
     conds = ["1=1"]
     params: dict = {}
     if symbols:

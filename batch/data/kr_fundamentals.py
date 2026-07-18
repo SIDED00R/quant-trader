@@ -22,12 +22,11 @@ import zipfile
 from datetime import date
 
 import httpx
-from dotenv import load_dotenv
 
-load_dotenv()
-from common.cache import dump_json, load_json, refcache_path  # noqa: E402
-from common.clickhouse_client import create_client  # noqa: E402
-from common.symbols import get_kr_symbols  # noqa: E402
+from common.cache import dump_json, load_json, refcache_path
+from common.clickhouse_client import create_client
+from common.config import DART_API_KEY
+from common.symbols import get_kr_symbols
 
 _BASE = "https://opendart.fss.or.kr/api"
 _CACHE = os.path.join(os.path.dirname(__file__), ".dart_cache")
@@ -165,7 +164,7 @@ def _iso(yyyymmdd) -> date:
 
 
 def store_kr_fundamentals(symbols=None, start_year=2018, sleep=0.1, log=print):
-    key = os.getenv("DART_API_KEY")
+    key = DART_API_KEY
     if not key:
         raise RuntimeError("DART_API_KEY 미설정(.env)")
     ch = create_client()

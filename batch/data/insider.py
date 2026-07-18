@@ -18,10 +18,9 @@ from datetime import date, datetime
 import httpx
 
 from common.clickhouse_client import create_client
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
-_UA = {"User-Agent": SEC_USER_AGENT}
 _CACHE = os.path.join(os.path.dirname(__file__), ".insider_cache")
 _BASE = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets"
 _COLS = ["symbol", "trans_date", "filed_date", "accession", "trans_sk", "owner_cik",
@@ -155,7 +154,7 @@ def collect(start_year: int = 2019, log=print) -> int:
         raise RuntimeError("[insider] US 유니버스 없음(stock_candles_1d market='US' 비어있음)")
     this_year = date.today().year
     total = 0
-    with httpx.Client(timeout=180, headers=_UA, follow_redirects=True) as c:
+    with httpx.Client(timeout=180, headers=SEC_UA_HEADERS, follow_redirects=True) as c:
         for year in range(start_year, this_year + 1):
             for q in (1, 2, 3, 4):
                 zf = _fetch_zip(year, q, c)

@@ -1,13 +1,20 @@
-"""온디맨드 매매 잡 순수 결정부 검증 (plan_orders/plan_decisions — DB/Kafka/ClickHouse 연결 불필요)."""
+"""온디맨드 매매 잡 순수 결정부 검증 (plan_decisions — DB/Kafka/ClickHouse 연결 불필요)."""
 import unittest
 from datetime import date
 from decimal import Decimal
 
 from common.config import FEE_RATE
-from trading.strategy.trade_once import plan_decisions, plan_orders, stale_bar_reason
+from trading.strategy.trade_once import plan_decisions, stale_bar_reason
 
 _PX = Decimal("1000")
 _CASH = Decimal("1000000")
+
+
+def plan_orders(targets: dict, snapshots: dict, band: float) -> list:
+    """{sym: target} → 실행 주문 [(acct, symbol, side, qty)] — plan_decisions의 매매분만 추린 뷰(회귀 고정용 테스트 헬퍼)."""
+    analysis = {s: {"target": t, "bar_date": None, "signals": []} for s, t in targets.items()}
+    return [(d["account_id"], d["symbol"], d["action"], d["quantity"])
+            for d in plan_decisions(analysis, snapshots, band) if d["action"] in ("BUY", "SELL")]
 
 
 def _snap(cash, positions, prices):
@@ -95,16 +102,16 @@ class TestPlanDecisions(unittest.TestCase):
         self.assertEqual(d["action"], "HOLD")
         self.assertIn("불완전", d["reason"])
 
-    def test_plan_orders_matches_decisions_trades(self):
-        # plan_orders는 plan_decisions의 매매분만 — 두 종목(매수 1·유지 1)
+    def test_decisions_two_symbols_buy_and_hold(self):
+        # 두 종목(매수 1·유지 1) — 결정 레코드와 매매분 추출이 함께 검증된다
         snaps = {"a": _snap(_CASH, {}, {"KRW-BTC": _PX, "KRW-ETH": _PX})}
         analysis = {"KRW-BTC": _a(0.5), "KRW-ETH": _a(0.0)}
         ds = plan_decisions(analysis, snaps, 0.5)
-        trades = [d for d in ds if d["action"] in ("BUY", "SELL")]
-        orders = plan_orders({"KRW-BTC": 0.5, "KRW-ETH": 0.0}, snaps, 0.5)
         self.assertEqual(len(ds), 2)
-        self.assertEqual(len(trades), len(orders))     # 위임 일관성
-        self.assertEqual(orders[0][1], "KRW-BTC")
+        trades = [d for d in ds if d["action"] in ("BUY", "SELL")]
+        self.assertEqual(len(trades), 1)
+        self.assertEqual(trades[0]["symbol"], "KRW-BTC")
+        self.assertEqual(trades[0]["action"], "BUY")
 
 
 class TestStaleBarReason(unittest.TestCase):

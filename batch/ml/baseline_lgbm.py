@@ -10,12 +10,9 @@ docs/ml_progress.md §4). 기본 손실=lambdarank(랭킹; fwd_ret 버킷 라벨
 import argparse
 import sys
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
-
-load_dotenv()
-import lightgbm as lgb
 
 from batch.ml.cv import purged_walkforward
 from batch.ml.dataset import build_dataset

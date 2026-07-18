@@ -21,8 +21,9 @@ HTTP_MAX_BACKOFF = 30.0    # 지수 백오프 상한(초) — REST 재시도·WS
 HTTP_TIMEOUT = 20.0        # 캔들/시세 수집 REST 타임아웃(초)
 BROKER_TIMEOUT = 15.0      # 브로커 인증/조회 REST 타임아웃(초)
 
-# ── SEC EDGAR 예절 (User-Agent 단일 출처 — 펀더멘털·13F·섹터 수집기 공용) ──
+# ── SEC EDGAR 예절 (User-Agent 단일 출처 — US 외부데이터 수집기 공용: 펀더·13F·섹터·어닝·내부자·FINRA·팩터) ──
 SEC_USER_AGENT = "coin-auto-trader research jh.lee@kornukopia-ai.com"
+SEC_UA_HEADERS = {"User-Agent": SEC_USER_AGENT}   # httpx headers= 인자용(각 수집기 로컬 _UA 재정의 금지)
 
 # ── KIS 잔고 TR·기본 코드 (불투명 식별자 → 의미 부여) ──
 KIS_TR_DOMESTIC_BALANCE = "TTTC8434R"   # 국내 잔고(모의는 V접두로 토글)

@@ -16,10 +16,9 @@ import httpx
 
 from batch.features.edgar import ticker_cik_map
 from common.clickhouse_client import create_client
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
-_UA = {"User-Agent": SEC_USER_AGENT}
 _SUB = "https://data.sec.gov/submissions/CIK{cik}.json"
 _COLS = ["symbol", "market", "announce_date", "period_end", "form", "source"]
 
@@ -57,7 +56,7 @@ def collect(log=print) -> int:
         raise RuntimeError("[earnings] US 유니버스 없음(stock_candles_1d market='US' 비어있음)")
     cik_map = ticker_cik_map()
     total, hit, miss = 0, 0, 0
-    with httpx.Client(timeout=30, headers=_UA, follow_redirects=True) as c:
+    with httpx.Client(timeout=30, headers=SEC_UA_HEADERS, follow_redirects=True) as c:
         for i, sym in enumerate(universe, 1):
             cik = cik_map.get(sym.upper())
             if not cik:

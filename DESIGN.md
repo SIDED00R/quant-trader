@@ -19,7 +19,7 @@
 - 실시간 틱/캔들 적재 및 대시보드
 
 ### 1.3 비범위 (이번 프로젝트에서 다루지 않음)
-- 실제 사용자 인증/보안(OAuth 등) — 학습용 단순 user_id 식별로 대체
+- 실제 사용자 인증/보안 — 학습용 단순 user_id 식별로 대체 (이후 공개 대시보드에 한해 구글 OAuth 도입: `api/auth_google.py`)
 - 사용자 간 호가 매칭(order book) — 시장가 기준 모의 체결로 대체
 - 레버리지/선물/마진 거래
 
@@ -286,22 +286,7 @@ kafka_project/
 
 ---
 
-## 9. GCP 배포 매핑
-
-| 컴포넌트 | GCP 서비스 |
-|----------|-----------|
-| Kafka | Managed Service for Apache Kafka (또는 Confluent Cloud) |
-| PostgreSQL | Cloud SQL for PostgreSQL |
-| ClickHouse | ClickHouse Cloud 또는 GCE/GKE self-host |
-| 수집기·소비자(상시 구동) | GKE (장기 실행 consumer에 적합) |
-| 주문 API | Cloud Run 또는 GKE |
-| 대시보드 | GCE의 Grafana 또는 Grafana Cloud |
-
-> Kafka consumer는 상시 떠 있어야 하므로 Cloud Run보다 GKE가 적합. 로컬에서 0~8단계를 완성한 뒤 9단계에서 GCP로 이전한다.
-
----
-
-## 10. 학습 체크포인트 (Kafka 개념 ↔ 구현 매핑)
+## 9. 학습 체크포인트 (Kafka 개념 ↔ 구현 매핑)
 
 | Kafka 개념 | 어디서 학습되나 |
 |------------|-----------------|
@@ -311,4 +296,3 @@ kafka_project/
 | 스트림 윈도우 집계 | 캔들 집계기(1분봉) |
 | 멱등성/중복 방지 | `execution_id` 기반 잔고 반영 |
 | 보관/압축 정책 | 토픽별 retention 설정 |
-```

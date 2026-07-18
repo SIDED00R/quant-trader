@@ -148,13 +148,6 @@ def plan_decisions(analysis: dict, snapshots: dict, band: float) -> list:
     return out
 
 
-def plan_orders(targets: dict, snapshots: dict, band: float) -> list:
-    """{sym: target} → 실행 주문 [(acct, symbol, side, qty)] — plan_decisions의 매매분만 추린 뷰(회귀 테스트용)."""
-    analysis = {s: {"target": t, "bar_date": None, "signals": []} for s, t in targets.items()}
-    return [(d["account_id"], d["symbol"], d["action"], d["quantity"])
-            for d in plan_decisions(analysis, snapshots, band) if d["action"] in ("BUY", "SELL")]
-
-
 def _execute(conn, acct, symbol, side, qty: Decimal, price: Decimal) -> str:
     """주문(PENDING, outbox 없음) INSERT 후 동기 체결(apply_execution: 검증·상태 갱신·FILLED). 반환=결과."""
     order_id = str(uuid.uuid4())

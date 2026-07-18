@@ -10,7 +10,7 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from common.market_hours import (
-    asset_class, is_coin, is_market_open, is_stock,
+    asset_class, is_market_open, is_stock,
     market_open, market_seconds_to_close, periods_per_year,
 )
 
@@ -23,9 +23,7 @@ class TestAssetClass(unittest.TestCase):
         self.assertEqual(asset_class("005930"), "STOCK_KR")
         self.assertEqual(asset_class("AAPL"), "STOCK_US")
 
-    def test_is_coin_is_stock(self):
-        self.assertTrue(is_coin("KRW-ETH"))
-        self.assertFalse(is_coin("005930"))
+    def test_is_stock(self):
         self.assertTrue(is_stock("005930"))
         self.assertTrue(is_stock("AAPL"))
         self.assertFalse(is_stock("KRW-BTC"))

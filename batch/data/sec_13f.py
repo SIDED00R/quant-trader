@@ -17,15 +17,12 @@ import zipfile
 from datetime import date, timedelta
 
 import httpx
-from dotenv import load_dotenv
 
-load_dotenv()
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
-_UA = {"User-Agent": SEC_USER_AGENT}
 _CACHE = os.path.join(os.path.dirname(__file__), ".13f_cache")
 _LIST = "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"
 _MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -119,7 +116,7 @@ def collect(start_year: int = 2019, log=print) -> int:
     us = get_us_symbols(ch)
     total = 0
     universe = set(us)
-    with httpx.Client(timeout=180, headers=_UA, follow_redirects=True) as c:
+    with httpx.Client(timeout=180, headers=SEC_UA_HEADERS, follow_redirects=True) as c:
         quarters = _zip_urls(c, start_year)
         log(f"[13f] 분기 {len(quarters)}개")
         # 부트스트랩: 최근 '완성'분기에서 CUSIP별 보유기관수 집계 → 상위 CUSIP을 CUSIP→ticker 매핑.
