@@ -2,8 +2,8 @@
 
 RSI가 과매도(≤30)면 반등 기대 매수, 과매수(≥70)면 청산. 청산은 신호 외 STOP/TAKE/TRAIL도 적용.
 """
-from trading.strategy.disciplined import DisciplinedStrategy
-from trading.strategy.indicators import rsi
+from trading.strategy.plugins.disciplined import DisciplinedStrategy
+from trading.strategy.core.indicators import rsi
 
 _PERIOD = 14
 _OVERSOLD = 30.0

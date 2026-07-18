@@ -28,8 +28,8 @@ from common.postgres_client import close_pool, open_pool, pool
 from common.marketdata.stock_ohlc import daily_ohlc
 from common.marketdata.stock_price import latest_closes
 from trading.portfolio import paper_ledger
-from trading.strategy.notify_messages import error_message, ichimoku_message
-from trading.strategy.weekly_marker import mark_week_done, week_done
+from trading.strategy.core.notify_messages import error_message, ichimoku_message
+from trading.strategy.runners.weekly_marker import mark_week_done, week_done
 
 MARKET_KEY = "KR_ICHIMOKU"     # 주간 마커 키(ML 'KR'과 격리)
 HISTORY_DAYS = 800             # 선행B 52주 + 선행이동 26주 커버 + 여유

@@ -20,9 +20,9 @@ from common.broker.kis_overseas_price import price_and_exchange
 from common.marketdata.market_holidays import market_today
 from common.marketdata.market_hours import market_open, market_seconds_to_close
 from common.marketdata.stock_price import latest_closes
-from trading.strategy.notify_messages import error_message, stock_message
-from trading.strategy.stock_trade_common import build_plan, skip_result, weekly_guard
-from trading.strategy.weekly_marker import completed, mark_week_done
+from trading.strategy.core.notify_messages import error_message, stock_message
+from trading.strategy.runners.stock_trade_common import build_plan, skip_result, weekly_guard
+from trading.strategy.runners.weekly_marker import completed, mark_week_done
 
 _BUFFER = 1.02   # 동일가중 수량 산정용 1차 지정가 버퍼(kis_chase의 1차 BUY 버퍼와 동일)
 _MIN_SECONDS_TO_CLOSE = 300   # 정규장 마감까지 이 이하로 남으면 발주 스킵(부분 거부 방지 — 다음 평일 재시도)

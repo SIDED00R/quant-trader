@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal
 
 from common.equity.equity_snapshot import ICHIMOKU_ACCOUNT
-from trading.strategy.kr_ichimoku_trade_once import MARKET_KEY, plan_trades
+from trading.strategy.runners.kr_ichimoku_trade_once import MARKET_KEY, plan_trades
 
 TODAY = date(2026, 7, 17)
 
@@ -62,7 +62,7 @@ class TestKeys(unittest.TestCase):
 
 class TestSendEntryCharts(unittest.TestCase):
     def test_sends_per_buy_and_isolates_errors(self):
-        import trading.strategy.kr_ichimoku_trade_once as job
+        import trading.strategy.runners.kr_ichimoku_trade_once as job
         from unittest import mock
         bars = [(date(2026, 7, 1), 1, 1, 1, 1)]
         buy_bars = [("005930", bars), ("000660", bars), ("035420", bars)]
@@ -82,7 +82,7 @@ class TestSendEntryCharts(unittest.TestCase):
         self.assertTrue(all(c.startswith("🟢 [KR 일목 매수]") for c in caps))
 
     def test_empty_is_noop(self):
-        import trading.strategy.kr_ichimoku_trade_once as job
+        import trading.strategy.runners.kr_ichimoku_trade_once as job
         from unittest import mock
         with mock.patch.object(job.notify_telegram, "send_photo") as sp:
             job.send_entry_charts([])

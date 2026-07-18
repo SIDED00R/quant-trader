@@ -16,8 +16,8 @@ from common.config import (
     STRATEGY_ORDER_FRACTION_MAX,
     STRATEGY_WARMUP_SEC,
 )
-from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.sma_trader import MIN_ORDER_KRW, liquidation_reason
+from trading.strategy.core.base import Broker, MarketTick, Strategy
+from trading.strategy.plugins.sma_trader import MIN_ORDER_KRW, liquidation_reason
 
 _NEG_INF = -1e18  # 미설정 시각의 하한(쿨다운/최소보유 비교에서 항상 경과로 취급)
 

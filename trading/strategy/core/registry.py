@@ -3,16 +3,16 @@
 신규 전략(2단계 RSI/MACD/...)은 여기 등록만 하면 백테스트·워크포워드(--strategy)에서 이름으로 선택된다.
 (앙상블/commander는 이 registry가 아니라 ensemble.default_loads의 부하 구성을 쓴다 — 자동 편입 아님.)
 """
-from trading.strategy.base import Strategy
-from trading.strategy.bollinger import BollingerStrategy
-from trading.strategy.breakout import BreakoutStrategy
-from trading.strategy.cross_sectional import XSMomentumStrategy, XSReversalStrategy
-from trading.strategy.ensemble import EnsembleStrategy
-from trading.strategy.intraday import IntradayMomentumStrategy, ORBStrategy
-from trading.strategy.macd import MACDStrategy
-from trading.strategy.rsi import RSIStrategy
-from trading.strategy.sma import SMAStrategy
-from trading.strategy.trend import TrendStrategy
+from trading.strategy.core.base import Strategy
+from trading.strategy.plugins.bollinger import BollingerStrategy
+from trading.strategy.plugins.breakout import BreakoutStrategy
+from trading.strategy.plugins.cross_sectional import XSMomentumStrategy, XSReversalStrategy
+from trading.strategy.plugins.ensemble import EnsembleStrategy
+from trading.strategy.plugins.intraday import IntradayMomentumStrategy, ORBStrategy
+from trading.strategy.plugins.macd import MACDStrategy
+from trading.strategy.plugins.rsi import RSIStrategy
+from trading.strategy.plugins.sma import SMAStrategy
+from trading.strategy.plugins.trend import TrendStrategy
 
 _REGISTRY: dict[str, type[Strategy]] = {
     SMAStrategy.name: SMAStrategy,

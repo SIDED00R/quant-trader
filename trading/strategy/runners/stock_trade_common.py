@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from batch.ml.stock_score import score_latest
 from common.marketdata.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
-from trading.strategy.weekly_marker import week_done
+from trading.strategy.runners.weekly_marker import week_done
 
 _EMPTY_PLAN = {"bar": None, "cash": 0.0, "targets": [], "buys": [], "sells": [], "ranked": None}
 MAX_STALE_DAYS = 7   # 최신봉 신선도 상한(달력일) — 초과 시 매매 중단(잘못된 시세로 사이징 방지)

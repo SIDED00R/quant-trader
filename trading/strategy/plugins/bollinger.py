@@ -2,8 +2,8 @@
 
 현재가가 하단 밴드(SMA−2σ) 이하면 매수, 상단 밴드(SMA+2σ) 이상이면 청산. STOP/TAKE/TRAIL 병행.
 """
-from trading.strategy.disciplined import DisciplinedStrategy
-from trading.strategy.indicators import bollinger
+from trading.strategy.plugins.disciplined import DisciplinedStrategy
+from trading.strategy.core.indicators import bollinger
 
 _WINDOW = 20
 _K = 2.0

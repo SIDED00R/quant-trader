@@ -19,7 +19,7 @@ from common.config import (
     STRATEGY_ORDER_FRACTION_MAX,
 )
 from common.marketdata.market_hours import seconds_to_close, session_date
-from trading.strategy.base import Broker, MarketTick, Strategy
+from trading.strategy.core.base import Broker, MarketTick, Strategy
 
 
 class _Session:

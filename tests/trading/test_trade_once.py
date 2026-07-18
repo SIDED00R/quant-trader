@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from common.config import FEE_RATE
-from trading.strategy.trade_once import plan_decisions, stale_bar_reason
+from trading.strategy.runners.trade_once import plan_decisions, stale_bar_reason
 
 _PX = Decimal("1000")
 _CASH = Decimal("1000000")

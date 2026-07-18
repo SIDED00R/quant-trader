@@ -2,7 +2,7 @@
 import unittest
 from decimal import Decimal
 
-from trading.strategy.live_ensemble import LiveEnsemble, utc_day
+from trading.strategy.runners.live_ensemble import LiveEnsemble, utc_day
 
 
 def _hist(closes):

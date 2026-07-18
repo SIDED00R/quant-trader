@@ -51,7 +51,7 @@ from batch.backtest.metrics import compute_metrics
 from batch.backtest.report import print_summary, write_outputs
 from batch.backtest.upbit_candles import load as load_candle_cache
 from common.marketdata.market_hours import is_market_open, periods_per_year
-from trading.strategy.registry import available, get_strategy
+from trading.strategy.core.registry import available, get_strategy
 
 
 def _regular_session_only(candles):

@@ -14,8 +14,8 @@ from collections import deque
 from decimal import Decimal
 
 from common.config import XS_LOOKBACK, XS_MAX_WEIGHT, XS_REBALANCE_BAND, XS_TOP_N
-from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.rebalance import bar_key, decide
+from trading.strategy.core.base import Broker, MarketTick, Strategy
+from trading.strategy.core.rebalance import bar_key, decide
 
 
 class CrossSectionalStrategy(Strategy):

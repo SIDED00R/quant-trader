@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 
 from api.cache import cache_get, cache_get_stale, cache_set
 from common.config import ENSEMBLE_SYMBOLS
-from trading.strategy.ensemble import EnsembleStrategy
+from trading.strategy.plugins.ensemble import EnsembleStrategy
 
 router = APIRouter(prefix="/strategy")
 

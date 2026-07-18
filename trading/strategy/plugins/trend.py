@@ -23,8 +23,8 @@ from common.config import (
     TREND_VOL_LOOKBACK,
     TREND_VOL_TARGET,
 )
-from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.rebalance import affordable_qty
+from trading.strategy.core.base import Broker, MarketTick, Strategy
+from trading.strategy.core.rebalance import affordable_qty
 
 
 def _sma(closes: list[float], n: int) -> float:

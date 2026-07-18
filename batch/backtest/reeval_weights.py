@@ -22,8 +22,8 @@ from common.config import (
     INITIAL_BALANCE,
 )
 from common.postgres_client import close_pool, open_pool, pool
-from trading.strategy.ensemble import default_loads
-from trading.strategy.weight_policy import compute_weights
+from trading.strategy.plugins.ensemble import default_loads
+from trading.strategy.core.weight_policy import compute_weights
 
 _DAY = 86400.0
 
@@ -32,7 +32,7 @@ def score_loads(bars, loads, initial, fills, sample_sec, is_sec, oos_sec, step_s
     """각 부하의 walk-forward OOS 성과 → {load: (score, gate)}. score=연율 Sharpe, gate=DSR(N=1→PSR)."""
     from batch.backtest.metrics import SECONDS_PER_YEAR, _sharpe_from_returns, deflated_sharpe
     from batch.backtest.walkforward import oos_returns
-    from trading.strategy.trend import TrendStrategy
+    from trading.strategy.plugins.trend import TrendStrategy
 
     ppy = SECONDS_PER_YEAR / sample_sec if sample_sec > 0 else SECONDS_PER_YEAR
     # 공통 prime = 부하 중 최장 warmup → 모든 부하를 동일 OOS 창에서 평가(부하 간 Sharpe 공정 비교).

@@ -25,11 +25,11 @@ from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
 from common.marketdata.upbit_ticker import latest_prices
 from trading.portfolio.updater import apply_execution
-from trading.strategy.commander import combined_for_bar, decide
-from trading.strategy.decision_record import classify
-from trading.strategy.ensemble import default_loads
-from trading.strategy.live_ensemble import LiveEnsemble
-from trading.strategy.notify_messages import coin_message, error_message
+from trading.strategy.runners.commander import combined_for_bar, decide
+from trading.strategy.core.decision_record import classify
+from trading.strategy.plugins.ensemble import default_loads
+from trading.strategy.runners.live_ensemble import LiveEnsemble
+from trading.strategy.core.notify_messages import coin_message, error_message
 
 _FEE_QUANT = Decimal("0.0001")
 _MAX_STALE_DAYS = 3   # 최신 완료 일봉 허용 지연(일). 코인은 무휴장이라 3일이면 백필 고장 확정.

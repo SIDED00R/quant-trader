@@ -259,10 +259,10 @@ kafka_project/
 - `scripts.init_db` → 모든 서비스 (스키마 생성 선행)
 - `streaming.ingester` → `streaming.sink` · `streaming.aggregator` (market.ticks 흐름)
 - `streaming.aggregator.candle` → `.daily` (candles_1m → candles_1d)
-- `streaming.aggregator.daily` → `trading.strategy.live_ensemble` (candles_1d 워밍업)
-- `trading.strategy.live_ensemble` → `.commander` (strategy.signals)
+- `streaming.aggregator.daily` → `trading.strategy.runners.live_ensemble` (candles_1d 워밍업)
+- `trading.strategy.runners.live_ensemble` → `.commander` (strategy.signals)
 - `.commander` → `trading.relay` → `trading.engine` → `trading.portfolio` (orders → executions → 잔고)
-- candles_1d 완성 → `trading.strategy.trade_once` (일 1회 온디맨드 배치)
+- candles_1d 완성 → `trading.strategy.runners.trade_once` (일 1회 온디맨드 배치)
 - candles_1d(전기간) → `batch.backtest.reeval_weights` (가중치 재평가)
 
 ---

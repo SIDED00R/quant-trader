@@ -1,7 +1,7 @@
 """부하 가중치 정책 검증 (순수 함수 compute_weights — DB/백테스트 불필요)."""
 import unittest
 
-from trading.strategy.weight_policy import compute_weights
+from trading.strategy.core.weight_policy import compute_weights
 
 # alpha=1.0 → EWMA 우회(순수 타깃)로 결정적 검증. 개별 테스트에서 override.
 _G = dict(floor_mult=0.5, cap_mult=1.5, dsr_gate=0.9, ewma_alpha=1.0)

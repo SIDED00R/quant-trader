@@ -9,8 +9,8 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from trading.strategy.cross_sectional import XSMomentumStrategy, XSReversalStrategy
-from trading.strategy.rebalance import bar_key, decide
+from trading.strategy.plugins.cross_sectional import XSMomentumStrategy, XSReversalStrategy
+from trading.strategy.core.rebalance import bar_key, decide
 
 
 def _xs_ticks(prices_by_bar, bar_sec=60.0):

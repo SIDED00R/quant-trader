@@ -2,7 +2,7 @@
 import unittest
 from decimal import Decimal
 
-from trading.strategy.commander import combined_for_bar, decide
+from trading.strategy.runners.commander import combined_for_bar, decide
 
 _EQ = Decimal("1000000")     # 총자산 100만(계산 편의)
 _PX = Decimal("1000")        # 가격

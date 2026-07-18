@@ -13,8 +13,8 @@ from decimal import Decimal
 
 from common.config import ENSEMBLE_SYMBOLS, TOPIC_SIGNALS, TOPIC_TICKS
 from common.schemas import Signal
-from trading.strategy.ensemble import default_loads
-from trading.strategy.trend_signal import TrendSignal
+from trading.strategy.plugins.ensemble import default_loads
+from trading.strategy.plugins.trend_signal import TrendSignal
 
 # common.kafka_client(confluent-kafka)는 run()에서만 지연 import — LiveEnsemble 순수 상태기는
 # Kafka 비의존이라 단위 테스트 시 무거운 의존성을 끌어오지 않는다.

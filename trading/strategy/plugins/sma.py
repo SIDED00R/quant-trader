@@ -20,8 +20,8 @@ from common.config import (
     STRATEGY_MIN_HOLD_SEC,
     STRATEGY_WARMUP_SEC,
 )
-from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.sma_trader import (
+from trading.strategy.core.base import Broker, MarketTick, Strategy
+from trading.strategy.plugins.sma_trader import (
     MIN_ORDER_KRW,
     liquidation_reason,
     position_fraction,

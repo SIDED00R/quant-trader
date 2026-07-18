@@ -3,8 +3,8 @@
 현재가가 직전 lookback봉 최고가를 상향 돌파하면 매수(추세 추종), 최저가를 하향 이탈하면 청산.
 평균회귀(RSI/볼린저)와 반대 방향의 모멘텀 전략. STOP/TAKE/TRAIL 병행.
 """
-from trading.strategy.disciplined import DisciplinedStrategy
-from trading.strategy.indicators import donchian
+from trading.strategy.plugins.disciplined import DisciplinedStrategy
+from trading.strategy.core.indicators import donchian
 
 _LOOKBACK = 20
 

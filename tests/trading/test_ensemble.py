@@ -6,8 +6,8 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from trading.strategy.ensemble import EnsembleStrategy
-from trading.strategy.trend_signal import TrendSignal
+from trading.strategy.plugins.ensemble import EnsembleStrategy
+from trading.strategy.plugins.trend_signal import TrendSignal
 
 
 def _ticks(prices):

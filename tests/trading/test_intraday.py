@@ -10,7 +10,7 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from trading.strategy.intraday import IntradayMomentumStrategy, ORBStrategy
+from trading.strategy.plugins.intraday import IntradayMomentumStrategy, ORBStrategy
 
 _KST = timezone(timedelta(hours=9))
 

@@ -4,8 +4,8 @@ import unittest
 import pandas as pd
 
 from batch.ml.stock_score import _latest_covered
-from trading.strategy.notify_messages import stock_message
-from trading.strategy.stock_trade_common import skip_result
+from trading.strategy.core.notify_messages import stock_message
+from trading.strategy.runners.stock_trade_common import skip_result
 
 
 class TestSkipResult(unittest.TestCase):

@@ -1,7 +1,7 @@
 """텔레그램 알림 문안 조립 검증 (notify_messages — 순수 함수, I/O 없음)."""
 import unittest
 
-from trading.strategy.notify_messages import coin_message, error_message, stock_message
+from trading.strategy.core.notify_messages import coin_message, error_message, stock_message
 
 
 def _r(**kw):

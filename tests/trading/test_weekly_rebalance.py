@@ -6,7 +6,7 @@ import unittest
 from datetime import date
 
 from common.marketdata.market_holidays import is_market_holiday
-from trading.strategy.weekly_marker import _iso_week, completed
+from trading.strategy.runners.weekly_marker import _iso_week, completed
 
 
 class TestIsoWeek(unittest.TestCase):

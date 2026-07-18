@@ -2,7 +2,7 @@
 import unittest
 from decimal import Decimal
 
-from trading.strategy.decision_record import classify
+from trading.strategy.core.decision_record import classify
 
 D0 = Decimal("0")
 D10 = Decimal("10")

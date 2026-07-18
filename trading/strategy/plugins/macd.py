@@ -3,8 +3,8 @@
 MACD선(EMA12−EMA26)이 시그널선(MACD의 EMA9)을 상향 교차하면 매수, 하향 교차하면 청산.
 EMA는 경로 의존이라 종목별 증분 상태(Ema)로 유지한다. EMA 수렴 전(_SLOW봉 미만)엔 신호 억제.
 """
-from trading.strategy.disciplined import DisciplinedStrategy
-from trading.strategy.indicators import Ema
+from trading.strategy.plugins.disciplined import DisciplinedStrategy
+from trading.strategy.core.indicators import Ema
 
 _FAST, _SLOW, _SIGNAL = 12, 26, 9
 

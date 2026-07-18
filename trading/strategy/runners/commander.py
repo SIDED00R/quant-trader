@@ -17,9 +17,9 @@ from common.kafka_client import create_consumer
 from common.order_writer import place_order
 from common.postgres_client import close_pool, open_pool, pool
 from common.strategy_weights import load_weights
-from trading.strategy.ensemble import default_loads
+from trading.strategy.plugins.ensemble import default_loads
 # 리밸런싱 규칙은 공용 정본(rebalance.py)에서 — 백테스트 횡단면과 동일 규칙·테스트 가능. 재export로 기존 import 호환.
-from trading.strategy.rebalance import combined_for_bar, decide, _roster_ready
+from trading.strategy.core.rebalance import combined_for_bar, decide, _roster_ready
 
 GROUP_ID = "ensemble-commander"
 

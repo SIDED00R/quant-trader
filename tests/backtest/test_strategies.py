@@ -8,7 +8,7 @@ from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from trading.strategy.registry import available, get_strategy
+from trading.strategy.core.registry import available, get_strategy
 
 
 def _series(prices):

@@ -1,7 +1,7 @@
 """기술 지표 순수 함수 검증."""
 import unittest
 
-from trading.strategy.indicators import Ema, bollinger, donchian, rsi
+from trading.strategy.core.indicators import Ema, bollinger, donchian, rsi
 
 
 class TestRSI(unittest.TestCase):

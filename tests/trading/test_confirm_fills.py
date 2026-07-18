@@ -7,8 +7,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from trading.strategy.stock_trade_common import confirm_fills
-from trading.strategy.stock_trade_once import _fill_deadline
+from trading.strategy.runners.stock_trade_common import confirm_fills
+from trading.strategy.runners.stock_trade_once import _fill_deadline
 
 _EPOCH = datetime(2026, 7, 7, 6, 0, tzinfo=timezone.utc)
 

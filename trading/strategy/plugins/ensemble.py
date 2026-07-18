@@ -7,9 +7,9 @@ whipsaw를 분산한다(부하 다수가 동의할수록 비중↑). config/base
 from decimal import Decimal
 
 from common.config import ENSEMBLE_REBALANCE_BAND
-from trading.strategy.base import Broker, MarketTick, Strategy
-from trading.strategy.rebalance import decide
-from trading.strategy.trend_signal import TrendSignal
+from trading.strategy.core.base import Broker, MarketTick, Strategy
+from trading.strategy.core.rebalance import decide
+from trading.strategy.plugins.trend_signal import TrendSignal
 
 # 빠름/중간/느림 — 단일 5/40의 속도 편중을 분산(파라미터 리스크↓). BTC/ETH 6.6년 교차검증 채택 구성.
 _DEFAULT_SPECS = [(5, 40), (10, 60), (20, 100)]

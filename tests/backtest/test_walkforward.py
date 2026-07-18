@@ -7,7 +7,7 @@ from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
 from batch.backtest.metrics import _sharpe_from_returns
 from batch.backtest.walkforward import _combos, _evaluate, _folds, run_walkforward
-from trading.strategy.trend import TrendStrategy
+from trading.strategy.plugins.trend import TrendStrategy
 
 _DAY = 86400.0
 
@@ -67,7 +67,7 @@ class TestEndToEnd(unittest.TestCase):
 
     def test_generic_fixed_strategy_via_factory(self):
         # 임의 등록 전략(고정구성)도 factory로 walk-forward 가능 — xs_reversal 예시(n_trials=1→PSR)
-        from trading.strategy.cross_sectional import XSReversalStrategy
+        from trading.strategy.plugins.cross_sectional import XSReversalStrategy
         bars = [
             BTick(sym, Decimal(str(round(p, 4))), float(i) * _DAY)
             for i in range(600)

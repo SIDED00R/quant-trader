@@ -23,8 +23,8 @@ from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.metrics import SECONDS_PER_YEAR, _sharpe_from_returns, deflated_sharpe
 from batch.backtest.upbit_candles import load as load_candle_cache
-from trading.strategy.ensemble import EnsembleStrategy
-from trading.strategy.trend import TrendStrategy
+from trading.strategy.plugins.ensemble import EnsembleStrategy
+from trading.strategy.plugins.trend import TrendStrategy
 
 _GRID_SHORT = [5, 10, 20]
 _GRID_LONG = [30, 40, 60]
@@ -300,7 +300,7 @@ def main(argv=None) -> int:
         return 1
     factory = None
     if args.strategy not in ("trend", "ensemble"):   # 임의 등록 전략 → 고정구성 factory(fold별 새 인스턴스)
-        from trading.strategy.registry import get_strategy
+        from trading.strategy.core.registry import get_strategy
         if args.source == "clickhouse":
             bar_min = 1 if args.ch_table in ("candles_1m", "stock_candles_1m") else 1440
         else:

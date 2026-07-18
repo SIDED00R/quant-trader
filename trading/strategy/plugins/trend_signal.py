@@ -16,7 +16,7 @@ from common.config import (
     TREND_VOL_LOOKBACK,
     TREND_VOL_TARGET,
 )
-from trading.strategy.trend import _ann_vol, _sma, target_weight
+from trading.strategy.plugins.trend import _ann_vol, _sma, target_weight
 
 
 class TrendSignal:

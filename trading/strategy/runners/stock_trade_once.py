@@ -19,9 +19,9 @@ from common.equity.equity_snapshot import record_stock_snapshot
 from common.broker.kis_order import place_domestic_order
 from common.marketdata.market_holidays import market_today
 from common.marketdata.stock_price import latest_closes
-from trading.strategy.notify_messages import error_message, stock_message
-from trading.strategy.stock_trade_common import build_plan, confirm_fills, skip_result, weekly_guard
-from trading.strategy.weekly_marker import completed, mark_week_done
+from trading.strategy.core.notify_messages import error_message, stock_message
+from trading.strategy.runners.stock_trade_common import build_plan, confirm_fills, skip_result, weekly_guard
+from trading.strategy.runners.weekly_marker import completed, mark_week_done
 
 _KST = ZoneInfo("Asia/Seoul")
 

@@ -10,12 +10,12 @@ import unittest
 from decimal import Decimal
 from unittest import mock
 
-import trading.strategy.sma as sma_mod
+import trading.strategy.plugins.sma as sma_mod
 from batch.backtest.account import BacktestAccount
 from batch.backtest.engine import BacktestEngine
 from batch.backtest.fills import FillModel
 from batch.backtest.models import BTick
-from trading.strategy.sma import SMAStrategy
+from trading.strategy.plugins.sma import SMAStrategy
 
 
 def _rise(n, step="0.0015"):
