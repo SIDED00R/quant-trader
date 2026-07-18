@@ -2,32 +2,19 @@
 
 코인 sink/tick_clickhouse.py 패턴 미러(별도 GROUP_ID·테이블). Tick 스키마를 공유한다.
 """
-import json
 import time
-from datetime import datetime
 
 from common.clickhouse_client import create_client
 from common.config import TOPIC_STOCK_TICKS
 from common.constants import COLUMNS_TICKS
 from common.kafka_client import create_consumer
+from streaming.sink._parse import parse_row
 
 GROUP_ID = "stock-tick-clickhouse-sink"
 TABLE = "stock_ticks"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
 COLUMNS = COLUMNS_TICKS
-
-
-def parse_row(value: bytes) -> list:
-    t = json.loads(value)
-    return [
-        t["symbol"],
-        float(t["price"]),
-        float(t["volume"]),
-        t["side"],
-        datetime.fromisoformat(t["trade_ts"]),
-        int(t["seq"]),
-    ]
 
 
 def run() -> None:

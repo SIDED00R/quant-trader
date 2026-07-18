@@ -1,29 +1,16 @@
 """market.ticks → ClickHouse 적재 (단일 책임: 틱 싱크)."""
-import json
 import time
-from datetime import datetime
 
 from common.clickhouse_client import create_client
 from common.config import TOPIC_TICKS
 from common.constants import COLUMNS_TICKS
 from common.kafka_client import create_consumer
+from streaming.sink._parse import parse_row
 
 GROUP_ID = "tick-clickhouse-sink"
 BATCH_SIZE = 500
 FLUSH_SEC = 2.0
 COLUMNS = COLUMNS_TICKS
-
-
-def parse_row(value: bytes) -> list:
-    t = json.loads(value)
-    return [
-        t["symbol"],
-        float(t["price"]),
-        float(t["volume"]),
-        t["side"],
-        datetime.fromisoformat(t["trade_ts"]),
-        int(t["seq"]),
-    ]
 
 
 def run() -> None:

@@ -17,7 +17,7 @@ from common.config import (
     STRATEGY_WARMUP_SEC,
 )
 from trading.strategy.core.base import Broker, MarketTick, Strategy
-from trading.strategy.plugins.sma_trader import MIN_ORDER_KRW, liquidation_reason
+from trading.strategy.plugins.sma_trader import MIN_ORDER_KRW, check_liquidations
 
 _NEG_INF = -1e18  # 미설정 시각의 하한(쿨다운/최소보유 비교에서 항상 경과로 취급)
 
@@ -44,29 +44,12 @@ class DisciplinedStrategy(Strategy):
             self.started_at = now
         dq = self.prices.setdefault(sym, deque(maxlen=self.window))
         dq.append(price)
-        self._check_liquidations(sym, price, now, broker)  # 자본보호 우선(워밍업 무관)
+        check_liquidations(self, sym, price, now, broker)  # 자본보호 우선(워밍업 무관)
         sig = self._signal(sym, dq)
         if sig == "BUY":
             self._enter(sym, price, now, broker)
         elif sig == "SELL":
             self._exit_signal(sym, now, broker)
-
-    def _check_liquidations(self, sym, price, now, broker):
-        qty = broker.position_qty(sym)
-        avg = broker.position_avg(sym)
-        if qty <= 0 or avg <= 0:
-            self.peak.pop(sym, None)
-            return
-        pnl = price / avg - 1
-        peak = self.peak.get(sym, pnl)
-        if pnl > peak:
-            peak = pnl
-        self.peak[sym] = peak
-        reason = liquidation_reason(pnl, peak)
-        if reason and broker.sell(sym, qty, reason, now):
-            self.last_exit[sym] = now
-            self.peak.pop(sym, None)
-            self.entry_time.pop(sym, None)
 
     def _enter(self, sym, price, now, broker):
         if now - self.started_at < STRATEGY_WARMUP_SEC:
