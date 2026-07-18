@@ -17,6 +17,7 @@ from datetime import date, datetime
 
 import httpx
 
+from batch.rawdata._parse import to_float as _flt
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
 from common.marketdata.symbols import get_us_symbols
@@ -138,13 +139,6 @@ def _quarter_rows(zf: zipfile.ZipFile, universe: set) -> list:
                 _flt(_get(p, tidx, "SHRS_OWND_FOLWNG_TRANS")),
             ])
     return rows
-
-
-def _flt(s: str) -> float:
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return 0.0
 
 
 def collect(start_year: int = 2019, log=print) -> int:

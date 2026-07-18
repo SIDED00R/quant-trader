@@ -75,7 +75,7 @@ def _fetch_zip(url: str, client: httpx.Client):
     os.makedirs(_CACHE, exist_ok=True)   # 신선 환경(부트스트랩 _cusip_to_ticker 전에 호출) 대응
     fn = url.split("/")[-1]
     fp = os.path.join(_CACHE, fn)
-    for attempt in (1, 2):
+    for _ in (1, 2):
         if not os.path.exists(fp):
             r = client.get(url)
             r.raise_for_status()

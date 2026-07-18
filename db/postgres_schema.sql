@@ -120,7 +120,7 @@ INSERT INTO accounts (account_id, krw_balance)
 VALUES ('kr_ichimoku', 100000000)
 ON CONFLICT (account_id) DO NOTHING;
 
--- 시장별 평가자산 스냅샷: 각 매매 잡이 종료 시 하루 1행 upsert(common/equity_snapshot.py).
+-- 시장별 평가자산 스냅샷: 각 매매 잡이 종료 시 하루 1행 upsert(common/equity/equity_snapshot.py).
 -- 대시보드 '자산' 탭(/equity/history)과 README 차트(scripts/render_equity_chart.py)의 원천.
 -- account_id: COIN=accounts.account_id, KR/US='kis'(단일 KIS 모의계좌), KR 일목 페이퍼='kr_ichimoku'(별도 곡선) — accounts FK 없음(의도).
 -- snap_date=UTC 달력일. 같은 날 재실행(스위퍼·US 다중 부팅)은 PK upsert로 마지막 실행이 승리.
