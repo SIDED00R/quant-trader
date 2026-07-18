@@ -8,6 +8,7 @@
   진입 = 종가>구름상단 AND 전환>기준 · 청산 = --exit-rule 택일(tk_cross=전환<기준 데드크로스[기본] / cloud=종가<=구름상단).
 캡 있는 실운용 적응: 최대 max-positions 종목, 종목당 예산=평가자산/max, 슬롯 초과 시 돌파강도 상위 우선.
 체결가 = 최신 일봉 종가(백테스트=주 종가와 미세 차이 — 월요일 실행분이라 문서화). 무재시도·동기.
+매매 후 신규 매수(구름 돌파 진입) 종목의 주봉+일목 차트를 텔레그램 사진으로 발송한다(비치명, /차트 봇 렌더러 재사용).
 
 Dockerfile.batch(trade) 전용 — batch.backtest.refresh_stock_daily/toss_daily 의존(app 이미지 제외 경로).
 """
@@ -168,7 +169,8 @@ def execute(live: bool, max_positions: int, exit_rule: str) -> dict:
 
     return {"bar": str(freshest), "cash": float(cash_amt),
             "targets": p["targets"], "buys": [s for s, _, _ in p["buys"]],
-            "sells": [s for s, _, _ in p["sells"]], "placed": placed, "skipped": None}
+            "sells": [s for s, _, _ in p["sells"]], "placed": placed, "skipped": None,
+            "buy_bars": [(s, hist[s]) for s, _, _ in p["buys"] if hist.get(s)]}   # 신규 매수 차트용 일봉
 
 
 def snapshot() -> None:
@@ -180,6 +182,26 @@ def snapshot() -> None:
     pos_val = sum(Decimal(str(q)) * Decimal(str(closes.get(s, 0) or 0)) for s, q in held.items())
     record_snapshot("KR", ICHIMOKU_ACCOUNT, "KRW", cash_amt + pos_val,
                     cash=cash_amt, positions_value=pos_val)
+
+
+def send_entry_charts(buy_bars: list) -> None:
+    """신규 매수(구름 돌파 진입) 종목의 주봉+일목 차트를 텔레그램 사진으로 발송(종목별 격리·전부 비치명).
+
+    buy_bars=[(symbol, 일봉 rows)] — execute()가 채운다. /차트 봇과 동일한 symbol_chart 렌더러 재사용.
+    """
+    if not buy_bars:
+        return
+    from common import stock_names
+    from common.symbol_chart import chart_for_symbol
+    idx = stock_names.build_index(stock_names.fetch_all())
+    for sym, bars in buy_bars:
+        try:
+            hit = stock_names.resolve(idx, sym)
+            name = hit[2] if hit and hit[2] != sym else None
+            png, cap = chart_for_symbol(bars, "KR", sym, name)
+            notify_telegram.send_photo(png, "🟢 [KR 일목 매수] " + cap)
+        except Exception as e:
+            print(f"[kr-ichimoku] {sym} 차트 발송 실패(비치명): {type(e).__name__}: {e}")
 
 
 def main(argv=None) -> int:
@@ -210,6 +232,8 @@ def main(argv=None) -> int:
     for o in r.get("placed", []):
         print("  ", o)
     notify_telegram.send(ichimoku_message("KR 일목(페이퍼)", r, live=a.live))
+    if a.live:
+        send_entry_charts(r.get("buy_bars") or [])   # 매수 종목 주봉+일목 차트 발송(비치명)
     return 0
 
 

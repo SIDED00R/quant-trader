@@ -60,5 +60,34 @@ class TestKeys(unittest.TestCase):
         self.assertEqual(ICHIMOKU_ACCOUNT, "kr_ichimoku")
 
 
+class TestSendEntryCharts(unittest.TestCase):
+    def test_sends_per_buy_and_isolates_errors(self):
+        import trading.strategy.kr_ichimoku_trade_once as job
+        from unittest import mock
+        bars = [(date(2026, 7, 1), 1, 1, 1, 1)]
+        buy_bars = [("005930", bars), ("000660", bars), ("035420", bars)]
+
+        def fake_chart(b, market, symbol, name):
+            if symbol == "000660":
+                raise ValueError("render 실패")     # 한 종목 실패 → 격리, 나머지 계속
+            return (b"png", f"{symbol} 캡션")
+
+        with mock.patch("common.symbol_chart.chart_for_symbol", side_effect=fake_chart), \
+             mock.patch("common.stock_names.fetch_all", return_value={"KR": [], "US": []}), \
+             mock.patch.object(job.notify_telegram, "send_photo", return_value=True) as sp:
+            job.send_entry_charts(buy_bars)
+
+        self.assertEqual(sp.call_count, 2)              # 실패한 000660 제외 2건
+        caps = [c.args[1] for c in sp.call_args_list]
+        self.assertTrue(all(c.startswith("🟢 [KR 일목 매수]") for c in caps))
+
+    def test_empty_is_noop(self):
+        import trading.strategy.kr_ichimoku_trade_once as job
+        from unittest import mock
+        with mock.patch.object(job.notify_telegram, "send_photo") as sp:
+            job.send_entry_charts([])
+        sp.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
