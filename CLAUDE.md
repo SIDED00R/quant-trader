@@ -25,4 +25,4 @@
 
 ## 검증
 
-변경 후 최소: `python -m pytest batch/backtest/tests/ -q` 통과 + 영향 모듈 import 확인 + (인프라 변경 시) `docker compose config`.
+변경 후 최소: `python -m pytest tests/ -q` 통과 + 영향 모듈 import 확인 + (인프라 변경 시) `docker compose config`.

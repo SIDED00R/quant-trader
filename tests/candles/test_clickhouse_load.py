@@ -5,7 +5,7 @@ from datetime import timezone
 
 from batch.backtest import csv_to_clickhouse as c2c
 from batch.backtest.datasource import load_clickhouse_candles
-from batch.backtest.tests.test_upbit_candles import _write
+from tests.candles.test_upbit_candles import _write
 
 
 class _FakeCH:
@@ -20,7 +20,7 @@ class TestCsvToClickhouse(unittest.TestCase):
     def test_rows_parse_ohlcv_and_utc_window(self):
         with tempfile.TemporaryDirectory() as d:
             # ts_ms=60000 → 1970-01-01T00:01:00 UTC, close=100
-            from batch.backtest.tests.test_upbit_candles import _write_rows
+            from tests.candles.test_upbit_candles import _write_rows
             _write_rows(d, "KRW-BTC", 1, [[60000, "99", "110", "98", "100", "5", "x"]])
             from batch.backtest.upbit_candles import cache_path
             rows = list(c2c._rows(cache_path(d, "KRW-BTC", 1), "KRW-BTC"))

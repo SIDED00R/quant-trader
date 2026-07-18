@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install -q -r requirements.txt -r requirements-ml.txt pytest
-      - run: python -m pytest batch/backtest/tests/ -q
+      - run: python -m pytest tests/ -q
       - name: import 스윕 + 프로덕션 경계 검사
         run: |
           python - <<'EOF'
