@@ -2,7 +2,7 @@
 
 pykrx는 import 시점에 KRX_ID/KRX_PW로 로그인하므로, 이 모듈이 pykrx import 전에 .env를 로드한다.
 KRX 수집기(krx·krx_bulk·kr_index_membership)는
-`from batch.data._krx_session import stock, require_login`으로 import해 이 순서를 보장받는다
+`from batch.rawdata._krx_session import stock, require_login`으로 import해 이 순서를 보장받는다
 (각 수집기가 dotenv·pykrx를 직접 import하지 않는다). 세션은 1시간 만료 후 자동 재로그인.
 """
 from dotenv import load_dotenv

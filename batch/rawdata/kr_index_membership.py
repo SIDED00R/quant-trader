@@ -3,10 +3,10 @@
 KOSPI200(1028)·KOSDAQ150(2203)의 시점별 구성종목을 날짜 그리드(기본 월별)로 스냅샷,
 연속 스냅샷 diff로 멤버십 구간·편입편출 이벤트를 만든다. source='KRX'.
 
-⚠ pykrx 로그인·.env 선로드는 batch.data._krx_session이 일원화(거기서 stock·require_login import).
+⚠ pykrx 로그인·.env 선로드는 batch.rawdata._krx_session이 일원화(거기서 stock·require_login import).
 한계: 변경 시점 해상도 = 샘플링 주기(기본 월, US fja05680의 정확일과 달리 근사). --freq로 조절.
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.kr_index_membership [--start 2018-01-01] [--freq BMS]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.kr_index_membership [--start 2018-01-01] [--freq BMS]
 """
 import argparse
 import sys
@@ -15,7 +15,7 @@ from datetime import date
 
 import pandas as pd
 
-from batch.data._krx_session import require_login, stock
+from batch.rawdata._krx_session import require_login, stock
 from common.clickhouse_client import create_client
 
 _INDICES = {"KOSPI200": "1028", "KOSDAQ150": "2203"}

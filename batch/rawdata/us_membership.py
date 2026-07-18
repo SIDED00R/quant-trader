@@ -3,7 +3,7 @@
 생존편향 부분 해결(시점별 소속) + add/drop 이벤트 신호. S&P500은 PIT 정확(fja05680/sp500),
 NASDAQ-100 PIT는 무료 정형소스 부재 → 현재구성만(근사, 한계 명시). 재실행 멱등.
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.us_membership
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.us_membership
 """
 import csv
 import io

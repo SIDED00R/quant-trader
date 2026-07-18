@@ -5,7 +5,7 @@
 한눈에 보여주고, 임계 초과 시 종료코드로 알린다. maintenance_once의 마지막 스텝으로 배선 →
 임계(critical) 테이블이 비거나 크게 낡으면 유지보수 리포트가 🔴로 뜬다. 읽기전용(SELECT만).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.verify_freshness [--strict] [--notify]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.jobs.verify_freshness [--strict] [--notify]
 """
 import argparse
 import sys

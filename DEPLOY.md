@@ -51,7 +51,7 @@
   printf 'TOSS_CLIENT_ID=...\nTOSS_CLIENT_SECRET=...\n' | gcloud secrets create toss-env --data-file=-
   gcloud secrets add-iam-policy-binding toss-env --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"
   ```
-- **DART 시크릿(`dart-env`)**: 데이터 유지보수(`batch.data.maintenance_once`)가 DART OpenAPI(`kr_fundamentals`)를 호출하므로 toss-env와 동일 패턴으로 생성한다.
+- **DART 시크릿(`dart-env`)**: 데이터 유지보수(`batch.jobs.maintenance_once`)가 DART OpenAPI(`kr_fundamentals`)를 호출하므로 toss-env와 동일 패턴으로 생성한다.
   ```bash
   printf 'DART_API_KEY=...\n' | gcloud secrets create dart-env --data-file=-
   gcloud secrets add-iam-policy-binding dart-env --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"
@@ -63,7 +63,7 @@
   for s in krx-env fred-env; do gcloud secrets add-iam-policy-binding $s --member="serviceAccount:<매매 VM SA>" --role="roles/secretmanager.secretAccessor"; done
   ```
   **KRX 초회 선시딩(1회)**: 프로드 테이블(stock_investor_flow·stock_foreign_holding·stock_short KR)이 비어 있으면 월간 증분(`krx.py`)이 raise한다(암묵 수시간 per-symbol 전량 백필 차단). by-date 고속 수집기로 1회 시딩 후 증분에 맡긴다:
-  `docker compose --profile trade run --rm maintenance-once python -m batch.data.krx_bulk --start 2018-01-01`  *(분 단위·by-date 8콜/일. 주의: bulk는 수급 3분류(외국인·기관합계·연기금)만 — 이후 월간 증분(krx.py)은 11분류 원본 수집)*
+  `docker compose --profile trade run --rm maintenance-once python -m batch.rawdata.krx_bulk --start 2018-01-01`  *(분 단위·by-date 8콜/일. 주의: bulk는 수급 3분류(외국인·기관합계·연기금)만 — 이후 월간 증분(krx.py)은 11분류 원본 수집)*
 - **정기 데이터 유지보수(`maintenance-once`, #204)**: 매매 전 증분 갱신(14일)이 다루지 못하는 수정주가 기준 재조정·분기 공시 반영을 매월 첫 토요일 04:00 UTC에 1회 실행한다(활성 유니버스 일봉 선별 재백필(재조정/데이터갭 종목만) + EDGAR·13F·SIC·DART 수집기 재실행 + **연구 데이터 지속 수집**: KRX 수급·공매도·외국인보유(증분)·KR/US 지수 PIT 멤버십·FRED 매크로·KR 상폐 메타 — 모델 미사용이어도 재사용 자산으로 축적, 수집기별 0행 가드로 조용한 실패 차단). 단계별 격리 + 텔레그램 통보.
 - **원시 틱 TTL 180일 — 기존(라이브) 테이블 1회 ALTER 런북**: 스키마의 TTL은 신규 설치 전용(`db/clickhouse_schema.sql` 주석 — init_db가 매 부팅 재실행하므로 ALTER를 스키마에 넣으면 매번 재물질화). 수집 VM에 1회 적용:
   ```bash
@@ -228,7 +228,7 @@ startup 분기표: **04·05→유지보수(토·1~7일 가드) / 06·07→KR / 1
   rm gh-push-key gh-push-key.pub
   ```
   기존 읽기 키(`github-deploy-key`, clone/fetch용)와 **분리** — 쓰기 키는 push 스텝에서만 사용(유출 반경 최소화).
-- **환율**: '전체(KRW 환산)' 시리즈용 FRED usdkrw는 코인 데일리 잡이 `batch.data.fred`로 일 1회 갱신(`FRED_API_KEY`=기존 `fred-env` 시크릿, 실패 비치명 — 직전 환율 캐리).
+- **환율**: '전체(KRW 환산)' 시리즈용 FRED usdkrw는 코인 데일리 잡이 `batch.rawdata.fred`로 일 1회 갱신(`FRED_API_KEY`=기존 `fred-env` 시크릿, 실패 비치명 — 직전 환율 캐리).
 - **텔레그램 사진**: 같은 곡선을 코인 데일리 잡이 PNG로 렌더해 텔레그램 사진 1장/일 발송(`common/chart/equity_chart_telegram`, 스위퍼 재실행은 trade_once의 '이미 실행됨' 가드가 차단) — VM을 켜지 않고도 자산 흐름 확인.
 - **확인**: 잡 후 `assets` 브랜치 커밋 1개 + README 이미지 갱신. 렌더/발행 로그는 VM `/var/log/equity-chart.log`(`EQUITY_CHART_PUBLISHED` / `EQUITY_CHART_PUSH_FAILED(비치명)`).
 

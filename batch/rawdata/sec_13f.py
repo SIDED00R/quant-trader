@@ -5,7 +5,7 @@ FIGI→CUSIP 역추적 → CUSIP 집합(CUSIP은 구분기에도 항상 존재, 
 CUSIP로 스트리밍 필터 후 집계: 보유기관수(distinct accession)·총주식수(SH)·총평가액. 옵션(PUTCALL) 제외.
 주의: VALUE 단위가 2023Q1부터 천$→$ 변경 → total_shares·num_holders가 robust 신호(VALUE는 보조).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.sec_13f [--start-year 2019]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.sec_13f [--start-year 2019]
 """
 import argparse
 import io

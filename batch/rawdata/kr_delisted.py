@@ -8,7 +8,7 @@
 ⚠ FDR는 data.krx.co.kr 스크레이핑이라 깨지기 쉬움 — 라이브러리 최신 유지. 전체 시세 백필은
 종목당 HTTP 호출이라 수천종목 = 장시간(일회성). 메타만은 빠름(목록 1콜).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.kr_delisted [--limit N] [--no-prices]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.kr_delisted [--limit N] [--no-prices]
 """
 import argparse
 import sys

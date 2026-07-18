@@ -166,7 +166,7 @@
   - [x] 피처 배선 `kr_microstructure.py` + `dataset.py` KR경로 + IC/ablation — #156 / **PR #157**
   - [x] 데이터 적재: KR 미시구조 **2019-05~2026-06 (7년)·344종목**(수급 157만행), DART 펀더 344종목
   - **견고 결론**: KR OHLCV 0.26% → +펀더+미시 **1.21% OOF Rank IC, LS_Sharpe 1.03→1.34**. 방향 일관 양(+)이나 **NW_t~1.0(강≥2 미달)** — KR은 구조적 약신호(US 3.4~3.8% 대비). 공매도 단변량 −7.4%는 full-sample·금지레짐 효과.
-- [x] **PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼(`_krx_session.py`)로 중복 통합 ②README `batch/data` 목록 reconcile(#200에서 완료).
+- [x] **PR 4개 리뷰·머지** — 스택 순서 **#151 → #155**, #153·#157 독립. 머지 후: ①공용 KRX 세션헬퍼(`_krx_session.py`)로 중복 통합 ②README `batch/rawdata` 목록 reconcile(#200에서 완료).
 - [x] **공매도 금지 레짐 분리 검증** — 신호 실재하나 챔피언(OHLCV+DART)에 흡수·증분 0 → **보류 확정** (`docs/ml_progress.md` §7 task2).
 - [x] KR 챔피언 피처셋 확정 = **OHLCV+DART**(macro·미시 제외, 1.34%/NW_t 1.1) + `baseline_lgbm KR` 기본 반영(플래그 없음=챔피언) (`docs/ml_progress.md` task3a).
 - [ ] (후속) **생존편향 통제**(탈락·상폐 종목 가격 적재) — 절대 IC 과대의 본질, 별도 트랙.

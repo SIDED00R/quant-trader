@@ -3,7 +3,7 @@
 전 종목 공통 레짐 피처(금리·수익률곡선·VIX·환율·유가). 휴일은 전일캐리(ffill).
 FRED_API_KEY 필요(.env). 재실행 멱등(ReplacingMergeTree) → 일별 증분은 재실행만 하면 됨.
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.fred [--start 2018-01-01]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.fred [--start 2018-01-01]
 """
 import argparse
 import sys

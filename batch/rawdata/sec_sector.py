@@ -3,7 +3,7 @@
 산업모멘텀(indmom, GKX top-7)·sector-neutral 피처용. SIC 4자리 + 2자리 major group(sector2).
 캐시(sic_map.json). 재실행 멱등.
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.sec_sector
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.sec_sector
 """
 import sys
 import time

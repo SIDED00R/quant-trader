@@ -20,34 +20,34 @@ from pathlib import Path
 
 from batch.candles import selective_stock_backfill
 from batch.candles.refresh_stock_daily import alive_symbols
-from batch.data import (earnings, factor_returns, finra_short, fundamentals,
-                        insider, kr_fundamentals, sec_13f, sec_sector,
-                        verify_freshness)
+from batch.jobs import verify_freshness
+from batch.rawdata import (earnings, factor_returns, finra_short, fundamentals,
+                        insider, kr_fundamentals, sec_13f, sec_sector)
 from common import notify_telegram
 
 
 def _krx_flow_step() -> int:
-    from batch.data import krx                      # 지연 import — pykrx가 import 시 KRX 로그인
+    from batch.rawdata import krx                      # 지연 import — pykrx가 import 시 KRX 로그인
     return krx.main([])                             # --start 미지정 = 증분(적재 최신일−7일)
 
 
 def _kr_membership_step() -> int:
-    from batch.data import kr_index_membership      # 지연 import — 위와 동일
+    from batch.rawdata import kr_index_membership      # 지연 import — 위와 동일
     return kr_index_membership.main([])             # 월별 그리드 전체 재도출(저렴·멱등)
 
 
 def _fred_step() -> int:
-    from batch.data import fred                     # 지연 import — 무거운 의존 격리(일관성)
+    from batch.rawdata import fred                     # 지연 import — 무거운 의존 격리(일관성)
     return fred.main([])                            # 소량(9시리즈)이라 전량 재수집·멱등
 
 
 def _kr_delisted_step() -> int:
-    from batch.data import kr_delisted              # 지연 import — FDR
+    from batch.rawdata import kr_delisted              # 지연 import — FDR
     return kr_delisted.main(["--no-prices"])        # 메타만(상폐 OHLCV 백필은 수동 1회성)
 
 
 def _us_membership_step() -> int:
-    from batch.data import us_membership          # 지연 import — 일관성(경량·키리스)
+    from batch.rawdata import us_membership          # 지연 import — 일관성(경량·키리스)
     return us_membership.main([])
 
 

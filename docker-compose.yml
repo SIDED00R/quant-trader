@@ -97,8 +97,8 @@ x-batch-trade: &batch-trade
     TELEGRAM_TARGET: ${TELEGRAM_TARGET:-me}
   volumes:                          # 참조캐시·분기 zip 영속 — 월간 콜드 스타트 방지(#218).
     - refcache:/app/batch/.refcache             # cusip_map·corp_map·sic_map (불변 참조)
-    - cache13f:/app/batch/data/.13f_cache       # 13F 분기 zip (확정분기 불변)
-    - insidercache:/app/batch/data/.insider_cache
+    - cache13f:/app/batch/rawdata/.13f_cache       # 13F 분기 zip (확정분기 불변)
+    - insidercache:/app/batch/rawdata/.insider_cache
     # .edgar_cache(companyfacts)·.dart_cache(보고서)는 콜드 — SEC 조건부GET 미지원·정정 반영 위해 매월 재수신
 
 services:
@@ -387,7 +387,7 @@ services:
   # ── 온디맨드 데이터 유지보수 (매월 첫 토요일 04:00 UTC — 선별 재백필+분기 수집기+연구 수집기(KRX 증분·FRED·PIT 멤버십·상폐 메타), #204) ──
   maintenance-once:
     <<: *batch-trade
-    command: python -m batch.data.maintenance_once
+    command: python -m batch.jobs.maintenance_once
 
   # ── 자산 차트 렌더 (profile: trade — 매매 잡 후 startup이 실행, charts/*.svg 생성 → assets 브랜치 발행) ──
   # 앱 이미지(scripts/ 포함 — batch 이미지엔 없음). DB=매매 VM 로컬(127.0.0.1), 출력은 호스트 ./charts 바인드.

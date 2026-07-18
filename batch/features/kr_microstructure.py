@@ -41,7 +41,7 @@ def daily_kr_microstructure_from_store(panel: pd.DataFrame, log=print) -> pd.Dat
     hold = _query(ch, "SELECT date, symbol, holding_ratio FROM stock_foreign_holding FINAL")
     short = _query(ch, "SELECT date, symbol, short_balance_ratio, short_volume_ratio FROM stock_short FINAL WHERE market = 'KR'")
     if flow.empty and hold.empty and short.empty:
-        log("[kr-micro] KRX 테이블 비어있음 — batch.data.krx 먼저 실행")
+        log("[kr-micro] KRX 테이블 비어있음 — batch.rawdata.krx 먼저 실행")
         return pd.DataFrame()
 
     flow_by = {}

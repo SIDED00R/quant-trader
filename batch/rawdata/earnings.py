@@ -5,7 +5,7 @@ form=='8-K' & items에 '2.02' 포함 필터 → filingDate가 실제 발표일. 
 용도: 실적 전후 매매 마스킹(갭 리스크) + 실적발표후표류(PEAD) 이벤트. 재실행 멱등(ReplacingMergeTree).
 recent 블록(최근 ~1년)만 조회 — 월간 재실행으로 히스토리 누적. KR(DART rcept_dt)은 추후 확장(TODO).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.earnings
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.earnings
 """
 import argparse
 import sys

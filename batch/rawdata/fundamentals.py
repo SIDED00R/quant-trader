@@ -4,7 +4,7 @@ vintage 보존(정정공시 대비 filed_date별 모든 값 저장) → point-in
 계정: shares·equity·assets(instant) + net_income·revenue·op_cashflow(flow, duration 보존).
 재실행 멱등(ReplacingMergeTree). 일별 증분: 그냥 재실행하면 새 공시가 추가된다.
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.fundamentals [--fetch]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.fundamentals [--fetch]
   --fetch 없으면 캐시된 companyfacts만 적재(다른 작업과 SEC rate 충돌 회피).
 """
 import argparse

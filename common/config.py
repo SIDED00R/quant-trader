@@ -66,8 +66,8 @@ TOSS_CLIENT_SECRET = os.getenv("TOSS_CLIENT_SECRET", "")
 TOSS_REST_BASE = "https://openapi.tossinvest.com"
 
 # ── 연구 데이터 API 키 (batch 수집기 — 미설정이면 각 수집기가 실행 시점에 raise) ──
-FRED_API_KEY = os.getenv("FRED_API_KEY", "")   # 매크로 시계열(batch/data/fred.py)
-DART_API_KEY = os.getenv("DART_API_KEY", "")   # KR 펀더멘털(batch/data/kr_fundamentals.py)
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")   # 매크로 시계열(batch/rawdata/fred.py)
+DART_API_KEY = os.getenv("DART_API_KEY", "")   # KR 펀더멘털(batch/rawdata/kr_fundamentals.py)
 
 # ── 한국투자증권 KIS (모의 체결 브로커 — KR+US 통합) ──
 # 계좌 1개로 국내/해외 모의 체결. OAuth2 access_token(약 24h). 토큰 재발급 횟수 제한 있어 캐시 필수.

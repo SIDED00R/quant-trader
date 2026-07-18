@@ -5,7 +5,7 @@ SEC Form 3/4/5의 XML 기재부를 평탄화한 분기 zip(SUBMISSION/REPORTINGO
 비파생(NONDERIV) 거래만 적재 — 공개시장 매수(P)/매도(S)가 핵심 내부자 신호. filed_date로 PIT 게이팅.
 키없음(SEC User-Agent 예절만). 재실행 멱등(ReplacingMergeTree). 헤더명 기반 파싱(컬럼 순서 변동 견고).
 
-실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.insider [--start-year 2019]
+실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.insider [--start-year 2019]
 """
 import argparse
 import io
