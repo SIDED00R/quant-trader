@@ -16,7 +16,7 @@ from datetime import date
 import httpx
 
 from common.clickhouse_client import create_client
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 
 _BASE = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp"
 _FILES = [
@@ -77,7 +77,7 @@ def _parse(csv_text: str) -> list:
 
 def collect(log=print) -> int:
     rows: list = []
-    with httpx.Client(timeout=60, headers={"User-Agent": SEC_USER_AGENT},
+    with httpx.Client(timeout=60, headers=SEC_UA_HEADERS,
                       follow_redirects=True) as c:
         for url in _FILES:
             csv_text = _download_csv(url, c)

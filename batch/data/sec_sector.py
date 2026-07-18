@@ -5,17 +5,15 @@
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.data.sec_sector
 """
-import os
 import sys
 import time
 
 import httpx
-from dotenv import load_dotenv
 
-load_dotenv()
 from batch.features import edgar
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
 _CACHE = refcache_path("sic_map.json")   # 참조캐시(영속 볼륨) — SIC는 사실상 불변(#218)
@@ -49,7 +47,7 @@ def main(argv=None) -> int:
         pass
     ch = create_client()
     us = get_us_symbols(ch)
-    with httpx.Client(timeout=20, headers=edgar._UA) as c:
+    with httpx.Client(timeout=20, headers=SEC_UA_HEADERS) as c:
         sic = fetch_sic(us, c)
     rows = [[t, v["sic"], v["desc"], v["sic"][:2]] for t, v in sic.items() if v and v.get("sic")]
     if not rows:

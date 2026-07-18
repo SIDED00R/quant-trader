@@ -14,12 +14,11 @@ from datetime import date
 
 import httpx
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
 from batch.features import edgar
 from common.cache import load_json
 from common.clickhouse_client import create_client
+from common.constants import SEC_UA_HEADERS
 from common.symbols import get_us_symbols
 
 _CONCEPTS = {
@@ -51,7 +50,7 @@ def store_us_fundamentals(symbols=None, fetch: bool = False, log=print):
     if symbols is None:
         symbols = get_us_symbols(ch)
     nsym, total = 0, 0
-    with httpx.Client(timeout=30, headers=edgar._UA) as hc:
+    with httpx.Client(timeout=30, headers=SEC_UA_HEADERS) as hc:
         for sym in symbols:
             cik = cikmap.get(sym.upper())
             if not cik:

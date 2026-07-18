@@ -110,13 +110,32 @@
 ## 6단계 — 코인 마무리 & 성과 검증
 - [ ] 라이브 모의매매로 앙상블 vs 단일 SMA 성과 비교 (일정 기간 — **실제 시장 경과 필요**, 현재 CASH)
 - [x] 대시보드 성과 패널 — 실현손익·승률·거래수·수수료(`/performance` FIFO, `api/web`) #61
-- [x] 코인 단계 회고/문서화 (`BACKLOG.md` 회고 + `docs/model.md` 모델카드) #61
+- [x] 코인 단계 회고/문서화 (아래 회고 + `docs/model.md` 모델카드) #61
+
+### 코인 1차 라이브 완료 회고 (2026-06-20, 구 BACKLOG.md에서 이관)
+
+**달성**: 과매매로 −62%(1분봉 SMA)였던 전략을 **일봉 추세 앙상블(저회전)** 로 재설계해 walk-forward에서
+유의한 OOS(Sharpe~1.47/PSR 1.0)까지 끌어올리고 **GCE VM에 라이브(모의) 배포**. 모델 출처 = `docs/model.md`.
+
+**핵심 교훈**
+- **과매매·수수료가 주범**(신호보다 타임프레임). 1분봉→일봉으로 거래 −99%, 수수료 자본 39%→2%대.
+- **표본 길이(T)가 유의성 병목** — 2년 DSR<0.95, 6.6년이라야 충족. 데이터 확보가 튜닝보다 효과적.
+- **per-fold 그리드 최적화=과적합** → 고정 파라미터 + 앙상블로 파라미터 리스크 분산.
+- **적대적 코드리뷰가 실수를 잡음** — walk-forward prime 오염(거짓 OOS −31.5%), bollinger σ=0 오매수, 부분매도 수수료 중복, 프로덕션의 backtest 의존(실배포 크래시).
+
+**남은 것(시간·인프라 의존)**
+- 라이브 모의 앙상블 vs 단일 SMA **실측 성과 비교** — 실제 시장 경과 필요(현재 CASH).
+- ~~5단계 Airflow 배치 DAG~~ — **폐기**(Cloud Scheduler 온디맨드로 대체). 채택 앙상블은 **고정 파라미터**라 "가중치 자동 재학습 루프" 자체가 현 설계엔 불요.
+- 스트리밍 경로(로컬 dev 전용 `disciplined` 계열)의 재시작 시 진입시각/쿨다운 복원은 인메모리 한계로 남음 — 라이브는 일배치(`trade_once`)라 무관.
+- 구 백로그의 "계정별 전략 선택 UI"·"잔고 비율 포지션 사이징"은 **폐기** — 라이브가 고정 앙상블 목표비중(+변동성 타게팅) 설계로 대체되어 불요.
+
+> 참고: 모의 자금 기준이며 수익 최적화가 목표가 아니라 Kafka 파이프라인 위에서 전략을 붙여보는 학습이 목적이다.
 
 ## 7단계 — 주식 토대
 > **완결** — 체결/계좌 모델·틱 수집기 완료. 키움 기반 매매 계획(단건 주문 왕복·FID 보정·유니버스 선정)은 **폐기**: 체결=KIS(`common/kis_*`), 유니버스=ML 동적 top-N.
 - [x] 키움 API 조사: REST/WebSocket API + 모의투자 계정 발급·인증 흐름 → `docs/kiwoom.md` (#102)
 - [x] `stock_ingester`: 키움 실시간 시세 → 신규 토픽 `stock.ticks` (코인 ingester 패턴 재사용) (#104 — kiwoom_client(토큰)+stock_kiwoom(WS LOGIN/REG/0B/PING echo)+stock_tick_clickhouse 싱크+config/compose/clickhouse. 실서버(모의) 검증 완료 — **아카이브 수집 전용으로 운영**, 매매 활용 계획은 폐기)
-- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/market_hours.py`(`asset_class`/`is_coin`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개.
+- [x] 주식 체결/계좌 모델 (#120/PR#121): ①정수단위(ROUND_DOWN+<1주 skip 로그)를 `backtest/engine` 입구에(`_adjust_qty`) ②신규 `common/market_hours.py`(`asset_class`/`is_stock`/`is_market_open` — 코인 항상 True, 국내주식 KRX 09:00–15:30 KST) ③매도 거래세 비대칭(`STOCK_SELL_TAX_RATE` 0.20%, **국내주식만** — 미국·코인=0, `backtest/fills.tax`+`account.apply_sell` proceeds−fee−tax, `ClosedTrade.sell_tax`). **라이브-백테스트 수학 미러링 계약 준수**, 코인 경로 무영향(회귀 테스트 고정), 단위테스트 15개.
 
 ## 8단계 — 주식 백테스트·라이브 (ML 스코어러로 전환)
 - [x] 주식용 백테스트 하니스 지원 (#122: `datasource`/`run.py --ch-table`·`metrics.total_tax`+리포트 매도세; #124: `walkforward --ch-table stock_candles_1d`+OOS 매도세 집계) — 기준치 선별·유니버스는 ML 트랙(GBDT 챔피언·동적 top-N)으로 대체

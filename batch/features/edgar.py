@@ -17,11 +17,10 @@ import time
 
 import httpx
 from common.cache import dump_json, load_json
-from common.constants import SEC_USER_AGENT
+from common.constants import SEC_UA_HEADERS
 import numpy as np
 import pandas as pd
 
-_UA = {"User-Agent": SEC_USER_AGENT}
 _CACHE = os.path.join(os.path.dirname(__file__), ".edgar_cache")
 EPS = 1e-12
 
@@ -37,7 +36,7 @@ _REV = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
 
 @functools.lru_cache(maxsize=1)   # 한 실행 내 1회만 다운로드(fundamentals·sec_sector·earnings 공유 — #218)
 def ticker_cik_map() -> dict:
-    with httpx.Client(timeout=30, headers=_UA) as c:
+    with httpx.Client(timeout=30, headers=SEC_UA_HEADERS) as c:
         j = c.get("https://www.sec.gov/files/company_tickers.json").json()
     return {v["ticker"].upper(): str(v["cik_str"]).zfill(10) for v in j.values()}
 

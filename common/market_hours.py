@@ -38,10 +38,6 @@ def asset_class(symbol: str) -> str:
     return "STOCK_US"           # 그 외 영문 티커 AAPL
 
 
-def is_coin(symbol: str) -> bool:
-    return asset_class(symbol) == "COIN"
-
-
 def is_stock(symbol: str) -> bool:
     return asset_class(symbol) in ("STOCK_KR", "STOCK_US")
 
