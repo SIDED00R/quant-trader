@@ -31,5 +31,29 @@ class TestResolve(unittest.TestCase):
         self.assertIsNone(resolve(empty, "삼성전자"))                 # 사전 없고 티커도 아님
 
 
+# KR 우선 + 통칭/영문 별칭 (회귀: /chart nc 가 NACCO(US) 아닌 NCsoft(KR)여야 함)
+COLLIDE = {
+    "KR": [("036570", "NC"), ("005930", "삼성전자")],   # 036570 상장명이 'NC'
+    "US": [("NC", "NACCO Industries Inc"), ("AAPL", "Apple Inc.")],
+}
+
+
+class TestKrFirstAndAliases(unittest.TestCase):
+    def setUp(self):
+        self.idx = build_index(COLLIDE)
+
+    def test_kr_name_beats_us_ticker(self):
+        # 'nc' = US 티커(NACCO)이자 KR 상장명(036570) — KR 우선이라 KR로 해석
+        self.assertEqual(resolve(self.idx, "nc"), ("KR", "036570", "NC"))
+        self.assertEqual(resolve(self.idx, "NC"), ("KR", "036570", "NC"))
+
+    def test_us_only_ticker_preserved(self):
+        self.assertEqual(resolve(self.idx, "aapl"), ("US", "AAPL", "Apple Inc."))
+
+    def test_colloquial_alias(self):
+        self.assertEqual(resolve(self.idx, "엔씨소프트"), ("KR", "036570", "NC"))
+        self.assertEqual(resolve(self.idx, "samsung"), ("KR", "005930", "삼성전자"))
+
+
 if __name__ == "__main__":
     unittest.main()
