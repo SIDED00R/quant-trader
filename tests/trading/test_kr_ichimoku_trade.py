@@ -74,12 +74,35 @@ class TestSendEntryCharts(unittest.TestCase):
 
         with mock.patch("common.chart.symbol_chart.chart_for_symbol", side_effect=fake_chart), \
              mock.patch("common.marketdata.stock_names.fetch_all", return_value={"KR": [], "US": []}), \
+             mock.patch.object(job, "daily_ohlc", return_value={}), \
              mock.patch.object(job.notify_telegram, "send_photo", return_value=True) as sp:
             job.send_entry_charts(buy_bars)
 
         self.assertEqual(sp.call_count, 2)              # 실패한 000660 제외 2건
         caps = [c.args[1] for c in sp.call_args_list]
         self.assertTrue(all(c.startswith("🟢 [KR 일목 매수]") for c in caps))
+
+    def test_chart_uses_deep_history_with_fallback(self):
+        # 차트용 깊은 재조회(KR_FETCH_DAYS)가 있으면 그걸 쓰고, 없는 종목은 신호용 rows 폴백
+        import trading.strategy.runners.kr_ichimoku_trade_once as job
+        from unittest import mock
+        shallow = [(date(2026, 7, 1), 1, 1, 1, 1)]
+        deep = [(date(2020, 1, 2), 1, 1, 1, 1), (date(2026, 7, 1), 1, 1, 1, 1)]
+        seen = {}
+
+        def fake_chart(b, market, symbol, name):
+            seen[symbol] = b
+            return (b"png", f"{symbol} 캡션")
+
+        with mock.patch("common.chart.symbol_chart.chart_for_symbol", side_effect=fake_chart), \
+             mock.patch("common.marketdata.stock_names.fetch_all", return_value={"KR": [], "US": []}), \
+             mock.patch.object(job, "daily_ohlc", return_value={"005930": deep}) as do, \
+             mock.patch.object(job.notify_telegram, "send_photo", return_value=True):
+            job.send_entry_charts([("005930", shallow), ("000660", shallow)])
+
+        self.assertIs(seen["005930"], deep)
+        self.assertIs(seen["000660"], shallow)
+        self.assertEqual(do.call_args.args[:2], ("KR", ["005930", "000660"]))
 
     def test_empty_is_noop(self):
         import trading.strategy.runners.kr_ichimoku_trade_once as job
