@@ -75,7 +75,7 @@
   # 테이블 나이 < 180일인 지금 실행하면 만료 0행이라 재물질화 부하도 사실상 없음.
   # (매매 VM 로컬 ticks 테이블은 비어 있어 무관 — 다음 재생성 시 스키마 TTL이 자연 적용)
   ```
-- **수집 VM 헬스체크(`infra/collector-healthcheck.sh`) 활성화**: cron(30분)이 디스크(≥80%)·필수 컨테이너 다운·틱 유입 정지(코인 24/7, 주식 KRX 장중)를 검사해 텔레그램 통보(검사키별 6h 쿨다운, 회복 시 재무장). 1회 셋업:
+- **수집 VM 헬스체크(`infra/collector-healthcheck.sh`) 활성화**: cron(30분)이 디스크(≥80%)·필수 컨테이너 다운·틱 유입 정지(코인 24/7, 주식 KRX 장중)를 검사해 텔레그램 통보(검사키별 6h 쿨다운, 회복 시 재무장). **코인 틱 정지 시 kafka+스트림 자동 재기동**(`RESTART_COOLDOWN_SEC` 기본 3h 게이트, 마커 선기록으로 루프 방지, 재기동 결과 텔레그램 통보) — 2026-07-18 kafka 행(hang) 38h 무복구 사고 재발 방지. 자동복구 드라이런: 한산한 시간대에 `sudo COIN_STALE_MAX_SEC=1 RESTART_COOLDOWN_SEC=0 bash infra/collector-healthcheck.sh`(실제 재기동 1회 발생 주의). 1회 셋업:
   ```bash
   # ① 수집 VM SA에 telegram-env 접근 허용(주입은 startup이 수행)
   gcloud secrets add-iam-policy-binding telegram-env --member="serviceAccount:<수집 VM SA>" --role="roles/secretmanager.secretAccessor"

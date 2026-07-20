@@ -2,7 +2,8 @@
 
 연결 직후 LOGIN(접근토큰) → REG(0B 주식체결) 등록, 서버 PING은 받은 그대로 echo해
 keepalive를 유지한다. REAL 메시지의 FID values를 Tick으로 정규화해 발행하고,
-끊기면 지수 백오프로 재연결한다(코인 ingester/upbit_ws.py 패턴 미러).
+끊기면 지수 백오프로 재연결한다(코인 ingester/upbit_ws.py 패턴 미러 — 배달 워치독 포함:
+성공 배달이 DELIVERY_STALL_SEC 동안 없으면 SystemExit → docker 재시작 위임).
 출처: docs/kiwoom.md §3 (WebSocket LOGIN/REG/0B/PING).
 """
 import asyncio
@@ -23,6 +24,7 @@ from common.config import (
 )
 from common.constants import HTTP_MAX_BACKOFF
 from common.kafka_client import create_producer
+from common.kafka_watchdog import DELIVERY_STALL_SEC, DeliveryWatchdog
 from common.broker.kiwoom_client import get_access_token
 from common.schemas import Tick
 
@@ -95,20 +97,22 @@ def to_tick(item: dict) -> Tick:
     )
 
 
-def _on_delivery(err, msg) -> None:
-    if err is not None:
-        print(f"[stock-ingester] delivery failed: {err}")
-
-
 async def run() -> None:
     # 자격증명 미설정 시: 에러 재시도 루프로 churn하지 않고 조용히 idle.
-    # (코인 전용 배포에서 stock-ingester가 함께 떠도 무해 — AUTH_ENABLED와 동일한 '키 있으면 활성' 관례.)
+    # (코인 전용 배포에서 stock-ingester가 함께 떠도 무해 — AUTH_ENABLED와 동일한 '키 있으면 활성' 관례.
+    #  idle 모드는 produce가 없어 워치독(pending=0)도 발화하지 않는다.)
     if not (KIWOOM_APP_KEY and KIWOOM_APP_SECRET):
         print("[stock-ingester] KIWOOM_APP_KEY/SECRET 미설정 — 주식 수집 비활성(idle). .env 설정 후 재시작.")
         while True:
             await asyncio.sleep(3600)
 
     producer = create_producer()
+    watchdog = DeliveryWatchdog()
+
+    def _on_delivery(err, msg) -> None:
+        watchdog.record_delivery(err)
+        if err is not None:
+            print(f"[stock-ingester] delivery failed: {err}")
     print(
         f"[stock-ingester] connecting Kiwoom | kafka={KAFKA_BOOTSTRAP_SERVERS} ws={KIWOOM_WS_URL}"
     )
@@ -157,13 +161,22 @@ async def run() -> None:
                             except (KeyError, ValueError, TypeError) as e:
                                 print(f"[stock-ingester] skip bad real: {e}")
                                 continue
-                            producer.produce(
-                                TOPIC_STOCK_TICKS,
-                                key=tick.symbol.encode(),
-                                value=tick.to_json(),
-                                on_delivery=_on_delivery,
-                            )
+                            try:
+                                producer.produce(
+                                    TOPIC_STOCK_TICKS,
+                                    key=tick.symbol.encode(),
+                                    value=tick.to_json(),
+                                    on_delivery=_on_delivery,
+                                )
+                                watchdog.record_produce()
+                            except BufferError:  # 로컬 큐 만원(브로커 장기 불능 극단) — 한 틱 드랍하고 배수 기회
+                                producer.poll(1.0)
+                                print("[stock-ingester] local queue full — tick dropped")
                             producer.poll(0)
+                            if watchdog.stalled():   # SystemExit은 아래 except에 안 잡히고 그대로 종료
+                                print(f"[stock-ingester] 성공 배달 {DELIVERY_STALL_SEC:.0f}s 없음"
+                                      f"(pending={watchdog.pending}) — 종료, docker 재시작에 복구 위임")
+                                raise SystemExit(1)
                             count += 1
                             if count % 50 == 0:
                                 print(
