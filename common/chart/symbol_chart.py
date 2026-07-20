@@ -8,6 +8,10 @@ from common.marketdata import ichimoku
 from common.chart.candle_chart import render_candle_chart
 
 KR_WEEKS, US_DAYS = 104, 130
+# KR 차트용 일봉 조회 깊이(캘린더일) — 표시 KR_WEEKS(104주) 전 구간에 구름을 그리려면
+# 일목 lookback 77주(선행B 52 + 선행이동 26 − 1)를 더한 181주 ≈ 1,270일 + 여유가 필요.
+# 호출부(차트봇·관심종목 푸시·일목 진입 차트)가 이 값으로 조회한다(단일 출처).
+KR_FETCH_DAYS = 1400
 
 
 def _cloud_state(sig: dict | None) -> str:

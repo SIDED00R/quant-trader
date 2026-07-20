@@ -67,18 +67,41 @@ class TestIchimokuLines(unittest.TestCase):
 
 
 class TestLatestSignal(unittest.TestCase):
+    # 진입은 신규 돌파 이벤트: 직전 완결봉이 구름 위가 아니었어야 한다(기돌파 상태 재진입 방지).
+    # 아래 6봉 케이스의 직전 봉(i=4) 구름 = [11, 11.75], 현재 봉(i=5) 구름상단 = 15.75.
     KW = dict(tenkan=2, kijun=3, senkou_b=4, disp=1)
+    H, L = [10, 11, 12, 13, 20, 14], [9, 10, 11, 12, 13, 13]
 
     def test_none_when_short_or_incomplete(self):
         self.assertIsNone(latest_signal(_bars([10], [5]), **self.KW))
         self.assertIsNone(latest_signal(_bars([10, 11, 12], [5, 6, 7]), **self.KW))  # 구름 미정의
 
-    def test_entry_true(self):
-        bars = _bars([10, 11, 12, 13, 20, 14], [9, 10, 11, 12, 13, 13], closes=[0, 0, 0, 0, 0, 25])
+    def test_entry_true_new_breakout_from_below(self):
+        # 직전 종가 0 = 구름(11~11.75) 아래 → 이번 봉 25 > 15.75 신규 돌파
+        bars = _bars(self.H, self.L, closes=[0, 0, 0, 0, 0, 25])
         sig = latest_signal(bars, exit_rule="tk_cross", **self.KW)
-        self.assertTrue(sig["entry"])       # close 25 > cloud_top AND 전환>기준
+        self.assertTrue(sig["entry"])       # close 25 > cloud_top AND 전환>기준 AND 직전 봉 구름 위 아님
         self.assertFalse(sig["exit"])
         self.assertGreater(sig["breakout_pct"], 0)
+
+    def test_entry_true_new_breakout_from_inside_cloud(self):
+        # 직전 종가 11.5 = 구름 안(11 < 11.5 <= 11.75) → 신규 돌파로 인정
+        bars = _bars(self.H, self.L, closes=[0, 0, 0, 0, 11.5, 25])
+        self.assertTrue(latest_signal(bars, exit_rule="tk_cross", **self.KW)["entry"])
+
+    def test_entry_false_when_already_above(self):
+        # 직전 종가 15 > 직전 구름상단 11.75 = 기돌파 상태 → 신규 아님(2026-07-20 71종목 사고 회귀 고정)
+        bars = _bars(self.H, self.L, closes=[0, 0, 0, 0, 15, 25])
+        sig = latest_signal(bars, exit_rule="tk_cross", **self.KW)
+        self.assertFalse(sig["entry"])
+        self.assertGreater(sig["breakout_pct"], 0)   # 상태값(구름 위)은 그대로 노출 — 판정만 이벤트
+
+    def test_entry_false_when_prev_cloud_undefined(self):
+        # 현재 봉 구름은 정의(i=4)지만 직전 봉(i=3) 구름 미정의 → 신규 판정 불가 → 진입 아님
+        bars = _bars(self.H[:5], self.L[:5], closes=[0, 0, 0, 0, 25])
+        sig = latest_signal(bars, exit_rule="tk_cross", **self.KW)
+        self.assertIsNotNone(sig)
+        self.assertFalse(sig["entry"])
 
     def test_exit_rule_divergence(self):
         # 종가는 구름 위(cloud 청산 미발동)지만 전환<기준(tk 청산 발동) — 두 규칙 분기

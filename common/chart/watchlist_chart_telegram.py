@@ -13,7 +13,7 @@ from datetime import date
 
 from common import notify_telegram
 from common.postgres_client import close_pool, open_pool, pool
-from common.chart.symbol_chart import chart_for_symbol
+from common.chart.symbol_chart import KR_FETCH_DAYS, chart_for_symbol
 
 MAX_SYMBOLS = 20
 STALE_DAYS = 7
@@ -49,7 +49,7 @@ def load_bars(ch, market: str, symbol: str) -> list:
         print(f"[watchlist-charts] {symbol} CH 조회 실패: {type(e).__name__}: {e}")
     if not (daily and (date.today() - daily[-1][0]).days <= STALE_DAYS):     # 없거나 낡음 → Toss 폴백
         from common.marketdata.toss_daily import fetch_daily
-        tr = fetch_daily(symbol, 1000 if market == "KR" else 220, log=lambda *a: None)
+        tr = fetch_daily(symbol, KR_FETCH_DAYS if market == "KR" else 220, log=lambda *a: None)
         if tr:
             daily = [(r[1].date(), r[2], r[3], r[4], r[5]) for r in tr]
     return daily
