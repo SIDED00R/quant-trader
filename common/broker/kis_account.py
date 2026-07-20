@@ -58,7 +58,7 @@ def _headers(tr_id: str) -> dict:
 
 
 def _get(path: str, tr_id: str, params: dict) -> dict:
-    acquire("kis", "rest")   # KIS REST 호출 한도(모의 5/s) 페이싱
+    acquire("kis", "rest")   # KIS REST 호출 한도(모의 실측 2/s) 페이싱
     body = get_json(f"{KIS_REST_BASE}{path}", params, headers=_headers(tr_id), timeout=BROKER_TIMEOUT)
     if str(body.get("rt_cd")) != "0":
         raise RuntimeError(f"KIS 조회 실패({tr_id}): {body.get('msg_cd')} {body.get('msg1')}")

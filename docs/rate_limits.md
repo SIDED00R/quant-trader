@@ -10,7 +10,7 @@
 | Upbit | (미사용) | 주문(order) | **8** | 200 | API Key | 공식 |
 | Upbit | 코인 데이터 | 주문 외 Exchange | **30** | 900 | API Key | 공식 |
 | Upbit | 코인 틱 | WebSocket | **5** (요청/연결) | — | IP | 공식 |
-| KIS | 주식 체결 | REST(모의) | **5** | — | appkey | 공식 |
+| KIS | 주식 체결 | REST(모의) | **2** | — | appkey | **실측**(공식 표기 5 — 아래 상세) |
 | KIS | 주식 체결 | REST(실전) | **20** | — | appkey | 공식 |
 | KIS | (미사용) | WebSocket | 등록 종목 수 제한(≈41) | — | 세션 | 보조 |
 | Toss | 주식 데이터 | AUTH | **5** | — | client | 관측 |
@@ -20,7 +20,7 @@
 | Kiwoom | 틱 아카이브 수집(매매 미채택) | WebSocket | 등록 제한 | — | 세션 | 보조 |
 | Telegram | 매매 알림 발송 | send(MTProto) | **1** | ~20(채팅당) | 계정/채팅 | 공식(보수) |
 
-> 통합 레이트리미터 기본값은 위 "초당" 열을 보수적으로 채택했다. KIS는 모의(5) 기준이며 실전 전환 시 `acquire("kis","rest", rate=20)`. Telegram은 매매 잡당 1건(하루 수 건)이라 1/s로 충분하며, 초과 시 서버가 FloodWait을 주고 `notify_telegram`이 흡수한다.
+> 통합 레이트리미터 기본값은 위 "초당" 열을 보수적으로 채택했다. KIS는 모의 실측(2) 기준이며 실전 전환 시 그룹 분리(아래 예시). Telegram은 매매 잡당 1건(하루 수 건)이라 1/s로 충분하며, 초과 시 서버가 FloodWait을 주고 `notify_telegram`이 흡수한다.
 
 ## 제공자별 상세
 
@@ -33,7 +33,9 @@
 - 출처: [업비트 Rate Limit 정책](https://docs.upbit.com/kr/reference/rate-limits)
 
 ### KIS 한국투자증권 (주식 — 체결)
-- **REST**: **모의 초당 5건 / 실전 초당 20건** (appkey 기준).
+- **REST**: 공식 표기 **모의 초당 5건 / 실전 초당 20건** (appkey 기준). 그러나 **모의 실효 한도는 실측 ~2건/s** — 2026-07-20 KR 리밸런싱에서 5/s 페이싱으로 주문 3/10건이 `EGW00201`("초당 거래건수를 초과하였습니다") 거부됨. 기본값은 실측 2를 쓴다.
+- **EGW00201은 HTTP 500으로 반환**된다(200 아님) — body의 msg_cd를 봐야 원인이 보인다. 게이트웨이 레이어 거부(업무서버 도달 전 = 주문 미접수)라 `kis_order`는 이 코드에 한해 백오프 재시도(총 3회)한다. 그 외 5xx/전송오류는 접수 여부 불명 → 무재시도(비멱등 보호).
+- **주문 1건 = REST 2콜**(hashkey + order) — 유효 호출량이 2배임을 유의.
 - 모의는 한도가 낮아 연속 호출(파라미터 최적화 등)엔 부적합 — 단건 조회/일배치엔 충분.
 - WebSocket은 별도 정책(등록 종목 수 제한 ≈41) — 본 프로젝트는 데이터를 토스로 받으므로 미사용.
 - 출처: [KIS API 유량제한 쓰로틀링](https://hky035.github.io/web/kis-api-throttling/), [초당 20건 제한 대응](https://tgparkk.github.io/robotrader/2025/10/09/robotrader-1-70stocks-problem.html)
@@ -60,10 +62,10 @@ from common import rate_limit
 rate_limit.acquire("toss", "MARKET_DATA_CHART")
 r = httpx.get(...)
 
-# KIS: 모의/실전 한도가 다름(5 vs 20). rate는 버킷 최초 생성 시에만 반영(first-wins)되므로,
+# KIS: 모의/실전 한도가 다름(실측 2 vs 공식 20). rate는 버킷 최초 생성 시에만 반영(first-wins)되므로,
 # 모드별로 group을 분리한다.
 rate_limit.acquire("kis", "rest-real" if not KIS_MOCK else "rest-mock",
-                   rate=20 if not KIS_MOCK else 5)
+                   rate=20 if not KIS_MOCK else 2)
 ```
 
 - **균등 페이싱(기본)**: `capacity` 기본값 1 → 버스트 없이 `rate`개/초로 고르게. 토큰버킷 `capacity=rate`면 고정 1초 윈도우 경계에서 최대 ~2×rate가 통과할 수 있어, 엄격 한도에선 순간 초과 위험 → 기본은 버스트 없음. 버스트가 필요하면 `TokenBucket(rate, capacity=...)`로 명시.
