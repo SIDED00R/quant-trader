@@ -18,8 +18,10 @@ _DEFAULT_RATES: dict[str, float] = {
     "upbit:quotation": 10,   # 시세, IP 기준 (분당 600)
     "upbit:order": 8,        # 주문, 키 기준 (분당 200)
     "upbit:exchange": 30,    # 주문 외 Exchange, 키 기준 (분당 900)
-    # KIS (공식): 모의 5 / 실전 20. 기본은 모의 — 실전은 acquire(..., rate=20).
-    "kis:rest": 5,
+    # KIS: 실전 20(공식) / 모의 2(실측 2026-07-20 — 5/s 페이싱에서 EGW00201 '초당 거래건수
+    # 초과' HTTP 500, 리밸런싱 주문 3/10건 거부). 기본은 모의 — 실전 전환 시 그룹 분리
+    # (rest-mock/rest-real, docs/rate_limits.md §KIS).
+    "kis:rest": 2,
     # Toss (관측/스펙): 그룹별. 정확값은 응답 X-RateLimit-* 헤더로 확인 권장.
     "toss:AUTH": 5,
     "toss:MARKET_DATA": 5,
