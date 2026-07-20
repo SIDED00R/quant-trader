@@ -1,7 +1,7 @@
 """프로듀서 배달 정체 워치독 (단일 책임: 'produce는 되는데 성공 배달이 없음' 감지).
 
 2026-07-18 사고: 단일노드 Kafka 데이터플레인이 행(hang)에 빠졌는데, 프로듀서(ingester)는
-delivery 실패(_MSG_TIMED_OUT)를 콜백에서 print만 하고 삼켜 45시간 생존 — 프로세스가 안 죽으니
+delivery 실패(_MSG_TIMED_OUT)를 콜백에서 print만 하고 삼켜 38시간 정지 내내 생존 — 프로세스가 안 죽으니
 restart: unless-stopped 자가복구도 발동하지 않았다. 이 워치독은 "마지막 성공 배달 이후의
 produce가 쌓인 채 stall_sec가 지났다"를 감지해, 수집기가 스스로 종료(SystemExit)하고
 docker 재시작에 복구를 위임하게 한다(업비트·키움 수집기 공용).
