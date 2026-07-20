@@ -19,7 +19,7 @@ from common.broker.kis_account import _headers, _tr, split_account
 from common.rate_limit import acquire
 
 _THROTTLE_CD = "EGW00201"      # 초당 거래건수 초과 — 게이트웨이 거부(주문 미접수 확실)라 재시도 안전
-_THROTTLE_WAITS = (1.0, 2.0)   # 재시도 전 대기(초). 총 시도 = len+1회
+_RETRY_WAITS = (1.0, 2.0)      # 재시도 전 대기(초) — post_order는 EGW00201 한정, hashkey는 5xx/전송오류. 총 시도 = len+1회
 
 
 def _validate(side: str, qty: int) -> None:
@@ -45,7 +45,7 @@ def _hashkey(body: dict) -> str:
     순수 해시 계산(부수효과 없음 = 멱등)이라 5xx/전송오류는 짧게 재시도한다. 4xx는 즉시 실패.
     """
     last = ""
-    for i in range(len(_THROTTLE_WAITS) + 1):
+    for i in range(len(_RETRY_WAITS) + 1):
         acquire("kis", "rest")
         try:
             r = httpx.post(
@@ -61,9 +61,9 @@ def _hashkey(body: dict) -> str:
             last = f"HTTP {r.status_code} {b.get('msg_cd')} {b.get('msg1') or r.text[:120]}"
         except httpx.TransportError as e:
             last = f"{type(e).__name__}: {e}"
-        if i < len(_THROTTLE_WAITS):
-            print(f"[kis-order] hashkey 실패 재시도 {i + 1}/{len(_THROTTLE_WAITS)}: {last}")
-            time.sleep(_THROTTLE_WAITS[i])
+        if i < len(_RETRY_WAITS):
+            print(f"[kis-order] hashkey 실패 재시도 {i + 1}/{len(_RETRY_WAITS)}: {last}")
+            time.sleep(_RETRY_WAITS[i])
     raise RuntimeError(f"KIS hashkey 실패(재시도 소진): {last}")
 
 
@@ -78,15 +78,15 @@ def post_order(path: str, tr_id: str, body: dict) -> dict:
     """
     headers = _headers(tr_id)
     headers["hashkey"] = _hashkey(body)   # body 불변 → 해시 1회 계산, 재시도에 재사용
-    for i in range(len(_THROTTLE_WAITS) + 1):
+    for i in range(len(_RETRY_WAITS) + 1):
         acquire("kis", "rest")
         r = httpx.post(f"{KIS_REST_BASE}{path}", headers=headers, json=body, timeout=BROKER_TIMEOUT)
         b = _safe_json(r)
         throttled = b.get("msg_cd") == _THROTTLE_CD   # 500이든 200이든 게이트웨이 거부 = 미접수
-        if throttled and i < len(_THROTTLE_WAITS):
-            print(f"[kis-order] 초당 한도 거부({tr_id}) 재시도 {i + 1}/{len(_THROTTLE_WAITS)}: "
+        if throttled and i < len(_RETRY_WAITS):
+            print(f"[kis-order] 초당 한도 거부({tr_id}) 재시도 {i + 1}/{len(_RETRY_WAITS)}: "
                   f"HTTP {r.status_code} {b.get('msg1')}")
-            time.sleep(_THROTTLE_WAITS[i])
+            time.sleep(_RETRY_WAITS[i])
             continue
         exhausted = " — 한도거부 재시도 소진" if throttled else ""
         if r.status_code >= 400:
@@ -95,6 +95,7 @@ def post_order(path: str, tr_id: str, body: dict) -> dict:
         if str(b.get("rt_cd")) != "0":
             raise RuntimeError(f"KIS 주문 실패({tr_id}): {b.get('msg_cd')} {b.get('msg1')}{exhausted}")
         return b
+    raise AssertionError("unreachable — post_order 루프는 return/raise로만 종료")
 
 
 def place_domestic_order(symbol: str, side: str, qty: int, price: int | None = None) -> dict:

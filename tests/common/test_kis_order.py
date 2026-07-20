@@ -36,11 +36,11 @@ class _Resp:
 
 
 def _fake_post(responses, calls):
-    """미리 준비한 응답을 순차 반환하는 가짜 httpx.post. 응답이 예외면 raise."""
+    """미리 준비한 응답을 순차 반환하는 가짜 httpx.post. 응답이 예외면 raise. calls=[(url, headers)]."""
     seq = list(responses)
 
     def post(url, headers=None, json=None, timeout=None):
-        calls.append(url)
+        calls.append((url, headers))
         r = seq.pop(0)
         if isinstance(r, Exception):
             raise r
@@ -148,13 +148,14 @@ class TestPostOrderThrottle(_Base):
         self.assertEqual(self.sleeps, [])
 
     def test_hashkey_computed_once_and_header_set(self):
-        """hashkey는 1회만 계산되고 재시도에 재사용된다."""
+        """hashkey는 1회만 계산되고, 모든 시도의 요청 헤더에 재사용된다."""
         hk = mock.patch.object(ko, "_hashkey", return_value="H")
         m = hk.start()
         self.addCleanup(hk.stop)
         self._patch_post([_Resp(500, _THROTTLE_BODY), _Resp(200, _OK_BODY)])
         ko.post_order("/order", "VTTC0801U", {"PDNO": "139130"})
         self.assertEqual(m.call_count, 1)
+        self.assertEqual([h["hashkey"] for _, h in self.calls], ["H", "H"])
 
 
 class TestHashkeyRetry(_Base):
