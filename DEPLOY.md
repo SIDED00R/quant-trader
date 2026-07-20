@@ -75,6 +75,18 @@
   # 테이블 나이 < 180일인 지금 실행하면 만료 0행이라 재물질화 부하도 사실상 없음.
   # (매매 VM 로컬 ticks 테이블은 비어 있어 무관 — 다음 재생성 시 스키마 TTL이 자연 적용)
   ```
+- **ClickHouse system 로그 축소(#302) — 기존(라이브) 테이블 1회 DROP 런북**: `db/clickhouse_system_logs.xml`(config.d 오버라이드)이 text_log를 error 이상·TTL 7일로 제한하고 프로파일링 로그(query_log 등 7종)를 비활성한다(기본 설정은 Trace 레벨 무TTL 적재 → 수집 VM에서 37일간 7.7GB, 디스크 80% 경보 원인). 설정은 컨테이너 재생성 시 적용되지만 **기존 테이블 데이터는 남으므로** 배포 후 1회 DROP(활성 로그는 다음 flush 때 새 설정으로 자동 재생성):
+  ```bash
+  gcloud compute ssh coin-trader-vm --zone=us-central1-a --command \
+   "cd /opt/coin-auto-trader && P=\$(sudo grep -E '^CLICKHOUSE_PASSWORD=' .env | cut -d= -f2- | sed 's/[[:space:]]*#.*//; s/[[:space:]]*\$//'); \
+    for T in text_log query_log query_thread_log part_log metric_log trace_log asynchronous_metric_log processors_profile_log; do \
+      for N in \$T \${T}_0 \${T}_1; do sudo docker exec clickhouse clickhouse-client --password \"\${P:-ch_pw}\" \
+        -q \"DROP TABLE IF EXISTS system.\$N\"; done; done"
+  # (_0/_1 = 설정 변경 시 ClickHouse가 구조 불일치 구테이블을 rename 보존한 것 — 함께 정리)
+  # 확인: df -h / 및 SELECT table, formatReadableSize(sum(bytes_on_disk)) FROM system.parts
+  #        WHERE active AND database='system' GROUP BY table ORDER BY sum(bytes_on_disk) DESC
+  # (매매 VM 로컬 CH도 같은 오버라이드가 적용되나 온디맨드 가동이라 누적 미미 — 별도 조치 불요)
+  ```
 - **수집 VM 헬스체크(`infra/collector-healthcheck.sh`) 활성화**: cron(30분)이 디스크(≥80%)·필수 컨테이너 다운·틱 유입 정지(코인 24/7, 주식 KRX 장중)를 검사해 텔레그램 통보(검사키별 6h 쿨다운, 회복 시 재무장). **코인 틱 정지 시 kafka+스트림 자동 재기동**(`RESTART_COOLDOWN_SEC` 기본 3h 게이트, 마커 선기록으로 루프 방지, 재기동 결과 텔레그램 통보) — 2026-07-18 kafka 행(hang) 38h 무복구 사고 재발 방지. 자동복구 드라이런: 한산한 시간대에 `sudo COIN_STALE_MAX_SEC=1 RESTART_COOLDOWN_SEC=0 bash infra/collector-healthcheck.sh`(실제 재기동 1회 발생 주의). 1회 셋업:
   ```bash
   # ① 수집 VM SA에 telegram-env 접근 허용(주입은 startup이 수행)

@@ -1,0 +1,19 @@
+<!-- ClickHouse system.*_log 비대화 방지 오버라이드 (config.d 병합, #302).
+     기본 설정은 서버 로그를 Trace 레벨 그대로 system.text_log에 무TTL 적재해 수집 VM(30GB) 디스크를
+     ~200MB/일로 잠식했다(37일간 system 로그 7.7GB vs 실데이터 0.74GB). 정책: 에러만 7일 보존, 프로파일링 비활성.
+     기존(라이브) 테이블에는 소급 적용되지 않는다 — DEPLOY.md 런북의 1회 DROP으로 회수(다음 flush 때 재생성). -->
+<clickhouse>
+    <!-- 서버 로그 테이블: error 이상만 적재 + 7일 보존 -->
+    <text_log>
+        <level>error</level>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    </text_log>
+    <!-- 프로파일링/텔레메트리 테이블: 모니터링 미사용(프로메테우스 없음) — 비활성 -->
+    <query_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <part_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <processors_profile_log remove="1"/>
+</clickhouse>
