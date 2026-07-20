@@ -72,7 +72,10 @@ def latest_signal(bars, exit_rule="tk_cross", tenkan=9, kijun=26, senkou_b=52, d
     """마지막(완결) 주봉의 신호. 구름·전환·기준 중 어느 하나라도 미정의면 None.
 
     반환 {"close","cloud_top","cloud_bot","tenkan","kijun","entry","exit","breakout_pct"}.
-    entry: 종가>구름상단 AND 전환>기준 · exit: tk_cross→전환<기준 / cloud→종가<=구름상단.
+    entry: **신규 돌파 이벤트** — 종가>구름상단 AND 전환>기준 AND 직전 완결봉은 구름 위가
+    아니었음(직전 종가<=직전 구름상단; 직전 봉 구름 미정의면 신규 판정 불가 → False).
+    상태(현재 구름 위)만 보면 몇 주 전 돌파 종목이 매번 후보가 된다 — 2026-07-20 71종목 사고.
+    exit: tk_cross→전환<기준 / cloud→종가<=구름상단.
     """
     n = len(bars)
     if n < 2:
@@ -86,11 +89,13 @@ def latest_signal(bars, exit_rule="tk_cross", tenkan=9, kijun=26, senkou_b=52, d
     close = bars[i][4]
     cloud_top = max(sa, sb)
     cloud_bot = min(sa, sb)
+    pa, pb = lines["span_a"][i - 1], lines["span_b"][i - 1]
+    prev_not_above = pa is not None and pb is not None and bars[i - 1][4] <= max(pa, pb)
     exit_ = (ten < kij) if exit_rule == "tk_cross" else (close <= cloud_top)
     return {
         "close": close, "cloud_top": cloud_top, "cloud_bot": cloud_bot,
         "tenkan": ten, "kijun": kij,
-        "entry": bool(close > cloud_top and ten > kij),
+        "entry": bool(close > cloud_top and ten > kij and prev_not_above),
         "exit": bool(exit_),
         "breakout_pct": (close - cloud_top) / cloud_top if cloud_top else 0.0,
     }

@@ -19,11 +19,11 @@ import httpx
 from common import rate_limit
 from common.marketdata import stock_names
 from common.config import TELEGRAM_ALLOWED_CHAT_IDS, TELEGRAM_BOT_TOKEN
-from common.chart.symbol_chart import chart_for_symbol
+from common.chart.symbol_chart import KR_FETCH_DAYS, chart_for_symbol
 from common.marketdata.toss_daily import fetch_daily
 
 _API = "https://api.telegram.org/bot{token}/{method}"
-_KR_FETCH_DAYS, _US_FETCH_DAYS = 1000, 220
+_KR_FETCH_DAYS, _US_FETCH_DAYS = KR_FETCH_DAYS, 220   # KR은 104주 전 구간 구름에 필요한 깊이(단일 출처)
 _HELP = ("📈 사용법: /chart <종목명 또는 티커>  (한글 /차트 도 됨)\n"
          "예) /chart 삼성전자 · /chart 005930 · /chart AAPL\n"
          "국장=주봉+일목 구름 · 미장=일봉")
