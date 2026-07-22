@@ -73,6 +73,7 @@ echo "${DK_TOKEN:-}" | docker login -u oauth2accesstoken --password-stdin https:
 docker compose --profile app --profile data --profile batch --profile trade --profile collector down --remove-orphans || true  # 볼륨(chdata 등) 보존
 # CI 프리빌드 이미지 pull(빠름) — 실패 시 로컬 빌드 폴백(#94/#99 불변식 계승 — 폴백 제거 금지)
 if docker compose --profile collector pull -q; then B=""; else B="--build"; fi
+bash infra/fix-volume-ownership.sh                     # non-root 볼륨 소유권 정렬(up 전, 멱등)
 docker compose --profile collector up -d $B            # db-init(스키마)은 의존성으로 자동 실행
 
 # ── 헬스체크 cron 등록 (30분 주기: 디스크·컨테이너·틱 유입 → 텔레그램) + 주간 도커 정리(빌드캐시·dangling) ──

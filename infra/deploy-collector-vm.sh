@@ -9,6 +9,9 @@ SHA=${1:-}
 APP_IMG=us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker/quant-trader-app:latest
 cd /opt/coin-auto-trader
 
+# non-root 컨테이너(uid 1000)가 쓰는 볼륨/바인드 소유권 정렬(compose up 전, 멱등)
+bash infra/fix-volume-ownership.sh
+
 # Artifact Registry 로그인 (gcloud 불요 — VM 메타데이터 토큰)
 curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])" \

@@ -267,3 +267,12 @@ gcloud scheduler jobs run trade-vm-kr-close-sweep --location=us-central1   # KR:
 - 인증 = **Workload Identity Federation**(`github-pool`/`github-provider`, 레포 `SIDED00R/quant-trader` 핀) — GitHub 시크릿 저장 없음. 1회 셋업 = `bash infra/setup-cicd.sh`.
 - **롤백**: 원인 커밋 revert 후 머지(권장). 비상시: `gcloud artifacts docker tags add <AR>/quant-trader-app:<이전sha> <AR>/quant-trader-app:latest` 후 VM 재기동.
 - ⚠ **OS Login 활성화 금지**(프로젝트/인스턴스 모두) — CI SSH가 메타데이터 SSH 키 방식이라 OS Login이 켜지면 즉시 끊긴다.
+
+### 🔒 컨테이너 non-root 실행 (uid 1000)
+
+앱/배치 이미지는 `USER app`(uid 1000)로 실행된다(root 실행 금지 — 침해 시 권한 확대 차단). 앱이 파일을 쓰는 지점은 소유권 정렬이 필요하다:
+
+- **자동 처리**: `infra/fix-volume-ownership.sh`가 3개 기동/배포 스크립트에서 **compose up 전에** 멱등 실행돼 ① `./charts` 바인드(equity-chart SVG 출력) ② batch 캐시 named volume 3개(`coin-auto-trader_{refcache,cache13f,insidercache}`)를 uid 1000으로 chown한다. 멱등·self-guard라 수집 VM(해당 볼륨 없음)에선 no-op.
+- **전제**: 신규(빈) named volume은 `Dockerfile.batch`가 캐시 마운트 dir을 app 소유로 pre-create해 자동 상속. 이미 root 소유로 찬 **기존 라이브 볼륨**만 fix 스크립트가 정렬한다(매매 VM은 온디맨드라 다음 부팅에 자동 적용).
+- **진단**: 배포 후 `docker logs <svc>`에 `PermissionError`/`Permission denied`가 보이면 소유권 미정렬. 수동 복구: `sudo bash /opt/coin-auto-trader/infra/fix-volume-ownership.sh` 후 해당 서비스 재기동.
+- **롤백**: non-root가 문제를 일으키면 직전 sha 이미지로 즉시 고정 — `gcloud artifacts docker tags add <AR>/quant-trader-app:<이전sha> <AR>/quant-trader-app:latest`(batch 이미지도 동일) 후 VM 재기동. 구 root 이미지는 볼륨 소유권과 무관하게 동작.
