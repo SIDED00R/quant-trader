@@ -8,10 +8,14 @@
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.jobs.verify_freshness [--strict] [--notify]
 """
 import argparse
+import logging
 import sys
 from datetime import date, datetime, timezone
 
+from common import log
 from common.clickhouse_client import create_client
+
+logger = logging.getLogger(__name__)
 
 # (라벨, FROM식, 날짜컬럼, 허용지연일, critical) — critical 위반 시 종료코드 1(유지보수 🔴).
 # **maintenance_once가 자동 갱신하는 테이블만** 감시한다(안 그러면 상시 위반으로 알람이 무력화됨).
@@ -71,6 +75,7 @@ def _format(results: list) -> str:
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -82,12 +87,12 @@ def main(argv=None) -> int:
 
     results = check()
     report = _format(results)
-    print(report)
+    logger.info(report)
 
     crit_bad = [t for t, *_ , crit, br in results if br and crit]
     warn_bad = [t for t, *_ , crit, br in results if br and not crit]
     summary = f"critical 위반 {len(crit_bad)}: {crit_bad} / warn {len(warn_bad)}: {warn_bad}"
-    print(f"[verify] {summary}")
+    logger.info(summary)
 
     if a.notify and (crit_bad or warn_bad):     # 이상 있을 때만 통보(정상 실행은 무음 — 유지보수 요약이 ✅ 표기)
         from common import notify_telegram

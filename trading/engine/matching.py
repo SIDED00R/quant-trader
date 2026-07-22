@@ -14,15 +14,19 @@ market.ticks + orders 를 동시 소비한다.
 - latest_price/pending/limit_orders가 인메모리이므로 이 엔진은 단일 인스턴스로만 실행한다.
 """
 import json
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from common import log
 from common.config import FEE_RATE, TOPIC_EXECUTIONS, TOPIC_ORDERS, TOPIC_TICKS
 from common.kafka_client import create_consumer, create_producer
 from common.postgres_client import close_pool, open_pool, pool
 from common.schemas import Execution
+
+logger = logging.getLogger(__name__)
 
 GROUP_ID = "matching-engine"
 COMMIT_SEC = 1.0
@@ -81,7 +85,7 @@ def execute(order: dict, price: Decimal, producer) -> None:
         ts=datetime.now(timezone.utc).isoformat(),
     )
     producer.produce(TOPIC_EXECUTIONS, key=order["symbol"].encode(), value=ex.to_json())
-    print(f"[engine] filled {order['side']} {order['type']} {order['symbol']} qty={qty} @ {price} (fee={fee})")
+    logger.info(f"filled {order['side']} {order['type']} {order['symbol']} qty={qty} @ {price} (fee={fee})")
 
 
 def run() -> None:
@@ -90,7 +94,7 @@ def run() -> None:
     consumer.subscribe([TOPIC_TICKS, TOPIC_ORDERS])
     latest_price: dict[str, Decimal] = {}
     pending, limit_orders = load_pending_orders()
-    print(f"[engine] started (reseeded {sum(len(v) for v in pending.values())} market, "
+    logger.info(f"started (reseeded {sum(len(v) for v in pending.values())} market, "
           f"{sum(len(v) for v in limit_orders.values())} limit)")
     last_commit = time.monotonic()
     consumed = False
@@ -147,7 +151,8 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         run()
     except KeyboardInterrupt:
-        print("[engine] stopped")
+        logger.info("stopped")

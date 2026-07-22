@@ -10,10 +10,11 @@ pillow는 지연 import(미설치 환경에서도 모듈 import 안전 — notif
 """
 import argparse
 import io
+import logging
 import sys
 from datetime import datetime, timezone
 
-from common import notify_telegram
+from common import log, notify_telegram
 from common.equity.equity_series import (
     ICHIMOKU_ACCOUNT,
     KIS_ACCOUNT,
@@ -23,6 +24,8 @@ from common.equity.equity_series import (
     fetch_usdkrw,
 )
 from common.postgres_client import open_pool, pool
+
+logger = logging.getLogger(__name__)
 
 W, H = 1200, 560
 PAD_L, PAD_R, PAD_T, PAD_B = 78, 30, 112, 58
@@ -49,7 +52,7 @@ def _load_rows(days: int) -> list[dict]:
     try:
         fx = fetch_usdkrw(days)
     except Exception as e:
-        print(f"[equity-tg] 환율 조회 실패 — 전체(KRW) 시리즈 생략: {type(e).__name__}: {e}")
+        logger.error(f"환율 조회 실패 — 전체(KRW) 시리즈 생략: {type(e).__name__}: {e}")
         fx = []
     return chart_rows(markets, fx)
 
@@ -117,17 +120,18 @@ def send_chart(days: int = 365) -> bool:
     try:
         rows = _load_rows(days)
         if not rows:
-            print("[equity-tg] 시계열 미축적(시리즈당 2일 필요) — 발송 생략")
+            logger.warning("시계열 미축적(시리즈당 2일 필요) — 발송 생략")
             return False
         ok = notify_telegram.send_photo(_render_png(rows), _caption(rows))
-        print(f"[equity-tg] 자산 차트 발송 {'성공' if ok else '실패(비치명)'}")
+        logger.info(f"자산 차트 발송 {'성공' if ok else '실패(비치명)'}")
         return ok
     except Exception as e:
-        print(f"[equity-tg] 실패(비치명 — 매매 결과 무관): {type(e).__name__}: {e}")
+        logger.error(f"실패(비치명 — 매매 결과 무관): {type(e).__name__}: {e}")
         return False
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:

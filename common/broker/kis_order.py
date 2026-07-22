@@ -9,6 +9,7 @@ kis_account의 헬퍼를 재사용한다.
 출처: KIS Developers — 국내 order-cash(매수 TTTC0802U/매도 TTTC0801U),
 해외 order(미국 매수 TTTT1002U/매도 TTTT1006U), hashkey(/uapi/hashkey).
 """
+import logging
 import time
 
 import httpx
@@ -17,6 +18,8 @@ from common.config import KIS_APPKEY, KIS_APPSECRET, KIS_REST_BASE
 from common.constants import BROKER_TIMEOUT, KIS_DEFAULT_EXCHANGE
 from common.broker.kis_account import _headers, _tr, split_account
 from common.rate_limit import acquire
+
+logger = logging.getLogger(__name__)
 
 _THROTTLE_CD = "EGW00201"      # 초당 거래건수 초과 — 게이트웨이 거부(주문 미접수 확실)라 재시도 안전
 _RETRY_WAITS = (1.0, 2.0)      # 재시도 전 대기(초) — post_order는 EGW00201 한정, hashkey는 5xx/전송오류. 총 시도 = len+1회
@@ -62,7 +65,7 @@ def _hashkey(body: dict) -> str:
         except httpx.TransportError as e:
             last = f"{type(e).__name__}: {e}"
         if i < len(_RETRY_WAITS):
-            print(f"[kis-order] hashkey 실패 재시도 {i + 1}/{len(_RETRY_WAITS)}: {last}")
+            logger.warning(f"hashkey 실패 재시도 {i + 1}/{len(_RETRY_WAITS)}: {last}")
             time.sleep(_RETRY_WAITS[i])
     raise RuntimeError(f"KIS hashkey 실패(재시도 소진): {last}")
 
@@ -84,7 +87,7 @@ def post_order(path: str, tr_id: str, body: dict) -> dict:
         b = _safe_json(r)
         throttled = b.get("msg_cd") == _THROTTLE_CD   # 500이든 200이든 게이트웨이 거부 = 미접수
         if throttled and i < len(_RETRY_WAITS):
-            print(f"[kis-order] 초당 한도 거부({tr_id}) 재시도 {i + 1}/{len(_RETRY_WAITS)}: "
+            logger.warning(f"초당 한도 거부({tr_id}) 재시도 {i + 1}/{len(_RETRY_WAITS)}: "
                   f"HTTP {r.status_code} {b.get('msg1')}")
             time.sleep(_RETRY_WAITS[i])
             continue

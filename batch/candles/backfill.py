@@ -4,13 +4,18 @@
 업비트 REST에서 과거 분봉을 받아 로컬 캐시(기본 data/candles)에 저장한다. 이후 백테스트는 캐시를 읽는다.
 """
 import argparse
+import logging
 import sys
 
+from common import log
 from common.config import SYMBOLS
 from batch.candles.upbit_candles import backfill
 
+logger = logging.getLogger(__name__)
+
 
 def main(argv=None) -> int:
+    log.setup()
     try:  # 진행/에러 로그가 cp949 콘솔에서 깨지거나 크래시하지 않도록 UTF-8 강제
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
@@ -25,14 +30,14 @@ def main(argv=None) -> int:
     a = p.parse_args(argv)
     markets = [s.strip() for s in a.symbols.split(",") if s.strip()]
     if not markets:
-        print("[backfill] --symbols 가 비었습니다(유효한 종목 없음).", file=sys.stderr)
+        logger.error("--symbols 가 비었습니다(유효한 종목 없음).")
         return 2
     try:
         backfill(markets, a.unit, a.days, a.cache_dir)
     except Exception as e:  # 재시도 소진/HTTP 오류 등 → 라이브 run.py와 동일하게 fail-fast
-        print(f"[backfill] 실패: {e}", file=sys.stderr)
+        logger.error(f"실패: {e}")
         return 2
-    print(f"[backfill] 완료: {markets} unit={a.unit}m days={a.days} → {a.cache_dir}")
+    logger.info(f"완료: {markets} unit={a.unit}m days={a.days} → {a.cache_dir}")
     return 0
 
 

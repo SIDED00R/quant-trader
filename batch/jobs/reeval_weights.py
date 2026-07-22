@@ -9,9 +9,11 @@ backtest 이미지/배치로 실행한다(라이브 commander는 strategy_weight
 잡이 테이블을 갱신해도 commander는 ENSEMBLE_ADAPTIVE를 켜야 반영하므로, 적응 활성 전 A/B·검증 단계에서 안전하게 돌릴 수 있다.
 """
 import argparse
+import logging
 import sys
 from decimal import Decimal
 
+from common import log
 from common.config import (
     ENSEMBLE_DSR_GATE,
     ENSEMBLE_SYMBOLS,
@@ -24,6 +26,8 @@ from common.config import (
 from common.postgres_client import close_pool, open_pool, pool
 from trading.strategy.plugins.ensemble import default_loads
 from trading.strategy.core.weight_policy import compute_weights
+
+logger = logging.getLogger(__name__)
 
 _DAY = 86400.0
 
@@ -102,6 +106,7 @@ def parse_args(argv=None):
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
@@ -116,8 +121,7 @@ def main(argv=None) -> int:
     sample_sec = 86400.0 if args.ch_table == "candles_1d" else 60.0
     bars = list(load_clickhouse_candles(symbols=symbols, table=args.ch_table))
     if not bars:
-        print("[reeval] 0봉 — 먼저 백필: python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH",
-              file=sys.stderr)
+        logger.error("0봉 — 먼저 백필: python -m batch.candles.backfill_daily --symbols KRW-BTC,KRW-ETH")
         return 1
     open_pool()
     try:

@@ -9,14 +9,14 @@ portfolio.apply_execution을 재사용한다. 매 실행의 결정은 trade_deci
 재사용: commander.decide·combined_for_bar, decision_record.classify, live_ensemble.prime/signals_for,
 ensemble.default_loads, load_weights, apply_execution. 계정/시세 읽기 헬퍼는 commander와 일시 중복(스트리밍 commander 은퇴 시 정리).
 """
-import traceback
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from psycopg.types.json import Jsonb
 
-from common import notify_telegram
+from common import log, notify_telegram
 from common.marketdata.candles import daily_candles
 from common.config import ENSEMBLE_REBALANCE_BAND, ENSEMBLE_SYMBOLS, FEE_RATE
 from common.chart.equity_chart_telegram import send_chart
@@ -31,6 +31,8 @@ from trading.strategy.core.decision_record import classify
 from trading.strategy.plugins.ensemble import default_loads
 from trading.strategy.runners.live_ensemble import LiveEnsemble
 from trading.strategy.core.notify_messages import coin_message, error_message
+
+logger = logging.getLogger(__name__)
 
 _FEE_QUANT = Decimal("0.0001")
 _MAX_STALE_DAYS = 3   # 최신 완료 일봉 허용 지연(일). 코인은 무휴장이라 3일이면 백필 고장 확정.
@@ -170,12 +172,13 @@ def run(dry_run: bool = False) -> int:
 
     종료코드: 0=정상 / 70=거부 발생 또는 오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
     """
+    log.setup()
     open_pool()
     if not dry_run:                              # 코인 스위퍼 이중 실행 방지(#218 C2) — 오늘 이미 기록됐으면 스킵
         with pool.connection() as conn:
             already = _already_ran_today(conn)   # 연결은 블록 안에서만 사용 후 반납
         if already:
-            print("[trade_once] 오늘 이미 실행됨 — 스위퍼 이중 실행 스킵(주문·기록·알림 없음)")
+            logger.warning("오늘 이미 실행됨 — 스위퍼 이중 실행 스킵(주문·기록·알림 없음)")
             close_pool()
             return 0
     rejected = 0
@@ -193,11 +196,11 @@ def run(dry_run: bool = False) -> int:
         trades = [d for d in decisions if d["action"] in ("BUY", "SELL")]
         shown = {s: round(a["target"], 4) for s, a in analysis.items() if a["target"] is not None}
         tag = " [DRY-RUN]" if dry_run else ""
-        print(f"[trade_once]{tag} targets={shown} accounts={len(accts)} orders={len(trades)}")
+        logger.info(f"{tag} targets={shown} accounts={len(accts)} orders={len(trades)}")
         if dry_run:
             for d in trades:
-                print(f"[trade_once] (dry-run) would {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
-            print("[trade_once] dry-run done")
+                logger.info(f"(dry-run) would {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
+            logger.info("dry-run done")
             notify_telegram.send(coin_message(decisions, 0, shown, dry_run=True))
             return 0
         for d in decisions:
@@ -208,12 +211,12 @@ def run(dry_run: bool = False) -> int:
                     executed = result == "applied"
                     if result == "rejected":
                         rejected += 1
-                    print(f"[trade_once] {result} {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
+                    logger.info(f"{result} {d['action']} {d['symbol']} qty={d['quantity']} acct={d['account_id']} @ {d['price']}")
                 d["executed"] = executed          # 알림 문안용 체결 여부 주석
                 _record_decision(conn, run_ts, d, executed)
         if rejected:
-            print(f"[trade_once] ⚠ {rejected}/{len(trades)} 주문 거부(잔고/보유 부족) — 확인 필요")
-        print(f"[trade_once] done — decisions={len(decisions)} recorded")
+            logger.warning(f"⚠ {rejected}/{len(trades)} 주문 거부(잔고/보유 부족) — 확인 필요")
+        logger.info(f"done — decisions={len(decisions)} recorded")
         balances = {}
         for a in accts:
             c = cash(a)
@@ -225,7 +228,7 @@ def run(dry_run: bool = False) -> int:
         send_chart()   # 자산 차트 사진 1장/일 — 스위퍼 재실행은 상단 '이미 실행됨' 가드가 차단(비치명)
         return 70 if rejected else 0
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("trade_once 실행 크래시")
         sent = notify_telegram.send(error_message("코인", e))
         return 70 if sent else 1
     finally:

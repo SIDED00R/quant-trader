@@ -7,12 +7,12 @@ KR판(stock_trade_once)의 US 대응. 차이: USD 통화·해외 잔고(us_balan
 ⚠ 라이브 해외주문/시세는 미국장 시간 + KIS 모의 해외 시세도메인 실측 검증 필요(US장 마감 중엔 미검증).
 """
 import argparse
+import logging
 import sys
-import traceback
 from datetime import datetime, timezone
 
 from batch.candles.refresh_stock_daily import refresh
-from common import notify_telegram
+from common import log, notify_telegram
 from common.broker import kis_balance
 from common.equity.equity_snapshot import record_stock_snapshot
 from common.broker.kis_chase import place_and_chase
@@ -23,6 +23,8 @@ from common.marketdata.stock_price import latest_closes
 from trading.strategy.core.notify_messages import error_message, stock_message
 from trading.strategy.runners.stock_trade_common import build_plan, skip_result, weekly_guard
 from trading.strategy.runners.weekly_marker import completed, mark_week_done
+
+logger = logging.getLogger(__name__)
 
 _BUFFER = 1.02   # 동일가중 수량 산정용 1차 지정가 버퍼(kis_chase의 1차 BUY 버퍼와 동일)
 _MIN_SECONDS_TO_CLOSE = 300   # 정규장 마감까지 이 이하로 남으면 발주 스킵(부분 거부 방지 — 다음 평일 재시도)
@@ -83,6 +85,7 @@ def main(argv=None) -> int:
 
     종료코드: 0=정상 / 70=오류(텔레그램 통보 완료) / 1=오류인데 통보도 실패(startup 폴백이 발송).
     """
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -95,17 +98,17 @@ def main(argv=None) -> int:
     try:
         r = execute(top_n=a.top_n, max_orders=a.max_orders, live=a.live)
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("us_trade_once 실행 크래시")
         sent = notify_telegram.send(error_message("US 주식", e))
         return 70 if sent else 1
     if a.live:   # 자산 곡선 원천 — 주간 스킵 날도 매일 1포인트(비치명, KR판과 동일)
         record_stock_snapshot("US", kis_balance.us_balance)
-    print(f"[us-trade] bar={r['bar']} cash={r['cash']:,.2f} "
+    logger.info(f"bar={r['bar']} cash={r['cash']:,.2f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):
-        print(f"  skip: {r['skipped']}")
+        logger.warning(f"skip: {r['skipped']}")
     for o in r.get("placed", []):
-        print("  ", o)
+        logger.info(f"  {o}")
     notify_telegram.send(stock_message("US 주식", r, live=a.live))
     return 0
 

@@ -7,15 +7,20 @@
 ⚠️ 분봉은 일봉보다 호출량이 크고 rate limit(5/s)이 걸린다 — **대규모 유니버스는 소수 subset부터**(종목·기간 분할).
 """
 import argparse
+import logging
 import sys
 
 from batch.candles.toss_intraday import fetch_minute, upsert_clickhouse
+from common import log
 from common.clickhouse_client import create_client
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_SYMBOLS = "005930,000660,AAPL"   # 잠정 subset(유니버스 확정 전). KR=6자리 숫자, US=티커.
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
@@ -28,26 +33,26 @@ def main(argv=None) -> int:
     a = p.parse_args(argv)
     symbols = [s.strip() for s in a.symbols.split(",") if s.strip()]
     if not symbols:
-        print("[stock-1m] 대상 종목이 없습니다.", file=sys.stderr)
+        logger.error("대상 종목이 없습니다.")
         return 2
     try:   # CH 연결 실패는 전체 치명 → fail-fast
         client = create_client()
     except Exception as e:
-        print(f"[stock-1m] ClickHouse 연결 실패: {e} (기동·init_db 확인)", file=sys.stderr)
+        logger.error(f"ClickHouse 연결 실패: {e} (기동·init_db 확인)")
         return 2
     total, failed = 0, []
     for symbol in symbols:   # 종목별 격리 — 일시적 오류 1종목이 나머지를 막지 않게
         try:
             rows = fetch_minute(symbol, a.days)
             total += upsert_clickhouse(client, rows, a.table)
-            print(f"[stock-1m] {symbol}: {len(rows)}봉 적재")
+            logger.info(f"{symbol}: {len(rows)}봉 적재")
         except Exception as e:
             failed.append(symbol)
-            print(f"[stock-1m] {symbol} 실패(건너뜀): {e}", file=sys.stderr)
+            logger.error(f"{symbol} 실패(건너뜀): {e}")
     ok = len(symbols) - len(failed)
-    print(f"[stock-1m] 완료: {ok}/{len(symbols)}종목 → {a.table} ({total}행)")
+    logger.info(f"완료: {ok}/{len(symbols)}종목 → {a.table} ({total}행)")
     if failed:
-        print(f"[stock-1m] 실패 {len(failed)}종목: {failed} (재실행으로 보충 가능)", file=sys.stderr)
+        logger.error(f"실패 {len(failed)}종목: {failed} (재실행으로 보충 가능)")
         return 1
     return 0
 

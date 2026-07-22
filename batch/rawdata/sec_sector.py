@@ -5,16 +5,20 @@
 
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.rawdata.sec_sector
 """
+import logging
 import sys
 import time
 
 import httpx
 
 from batch.features import edgar
+from common import log
 from common.cache import dump_json, load_json, refcache_path
 from common.clickhouse_client import create_client
 from common.constants import SEC_UA_HEADERS
 from common.marketdata.symbols import get_us_symbols
+
+logger = logging.getLogger(__name__)
 
 _CACHE = refcache_path("sic_map.json")   # 참조캐시(영속 볼륨) — SIC는 사실상 불변(#218)
 
@@ -41,6 +45,7 @@ def fetch_sic(symbols, client, log=print) -> dict:
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -53,7 +58,7 @@ def main(argv=None) -> int:
     if not rows:
         raise RuntimeError("[sector] 적재 0행 — SEC submissions/유니버스 확인(전종목 실패의 조용한 성공 처리 방지)")
     ch.insert("stock_meta", rows, column_names=["symbol", "sic", "sic_desc", "sector2"])
-    print(f"[sector] {len(rows)}종목 SIC 적재. 고유 sector2={len(set(r[3] for r in rows))}")
+    logger.info(f"{len(rows)}종목 SIC 적재. 고유 sector2={len(set(r[3] for r in rows))}")
     return 0
 
 

@@ -10,8 +10,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from api import auth_google, stock_order_executor, warmup
 from api.routes import account, autotrade, decisions, equity, health, history, market, orders, performance, rebalance, stock_orders, stocks, strategy, watchlist, web
 from api.security import auth_gate
+from common import log
 from common.config import AUTH_ENABLED, SESSION_SECRET, SITE_ADDRESS
 from common.postgres_client import close_pool, open_pool
+
+log.setup()   # uvicorn이 이 모듈을 import할 때 1회 설정(app 모듈 최상단, fail-fast 가드보다 위)
 
 # 공개(인증) 배포인데 세션 서명 키가 기본값이면 쿠키 위조 가능 → 기동 실패(fail-fast).
 # 반경은 api 한정 — 세션 키의 유일 소비자이고, 수집·매매 데몬은 이 검사와 무관하다.

@@ -7,18 +7,22 @@
 """
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import websockets
 
+from common import log
 from common.config import KAFKA_BOOTSTRAP_SERVERS, TOPIC_TICKS
 from common.constants import HTTP_MAX_BACKOFF
 from common.kafka_client import create_producer
 from common.kafka_watchdog import DELIVERY_STALL_SEC, DeliveryWatchdog
 from common.schemas import Tick
 from common.marketdata.symbols import resolve_symbols
+
+logger = logging.getLogger(__name__)
 
 UPBIT_WS_URL = "wss://api.upbit.com/websocket/v1"
 MAX_BACKOFF = HTTP_MAX_BACKOFF
@@ -54,9 +58,9 @@ async def run() -> None:
     def _on_delivery(err, msg) -> None:
         watchdog.record_delivery(err)
         if err is not None:
-            print(f"[ingester] delivery failed: {err}")
+            logger.error(f"delivery failed: {err}")
 
-    print(f"[ingester] connecting Upbit | kafka={KAFKA_BOOTSTRAP_SERVERS}")
+    logger.info(f"connecting Upbit | kafka={KAFKA_BOOTSTRAP_SERVERS}")
     backoff = 1
     count = 0
     try:
@@ -65,7 +69,7 @@ async def run() -> None:
                 async with websockets.connect(UPBIT_WS_URL, ping_interval=60) as ws:
                     backoff = 1
                     symbols = resolve_symbols()  # (재)연결마다 재해석 → 콜드스타트 실패 후 복구 반영
-                    print(f"[ingester] subscribing {len(symbols)} symbols")
+                    logger.info(f"subscribing {len(symbols)} symbols")
                     await ws.send(build_subscribe(symbols))
                     async for raw in ws:
                         msg = json.loads(raw, parse_float=Decimal)
@@ -80,17 +84,17 @@ async def run() -> None:
                             watchdog.record_produce()
                         except BufferError:  # 로컬 큐 만원(브로커 장기 불능 극단) — 한 틱 드랍하고 배수 기회
                             producer.poll(1.0)
-                            print("[ingester] local queue full — tick dropped")
+                            logger.warning("local queue full — tick dropped")
                         producer.poll(0)
                         if watchdog.stalled():   # SystemExit은 아래 except에 안 잡히고 그대로 종료
-                            print(f"[ingester] 성공 배달 {DELIVERY_STALL_SEC:.0f}s 없음"
+                            logger.error(f"성공 배달 {DELIVERY_STALL_SEC:.0f}s 없음"
                                   f"(pending={watchdog.pending}) — 종료, docker 재시작에 복구 위임")
                             raise SystemExit(1)
                         count += 1
                         if count % 50 == 0:
-                            print(f"[ingester] produced {count} ticks (last: {tick.symbol} @ {tick.price})")
+                            logger.info(f"produced {count} ticks (last: {tick.symbol} @ {tick.price})")
             except (websockets.WebSocketException, OSError) as e:
-                print(f"[ingester] connection lost: {e}; reconnect in {backoff}s")
+                logger.error(f"connection lost: {e}; reconnect in {backoff}s")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, MAX_BACKOFF)
     finally:
@@ -98,7 +102,8 @@ async def run() -> None:
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        print("[ingester] stopped")
+        logger.info("stopped")

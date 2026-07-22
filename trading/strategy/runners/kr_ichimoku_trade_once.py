@@ -14,12 +14,12 @@
 Dockerfile.batch(trade) 전용 — batch.candles.refresh_stock_daily/toss_daily 의존(app 이미지 제외 경로).
 """
 import argparse
+import logging
 import sys
-import traceback
 from decimal import Decimal
 
 from batch.candles.refresh_stock_daily import alive_symbols, refresh
-from common import notify_telegram
+from common import log, notify_telegram
 from common.clickhouse_client import create_client
 from common.config import FEE_RATE, STOCK_SELL_TAX_RATE
 from common.equity.equity_snapshot import ICHIMOKU_ACCOUNT, record_snapshot
@@ -31,6 +31,8 @@ from common.marketdata.stock_price import latest_closes
 from trading.portfolio import paper_ledger
 from trading.strategy.core.notify_messages import error_message, ichimoku_message
 from trading.strategy.runners.weekly_marker import mark_week_done, week_done
+
+logger = logging.getLogger(__name__)
 
 MARKET_KEY = "KR_ICHIMOKU"     # 주간 마커 키(ML 'KR'과 격리)
 HISTORY_DAYS = 800             # 선행B 52주 + 선행이동 26주 커버 + 여유
@@ -125,7 +127,7 @@ def _refresh_held(live: bool) -> None:
         try:
             upsert_clickhouse(client, fetch_daily(s, 14, log=lambda *a: None))
         except Exception as e:
-            print(f"[kr-ichimoku] {s} 보유종목 갱신 실패(비치명): {type(e).__name__}: {e}")
+            logger.error(f"{s} 보유종목 갱신 실패(비치명): {type(e).__name__}: {e}")
 
 
 def execute(live: bool, max_positions: int, exit_rule: str) -> dict:
@@ -201,12 +203,12 @@ def send_entry_charts(buy_bars: list) -> None:
         from common.chart.symbol_chart import KR_FETCH_DAYS, chart_for_symbol
         idx = stock_names.build_index(stock_names.fetch_all())
     except Exception as e:
-        print(f"[kr-ichimoku] 차트 셋업 실패(비치명): {type(e).__name__}: {e}")
+        logger.error(f"차트 셋업 실패(비치명): {type(e).__name__}: {e}")
         return
     try:                                                        # 차트용 깊은 이력(≤캡 종목이라 조회량 작음)
         deep = daily_ohlc("KR", [s for s, _ in buy_bars], KR_FETCH_DAYS)
     except Exception as e:
-        print(f"[kr-ichimoku] 차트용 깊은 이력 조회 실패(비치명, 신호용 이력 폴백): {type(e).__name__}: {e}")
+        logger.error(f"차트용 깊은 이력 조회 실패(비치명, 신호용 이력 폴백): {type(e).__name__}: {e}")
         deep = {}
     for sym, bars in buy_bars:
         try:
@@ -215,11 +217,12 @@ def send_entry_charts(buy_bars: list) -> None:
             png, cap = chart_for_symbol(deep.get(sym) or bars, "KR", sym, name)
             notify_telegram.send_photo(png, "🟢 [KR 일목 매수] " + cap)
         except Exception as e:
-            print(f"[kr-ichimoku] {sym} 차트 발송 실패(비치명): {type(e).__name__}: {e}")
+            logger.error(f"{sym} 차트 발송 실패(비치명): {type(e).__name__}: {e}")
 
 
 def main(argv=None) -> int:
     """진입점(스케줄러가 호출). 종료코드 0=정상 / 70=오류(텔레그램 통보) / 1=통보도 실패(startup 폴백)."""
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -234,17 +237,17 @@ def main(argv=None) -> int:
         if a.live:
             snapshot()
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("kr_ichimoku_trade_once 실행 크래시")
         sent = notify_telegram.send(error_message("KR 일목(페이퍼)", e))
         return 70 if sent else 1
     finally:
         close_pool()
-    print(f"[kr-ichimoku] bar={r['bar']} cash={r['cash']:,.0f} "
+    logger.info(f"bar={r['bar']} cash={r['cash']:,.0f} "
           f"targets={len(r['targets'])} buys={len(r['buys'])} sells={len(r['sells'])} live={a.live}")
     if r.get("skipped"):
-        print(f"  skip: {r['skipped']}")
+        logger.warning(f"skip: {r['skipped']}")
     for o in r.get("placed", []):
-        print("  ", o)
+        logger.info(f"  {o}")
     notify_telegram.send(ichimoku_message("KR 일목(페이퍼)", r, live=a.live))
     if a.live:
         send_entry_charts(r.get("buy_bars") or [])   # 매수 종목 주봉+일목 차트 발송(비치명)
