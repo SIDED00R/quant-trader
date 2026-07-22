@@ -303,8 +303,9 @@ docker compose --profile batch run --rm reeval
 .venv/Scripts/python -m trading.portfolio.updater
 .venv/Scripts/python -m uvicorn api.main:app --port 8000
 
-# 테스트
+# 테스트 & 린트 (dev 도구: pip install -r requirements-dev.txt)
 .venv/Scripts/python -m pytest tests/ -q
+.venv/Scripts/python -m ruff check .
 ```
 
 접속(보안상 `127.0.0.1` 루프백 바인딩): 대시보드 `127.0.0.1:8000` · Kafka `:9092` · PostgreSQL `:5432` · ClickHouse `:8123` · Grafana `:3000`. 대시보드는 2초 폴링, 시각은 KST 표시(UTC 저장).

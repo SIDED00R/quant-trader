@@ -8,7 +8,7 @@ KRX 수집기(krx·krx_bulk·kr_index_membership)는
 from dotenv import load_dotenv
 
 load_dotenv()                        # ← pykrx import 전에 KRX_ID/KRX_PW 주입(로그인 트리거)
-from pykrx import stock              # noqa: E402  (import 시점 KRX 로그인)
+from pykrx import stock              # noqa: E402,F401  (import 시점 KRX 로그인 + 수집기가 re-export)
 from pykrx.website.comm.auth import get_auth_session  # noqa: E402
 
 

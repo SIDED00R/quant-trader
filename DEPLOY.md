@@ -229,7 +229,7 @@ startup 분기표: **04·05→유지보수(토·1~7일 가드) / 06·07→KR / 1
 
 각 매매 잡이 종료 시 시장별 평가자산을 `equity_snapshots`에 upsert하고(코인=잡 내부 훅, KR/US=`main()`에서 KIS 잔고 재조회 — 주간 스킵 날도 기록), startup 말미가 `equity-chart` 컨테이너(app 이미지, `scripts/render_equity_chart.py`)로 SVG 라이트/다크 2벌을 렌더해 **orphan `assets` 브랜치에 단일 커밋 force-push**한다. README `<picture>`가 `raw.githubusercontent.com/SIDED00R/quant-trader/assets/equity-{light,dark}.svg`를 참조.
 
-- **설계 근거**: DB가 매매 VM 로컬이라 GitHub Actions에선 접근 불가 → 데이터·git 키·시크릿이 이미 있는 매매 VM에서 발행. force-push 단일 커밋 = 브랜치 크기 SVG 2개 고정(히스토리 무증가). `deploy.yml`은 `push: branches: [main]` 전용이라 **CI 미발화**. raw 이미지는 camo가 ~5분 캐시(일 1~3회 갱신에 무해).
+- **설계 근거**: DB가 매매 VM 로컬이라 GitHub Actions에선 접근 불가 → 데이터·git 키·시크릿이 이미 있는 매매 VM에서 발행. force-push 단일 커밋 = 브랜치 크기 SVG 2개 고정(히스토리 무증가). `deploy.yml`의 `push` 트리거는 `branches: [main]` 한정이라 `assets` 브랜치 force-push로는 **CI 미발화**(PR 이벤트도 assets 브랜치엔 열지 않음). raw 이미지는 camo가 ~5분 캐시(일 1~3회 갱신에 무해).
 - **쓰기 배포키 1회 셋업** (미준비 동안 push 스텝만 조용히 스킵 — 코드 배포와 독립):
   ```bash
   ssh-keygen -t ed25519 -f gh-push-key -N "" -C trade-vm-assets-push
@@ -254,12 +254,14 @@ gcloud scheduler jobs run trade-vm-kr-close-sweep --location=us-central1   # KR:
 
 ### 🚀 CI/CD (GitHub Actions → Artifact Registry → VM)
 
-main 머지마다 [.github/workflows/deploy.yml](.github/workflows/deploy.yml)이 실행된다:
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml)은 **PR·main 머지·수동 실행** 모두에서 돈다. 단 이벤트별 범위가 다르다:
+- **PR (`pull_request`)**: `lint`+`test` 게이트만 실행(머지 전 검증). `build` 이하는 `if: github.event_name != 'pull_request'`로 스킵 → PR은 이미지·VM을 건드리지 않는다. PR 런은 PR별 concurrency 그룹이라 프로덕션 `deploy` 큐와 격리된다.
+- **main push / `workflow_dispatch`**: 게이트 통과 후 아래 배포 체인 실행.
 1. **build**(matrix 병렬): app/batch 이미지 빌드 — buildx **레지스트리 캐시**(`:buildcache`)로 pip 레이어 재사용 → 캐시 히트 시 이미지당 1~2분. 태그 `:latest`+`:<sha>`, `org.opencontainers.image.revision` 라벨.
 2. **deploy-collector-vm**: `gcloud compute ssh`로 git reset + [infra/deploy-collector-vm.sh](infra/deploy-collector-vm.sh)(pull→up→sha 라벨 검증) 실행.
 3. **update-trade-vm**(2와 병렬): 매매 VM 메타데이터 startup-script 갱신.
 
-- **test 게이트**: 모든 배포는 pytest(`tests/`)+전 모듈 import 스윕+프로덕션 경계(batch.* 금지) 검사를 선행한다(`build.needs: test`) — 빨간 코드는 빌드·배포가 시작되지 않는다.
+- **lint·test 게이트**: 모든 배포는 `ruff check .`(F·E9 correctness)와 pytest(`tests/`)+전 모듈 import 스윕+프로덕션 경계(batch.* 금지) 검사를 선행한다(`build.needs: [lint, test]`) — 빨간/린트 실패 코드는 빌드·배포가 시작되지 않는다. 테스트는 커버리지 리포트(term)를 informational로 출력(게이트 아님).
 - **CI 실패 알림**: 어느 잡이든 실패하면 `notify-failure` 잡이 WIF로 `telegram-env`를 읽어 텔레그램 통보한다. 1회 셋업:
   `gcloud secrets add-iam-policy-binding telegram-env --member="serviceAccount:github-deployer@coin-auto-trader-jvfhgq.iam.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`
 - 인증 = **Workload Identity Federation**(`github-pool`/`github-provider`, 레포 `SIDED00R/quant-trader` 핀) — GitHub 시크릿 저장 없음. 1회 셋업 = `bash infra/setup-cicd.sh`.
