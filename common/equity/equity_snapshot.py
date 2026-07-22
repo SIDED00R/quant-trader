@@ -2,7 +2,7 @@
 
 스냅샷은 부가 기능이라 어떤 실패도 매매 잡을 깨뜨리지 않는다 — 모든 예외를 삼키고 False를 반환.
 같은 날 재실행(스위퍼·US 다중 부팅)은 PK(market, account_id, snap_date) upsert로 마지막 실행이 승리.
-KR/US는 단일 KIS 모의계좌라 account_id='kis' 고정(accounts FK 없음 — 의도, db/postgres_schema.sql).
+KR/US는 단일 KIS 모의계좌라 account_id='kis' 고정(accounts FK 없음 — 의도, db/migrations/postgres/0001_baseline.sql).
 """
 from datetime import datetime, timezone
 

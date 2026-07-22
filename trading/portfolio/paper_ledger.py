@@ -3,7 +3,7 @@
 실계좌·브로커 없이 코인 시뮬 장부(portfolio.apply_execution)를 그대로 재사용한다:
 orders(PENDING) INSERT → 동기 체결(검증·현금/포지션 갱신·FILLED). 수수료는 KR 실계좌와 동일 가정 —
 매수=수수료(FEE_RATE), 매도=수수료+거래세(STOCK_SELL_TAX_RATE). KIS 실계좌(ML 전략)와 공정 비교용.
-account_id는 accounts에 별도 행으로 시드(db/postgres_schema.sql). auto_trade=FALSE 유지(코인 잡 비대상).
+account_id는 accounts에 별도 행으로 시드(db/migrations/postgres/0001_baseline.sql). auto_trade=FALSE 유지(코인 잡 비대상).
 """
 import uuid
 from decimal import Decimal

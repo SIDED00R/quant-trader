@@ -1,7 +1,7 @@
 -- 원시 틱은 TTL 180일 — 집계(candles_1m/1d)가 영구본이고 원시분은 인트라데이 연구·재집계용이라
 -- 반년 보존이면 충분. 무TTL이면 24/7 수집 VM(30GB)이 디스크풀 → 수집 중단으로 간다.
--- ⚠ TTL은 CREATE에만 있어 신규 설치 전용. 기존(라이브) 테이블은 DEPLOY.md 런북의 1회 ALTER로 적용
---   (init_db가 이 파일을 매 부팅 재실행하므로 ALTER MODIFY TTL을 여기 두면 매번 재물질화됨 — 금지).
+-- ⚠ TTL은 CREATE에만 있어 신규 설치 전용. 기존(라이브) 테이블에 TTL 변경 등 1회성 DDL은
+--   이 베이스라인을 고치지 말고 새 마이그레이션(db/migrations/clickhouse/000N_*.sql)으로 추가한다(런원스 보장).
 CREATE TABLE IF NOT EXISTS ticks (
     symbol     LowCardinality(String),
     price      Float64,
