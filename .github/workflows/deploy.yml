@@ -183,5 +183,5 @@ jobs:
           python-version: "3.13"
       - run: |
           gcloud secrets versions access latest --secret=telegram-env > .env
-          pip install -q telethon python-dotenv
+          pip install -q telethon pydantic-settings   # config가 pydantic-settings 사용(python-dotenv는 전이 의존)
           python -m common.notify_telegram "🔴 CI deploy 실패 — ${GITHUB_SHA:0:7} / https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

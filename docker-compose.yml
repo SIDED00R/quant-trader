@@ -442,6 +442,13 @@ services:
     ports:
       # 외부 공개는 Caddy(HTTPS)가 담당. api 자체는 루프백만 바인딩(SSH 터널용).
       - "${API_BIND:-127.0.0.1}:8000:8000"
+    # /healthz(DB 무의존 liveness) 폴링. python-slim에 curl 없어 stdlib urllib 사용(이미지 불변).
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # ── Caddy 리버스프록시 (HTTPS 종단 → api:8000) ─────────────────────
   caddy:
