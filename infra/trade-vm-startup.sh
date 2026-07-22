@@ -55,6 +55,9 @@ export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
 cd "$REPO" && git remote set-url origin git@github.com:SIDED00R/quant-trader.git && git fetch origin main && git reset --hard origin/main
 cp -n .env.example .env || true
 
+# non-root 컨테이너(uid 1000)가 쓰는 볼륨/바인드 소유권 정렬(모든 compose up/run 전, 멱등)
+bash infra/fix-volume-ownership.sh
+
 # ── 자격증명 주입 (Secret Manager kis-env·telegram-env·toss-env·dart-env·krx-env·fred-env → .env, VM 토큰으로 REST 접근; 실패해도 진행) ──
 # .env는 부팅 간 영속 — prefix 필터(grep -vE)로 지난 부팅의 주입 라인을 걷어내 중복 누적을 방지한다.
 KIS_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)

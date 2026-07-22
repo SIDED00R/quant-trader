@@ -13,10 +13,20 @@ WORKDIR /app
 COPY requirements.txt requirements-ml.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-ml.txt
 
-COPY common ./common
-COPY trading ./trading
-COPY batch ./batch
+# non-root 실행 사용자(uid 1000).
+RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin app
+
+COPY --chown=app:app common ./common
+COPY --chown=app:app trading ./trading
+COPY --chown=app:app batch ./batch
+
+# 캐시 마운트 지점을 app 소유로 pre-create — 신규(빈) named volume이 마운트 시 이 소유권을 상속한다.
+# (기존 라이브 볼륨은 root 소유로 남아 있으므로 infra/fix-volume-ownership.sh가 부팅 시 정렬)
+RUN mkdir -p /app/batch/.refcache /app/batch/rawdata/.13f_cache /app/batch/rawdata/.insider_cache \
+    && chown -R app:app /app/batch
 
 ENV PYTHONUNBUFFERED=1
+
+USER app
 
 # 기본 커맨드 없음 — compose에서 `python -m batch.jobs.reeval_weights [--dry-run]` 등으로 지정
