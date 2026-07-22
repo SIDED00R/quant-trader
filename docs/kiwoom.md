@@ -151,7 +151,7 @@
 | `common/kafka_client.py` | (그대로) | producer/consumer 팩토리 변경 불필요 |
 | `sink/tick_clickhouse.py` → `ticks` | `sink/stock_tick_clickhouse.py` → `stock_ticks` | parse_row/배치(500/2s)/insert/수동commit 미러, 별도 GROUP_ID |
 | `TOPIC_TICKS="market.ticks"` | `TOPIC_STOCK_TICKS="stock.ticks"` (config.py:19 근처) | kafka-init에 `--partitions 6 --config retention.ms=86400000` 라인 추가(AUTO_CREATE=false) |
-| ClickHouse `ticks` | `stock_ticks`(ReplacingMergeTree, ORDER BY (symbol,seq)) | `db/clickhouse_schema.sql`에 DDL 추가(schema_loader 자동 적용) |
+| ClickHouse `ticks` | `stock_ticks`(ReplacingMergeTree, ORDER BY (symbol,seq)) | 새 마이그레이션 `db/migrations/clickhouse/000N_*.sql`로 DDL 추가(migrations 러너가 자동 적용) |
 | Postgres `orders`/`executions`/`positions` | `ADD COLUMN IF NOT EXISTS asset_class TEXT`(+`broker_order_id TEXT`) | 단건 검증엔 컬럼 추가(A안)가 변경 최소. 별 테이블(B안)은 8·9단계 |
 | `engine/matching.py`(Kafka 모의체결) | **우회** — 키움이 외부 체결을 돌려줌 | 주식 주문은 `order_outbox`/relay/engine 경로를 타면 안 됨(코인 엔진이 오소비) |
 | `common/order_writer.place_order` | `common/broker/kiwoom_client.py` + 별도 체결 기록 함수 | 키움 REST 주문 호출→`ord_no`→executions 직접 기록(uuid5 멱등 유지) |

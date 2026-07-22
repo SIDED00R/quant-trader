@@ -65,7 +65,7 @@
   **KRX 초회 선시딩(1회)**: 프로드 테이블(stock_investor_flow·stock_foreign_holding·stock_short KR)이 비어 있으면 월간 증분(`krx.py`)이 raise한다(암묵 수시간 per-symbol 전량 백필 차단). by-date 고속 수집기로 1회 시딩 후 증분에 맡긴다:
   `docker compose --profile trade run --rm maintenance-once python -m batch.rawdata.krx_bulk --start 2018-01-01`  *(분 단위·by-date 8콜/일. 주의: bulk는 수급 3분류(외국인·기관합계·연기금)만 — 이후 월간 증분(krx.py)은 11분류 원본 수집)*
 - **정기 데이터 유지보수(`maintenance-once`, #204)**: 매매 전 증분 갱신(14일)이 다루지 못하는 수정주가 기준 재조정·분기 공시 반영을 매월 첫 토요일 04:00 UTC에 1회 실행한다(활성 유니버스 일봉 선별 재백필(재조정/데이터갭 종목만) + EDGAR·13F·SIC·DART 수집기 재실행 + **연구 데이터 지속 수집**: KRX 수급·공매도·외국인보유(증분)·KR/US 지수 PIT 멤버십·FRED 매크로·KR 상폐 메타 — 모델 미사용이어도 재사용 자산으로 축적, 수집기별 0행 가드로 조용한 실패 차단). 단계별 격리 + 텔레그램 통보.
-- **원시 틱 TTL 180일 — 기존(라이브) 테이블 1회 ALTER 런북**: 스키마의 TTL은 신규 설치 전용(`db/clickhouse_schema.sql` 주석 — init_db가 매 부팅 재실행하므로 ALTER를 스키마에 넣으면 매번 재물질화). 수집 VM에 1회 적용:
+- **원시 틱 TTL 180일 — 기존(라이브) 테이블 1회 ALTER 런북**: baseline의 TTL은 신규 설치 전용(`db/migrations/clickhouse/0001_baseline.sql` 주석). 이런 1회성 ALTER는 baseline을 고치지 말고 새 마이그레이션(`db/migrations/clickhouse/000N_*.sql`)으로 추가하면 런너가 런원스로 적용한다(수동 런북 불요). 이미 배포된 라이브 테이블에 지금 즉시 적용하려면 아래를 1회 실행:
   ```bash
   gcloud compute ssh coin-trader-vm --zone=us-central1-a --command \
    "cd /opt/coin-auto-trader && P=\$(sudo grep -E '^CLICKHOUSE_PASSWORD=' .env | cut -d= -f2- | sed 's/[[:space:]]*#.*//; s/[[:space:]]*\$//'); \

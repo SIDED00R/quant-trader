@@ -6,7 +6,7 @@
 단일 계좌·동기 체결을 가정한다(라이브의 지연=0 이상화).
 
 라이브 DB 스케일 모사: krw_balance·avg_buy_price는 NUMERIC(20,4)라 매 갱신 후 4자리로 반올림된다
-(db/postgres_schema.sql). 동일 정밀도를 유지하려 현금/평단을 0.0001로 양자화(ROUND_HALF_UP=Postgres NUMERIC).
+(db/migrations/postgres/0001_baseline.sql). 동일 정밀도를 유지하려 현금/평단을 0.0001로 양자화(ROUND_HALF_UP=Postgres NUMERIC).
 """
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal

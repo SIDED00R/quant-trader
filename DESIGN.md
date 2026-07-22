@@ -250,7 +250,7 @@ kafka_project/
 │
 ├── api/        # FastAPI 대시보드/REST (서빙 — 직교)
 ├── scripts/    # init_db 등 1회성 셋업
-├── db/         # 스키마 DDL (postgres_schema.sql · clickhouse_schema.sql)
+├── db/         # 버전 마이그레이션 (migrations/{postgres,clickhouse}/NNNN_*.sql · postgres_repair.sql)
 └── dashboard/  # Grafana 정의(프로비저닝)
 ```
 
