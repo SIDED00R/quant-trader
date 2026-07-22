@@ -8,9 +8,11 @@ strategy.signals에 **전략명 태그**로 발행한다(합성은 commander가 
 LiveEnsemble(순수 상태기)는 Kafka/ClickHouse 비의존이라 단위 테스트 가능. run()이 I/O를 얇게 감싼다.
 """
 import json
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from common import log
 from common.config import ENSEMBLE_SYMBOLS, TOPIC_SIGNALS, TOPIC_TICKS
 from common.schemas import Signal
 from trading.strategy.plugins.ensemble import default_loads
@@ -18,6 +20,8 @@ from trading.strategy.plugins.trend_signal import TrendSignal
 
 # common.kafka_client(confluent-kafka)는 run()에서만 지연 import — LiveEnsemble 순수 상태기는
 # Kafka 비의존이라 단위 테스트 시 무거운 의존성을 끌어오지 않는다.
+
+logger = logging.getLogger(__name__)
 
 GROUP_ID = "ensemble-signals"
 
@@ -116,7 +120,7 @@ def _publish(producer, symbol, load_name, target: Decimal, bar_day) -> None:
                  bar_ts=str(bar_day), ts=datetime.now(timezone.utc).isoformat())
     producer.produce(TOPIC_SIGNALS, sig.to_json())
     producer.poll(0)
-    print(f"[load] signal {symbol} {load_name} target={target} (bar={bar_day})")
+    logger.info(f"signal {symbol} {load_name} target={target} (bar={bar_day})")
 
 
 def _publish_all(producer, symbol, per_load, bar_day) -> None:
@@ -134,7 +138,7 @@ def run() -> None:
     consumer = create_consumer(GROUP_ID, enable_auto_commit=True, auto_offset_reset="latest")
     consumer.subscribe([TOPIC_TICKS])
     loads = ", ".join(name for name, _ in state.loads)
-    print(f"[loads] started — universe={ENSEMBLE_SYMBOLS}, loads=[{loads}], "
+    logger.info(f"started — universe={ENSEMBLE_SYMBOLS}, loads=[{loads}], "
           f"warmup={{{', '.join(f'{s}:{len(hist[s])}' for s in ENSEMBLE_SYMBOLS)}}}")
     try:
         while True:
@@ -154,7 +158,8 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         run()
     except KeyboardInterrupt:
-        print("[loads] stopped")
+        logger.info("stopped")

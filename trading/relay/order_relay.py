@@ -5,11 +5,15 @@ order_outbox의 미발행 레코드를 orders 토픽으로 발행한 뒤 publish
 중복 발행은 결정적 execution_id로 하류(체결엔진→포트폴리오)에서 멱등 처리된다.
 FOR UPDATE SKIP LOCKED로 다중 인스턴스에서도 안전하다.
 """
+import logging
 import time
 
+from common import log
 from common.config import TOPIC_ORDERS
 from common.kafka_client import create_producer
 from common.postgres_client import close_pool, open_pool, pool
+
+logger = logging.getLogger(__name__)
 
 BATCH = 100
 POLL_SEC = 0.2
@@ -18,7 +22,7 @@ POLL_SEC = 0.2
 def run() -> None:
     open_pool()
     producer = create_producer()
-    print("[relay] started")
+    logger.info("started")
     try:
         while True:
             with pool.connection() as conn:
@@ -37,14 +41,15 @@ def run() -> None:
                     "UPDATE order_outbox SET published=TRUE WHERE id = ANY(%s)",
                     ([r[0] for r in rows],),
                 )
-                print(f"[relay] published {len(rows)} orders")
+                logger.info(f"published {len(rows)} orders")
     finally:
         producer.flush(5)
         close_pool()
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         run()
     except KeyboardInterrupt:
-        print("[relay] stopped")
+        logger.info("stopped")

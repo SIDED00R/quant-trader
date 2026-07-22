@@ -6,12 +6,16 @@
 실행: PYTHONPATH=. .venv/Scripts/python.exe -m batch.features.compute [US KR] [--no-store]
 """
 import argparse
+import logging
 import sys
 
 import pandas as pd
 
 from batch.features.ohlcv import compute_features, feature_columns
+from common import log
 from common.clickhouse_client import create_client
+
+logger = logging.getLogger(__name__)
 
 _COLS = ["open", "high", "low", "close", "volume"]
 
@@ -48,6 +52,7 @@ def store(market: str, feats: pd.DataFrame) -> int:
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -60,10 +65,10 @@ def main(argv=None) -> int:
         panel = load_ohlcv(mk)
         feats = compute_features(panel)
         nfeat = len(feature_columns(feats))
-        print(f"[features] {mk}: {panel['symbol'].nunique()}종목 → {len(feats):,}행 × {nfeat}피처")
+        logger.info(f"{mk}: {panel['symbol'].nunique()}종목 → {len(feats):,}행 × {nfeat}피처")
         if not a.no_store:
             n = store(mk, feats)
-            print(f"[features] {mk}: {n:,}개 (symbol,date,feature) 값 적재")
+            logger.info(f"{mk}: {n:,}개 (symbol,date,feature) 값 적재")
     return 0
 
 

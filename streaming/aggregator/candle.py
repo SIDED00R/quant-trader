@@ -6,13 +6,17 @@
 - candles_1m는 ReplacingMergeTree라 같은 (symbol, window_start) 재기록은 멱등 병합
 """
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 
+from common import log
 from common.clickhouse_client import create_client
 from common.config import TOPIC_TICKS
 from common.constants import COLUMNS_CANDLES
 from common.kafka_client import create_consumer
+
+logger = logging.getLogger(__name__)
 
 GROUP_ID = "candle-aggregator"
 FLUSH_SEC = 2.0
@@ -36,7 +40,7 @@ def run() -> None:
     client = create_client()
     consumer = create_consumer(GROUP_ID)
     consumer.subscribe([TOPIC_TICKS])
-    print("[candle] started")
+    logger.info("started")
 
     candles: dict[tuple, dict] = {}
     dirty: set[tuple] = set()          # 직전 플러시 이후 갱신된 (symbol, window) — 이것만 재적재
@@ -57,7 +61,7 @@ def run() -> None:
                     vol = float(t["volume"])
                     wstart = floor_minute(t["trade_ts"])
                 except (KeyError, ValueError, TypeError) as e:
-                    print(f"[candle] skip bad message: {e}")
+                    logger.warning(f"skip bad message: {e}")
                 else:
                     if max_window is None or wstart > max_window:
                         max_window = wstart
@@ -77,7 +81,7 @@ def run() -> None:
             if now - last_flush >= FLUSH_SEC:
                 if dirty:                        # 갱신분만 재적재(마감봉·무입력 구간 재적재 제거)
                     client.insert("candles_1m", _rows({k: candles[k] for k in dirty}), column_names=COLUMNS)
-                    print(f"[candle] upserted {len(dirty)} candles")
+                    logger.info(f"upserted {len(dirty)} candles")
                     dirty.clear()
                 if consumed:                     # insert와 분리 — 갱신 없어도(bad message 등) 오프셋은 진행
                     consumer.commit(asynchronous=False)
@@ -98,7 +102,8 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         run()
     except KeyboardInterrupt:
-        print("[candle] stopped")
+        logger.info("stopped")

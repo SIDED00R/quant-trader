@@ -4,9 +4,12 @@
 같은 날 재실행(스위퍼·US 다중 부팅)은 PK(market, account_id, snap_date) upsert로 마지막 실행이 승리.
 KR/US는 단일 KIS 모의계좌라 account_id='kis' 고정(accounts FK 없음 — 의도, db/migrations/postgres/0001_baseline.sql).
 """
+import logging
 from datetime import datetime, timezone
 
 from common.postgres_client import open_pool, pool
+
+logger = logging.getLogger(__name__)
 
 KIS_ACCOUNT = "kis"
 ICHIMOKU_ACCOUNT = "kr_ichimoku"   # KR 일목 페이퍼 전략(실주문 없는 시뮬 장부) — market='KR'·별도 account_id로 곡선 분리
@@ -28,10 +31,10 @@ def record_snapshot(market: str, account_id: str, currency: str, equity,
         snap_date = datetime.now(timezone.utc).date()
         with pool.connection() as conn:
             conn.execute(_UPSERT, (snap_date, market, account_id, currency, cash, positions_value, equity))
-        print(f"[equity-snapshot] {market}/{account_id} {snap_date} equity={equity}")
+        logger.info(f"{market}/{account_id} {snap_date} equity={equity}")
         return True
     except Exception as e:
-        print(f"[equity-snapshot] 기록 실패(비치명 — 매매 결과 무관): {type(e).__name__}: {e}")
+        logger.error(f"기록 실패(비치명 — 매매 결과 무관): {type(e).__name__}: {e}")
         return False
 
 
@@ -47,5 +50,5 @@ def record_stock_snapshot(market: str, balance_fn) -> bool:
         return record_snapshot(market, KIS_ACCOUNT, bal["currency"], bal["cash"] + positions_value,
                                cash=bal["cash"], positions_value=positions_value)
     except Exception as e:
-        print(f"[equity-snapshot] {market} 잔고 조회 실패(비치명): {type(e).__name__}: {e}")
+        logger.error(f"{market} 잔고 조회 실패(비치명): {type(e).__name__}: {e}")
         return False

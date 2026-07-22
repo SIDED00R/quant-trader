@@ -5,16 +5,21 @@
 사전조건: docker compose up -d clickhouse + python -m scripts.init_db (candles_1d 생성).
 """
 import argparse
+import logging
 import sys
 from datetime import datetime, timezone
 
+from common import log
 from common.clickhouse_client import create_client
 from common.config import SYMBOLS
 from common.marketdata.upbit_markets import fetch_krw_markets
 from batch.candles.upbit_daily import fetch_daily, upsert_clickhouse
 
+logger = logging.getLogger(__name__)
+
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
@@ -30,19 +35,19 @@ def main(argv=None) -> int:
         try:
             markets = fetch_krw_markets()
         except Exception as e:
-            print(f"[daily] 마켓 목록 조회 실패: {e}", file=sys.stderr)
+            logger.error(f"마켓 목록 조회 실패: {e}")
             return 2
     else:
         markets = [s.strip() for s in a.symbols.split(",") if s.strip()]
     if not markets:
-        print("[daily] 대상 종목이 없습니다.", file=sys.stderr)
+        logger.error("대상 종목이 없습니다.")
         return 2
     # 진행 중(미마감) 당일 일봉 제외 경계 = 오늘 00:00 UTC
     complete_until = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     try:   # CH 연결 실패는 전체 치명 → fail-fast
         client = create_client()
     except Exception as e:
-        print(f"[daily] ClickHouse 연결 실패: {e} (기동·init_db 확인)", file=sys.stderr)
+        logger.error(f"ClickHouse 연결 실패: {e} (기동·init_db 확인)")
         return 2
     total, failed = 0, []
     for market in markets:   # 종목별 격리 — 일시적 429/오류 1종목이 나머지(수백) 종목을 막지 않게
@@ -51,14 +56,14 @@ def main(argv=None) -> int:
                                    parameters={"m": market}).result_rows[0][0]
             rows = fetch_daily(market, a.days, complete_until, since=latest)   # 증분: 저장된 과거 재수신 회피
             total += upsert_clickhouse(client, rows, a.table)
-            print(f"[daily] {market}: {len(rows)}봉 적재")
+            logger.info(f"{market}: {len(rows)}봉 적재")
         except Exception as e:
             failed.append(market)
-            print(f"[daily] {market} 실패(건너뜀): {e}", file=sys.stderr)
+            logger.error(f"{market} 실패(건너뜀): {e}")
     ok = len(markets) - len(failed)
-    print(f"[daily] 완료: {ok}/{len(markets)}종목 → {a.table} ({total}행)")
+    logger.info(f"완료: {ok}/{len(markets)}종목 → {a.table} ({total}행)")
     if failed:
-        print(f"[daily] 실패 {len(failed)}종목: {failed} (재실행으로 보충 가능)", file=sys.stderr)
+        logger.error(f"실패 {len(failed)}종목: {failed} (재실행으로 보충 가능)")
         return 1
     return 0
 

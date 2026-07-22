@@ -5,6 +5,7 @@ top-N long-or-cash 매매계획·잔고 폴링 체결확인. 시장별로 다른
 US 해외 지정가+체결추격(kis_chase)·거래소 라우팅)은 각 모듈에 남긴다. 최신 종가 조회는
 common/marketdata/stock_price.py로 이동(app 이미지 공용). batch.ml.stock_score 의존 → Dockerfile.batch(trade) 전용.
 """
+import logging
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +13,8 @@ from batch.ml.stock_score import score_latest
 from common.marketdata.market_holidays import is_market_holiday, market_today
 from common.postgres_client import open_pool
 from trading.strategy.runners.weekly_marker import week_done
+
+logger = logging.getLogger(__name__)
 
 _EMPTY_PLAN = {"bar": None, "cash": 0.0, "targets": [], "buys": [], "sells": [], "ranked": None}
 MAX_STALE_DAYS = 7   # 최신봉 신선도 상한(달력일) — 초과 시 매매 중단(잘못된 시세로 사이징 방지)
@@ -75,7 +78,7 @@ def confirm_fills(balance_fn, before: dict, placed: list,
         try:
             after = {x["symbol"]: x["qty"] for x in balance_fn()["positions"]}
         except Exception as e:                   # 일시 오류 — 로그 남기고 다음 폴에서 재시도
-            print(f"[confirm-fills] 잔고 조회 실패(폴 계속): {type(e).__name__}: {e}")
+            logger.error(f"잔고 조회 실패(폴 계속): {type(e).__name__}: {e}")
             continue
         deltas = {s: after.get(s, 0) - before.get(s, 0) for s in sides}
         filled = {s: round(abs(d)) for s, d in deltas.items()    # KIS 잔고 qty는 float — 표기용 정수화

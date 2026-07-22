@@ -7,12 +7,16 @@ NASDAQ-100 PIT는 무료 정형소스 부재 → 현재구성만(근사, 한계 
 """
 import csv
 import io
+import logging
 import sys
 from datetime import date
 
 import httpx
 
+from common import log
 from common.clickhouse_client import create_client
+
+logger = logging.getLogger(__name__)
 
 _UA = {"User-Agent": "coin-auto-trader research"}
 _BASE = "https://raw.githubusercontent.com/fja05680/sp500/master"
@@ -51,6 +55,7 @@ def store_sp500(client: httpx.Client, ch, log=print) -> tuple:
 
 
 def main(argv=None) -> int:
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -59,7 +64,7 @@ def main(argv=None) -> int:
     with httpx.Client(timeout=30, headers=_UA, follow_redirects=True) as client:
         store_sp500(client, ch)
     # NASDAQ-100 PIT: 무료 정형소스 부재 → 현재구성(batch/universe/nasdaq100.txt) 근사는 보류, 한계 명시
-    print("[membership] 주의: NASDAQ-100 PIT은 무료 소스 부재로 미적재(현재구성만, 한계). S&P500은 PIT 정확.")
+    logger.info("주의: NASDAQ-100 PIT은 무료 소스 부재로 미적재(현재구성만, 한계). S&P500은 PIT 정확.")
     return 0
 
 

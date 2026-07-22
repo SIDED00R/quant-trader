@@ -3,10 +3,13 @@
 SUBSCRIBE_ALL_KRW 면 업비트 전체 KRW 마켓을 동적 구독(캐시, 실패 시 정적 폴백),
 아니면 정적 SYMBOLS 목록을 쓴다.
 """
+import logging
 import time
 
 from common.config import SUBSCRIBE_ALL_KRW, SYMBOLS
 from common.marketdata.upbit_markets import fetch_krw_markets
+
+logger = logging.getLogger(__name__)
 
 _MARKETS_TTL = 3600.0  # 동적 목록 캐시(마켓 변동은 드묾)
 _FAIL_TTL = 60.0       # 조회 실패 후 재시도 억제(초) — 콜드 캐시 재시도 폭주/블로킹 방지
@@ -29,7 +32,7 @@ def resolve_symbols() -> list[str]:
             _cache_at = now
         except Exception as e:
             _fail_at = now
-            print(f"[symbols] 업비트 마켓 조회 실패: {e}; 폴백={SYMBOLS}")
+            logger.error(f"업비트 마켓 조회 실패: {e}; 폴백={SYMBOLS}")
             return _cache or SYMBOLS
     return _cache or SYMBOLS
 

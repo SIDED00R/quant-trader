@@ -7,8 +7,11 @@
 사전 로딩이 실패해도 `/차트 005930`·`/차트 AAPL`은 항상 동작하고, 이름검색(`/차트 삼성전자`)만 열화된다.
 """
 import json
+import logging
 import os
 import re
+
+logger = logging.getLogger(__name__)
 
 _BUNDLED = os.path.join(os.path.dirname(__file__), "refdata", "stock_names.json")
 _KR_CODE = re.compile(r"^\d{6}$")
@@ -45,7 +48,7 @@ def fetch_all() -> dict:
         return {"KR": [(str(c), str(nm)) for c, nm in b.get("KR", [])],
                 "US": [(str(t).upper(), str(nm)) for t, nm in b.get("US", [])]}
     except Exception as e:
-        print(f"[stock-names] 번들 사전 로드 실패(비치명): {type(e).__name__}: {e}")
+        logger.error(f"번들 사전 로드 실패(비치명): {type(e).__name__}: {e}")
         return {"KR": [], "US": []}
 
 

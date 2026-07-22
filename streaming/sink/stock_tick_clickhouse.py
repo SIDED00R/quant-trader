@@ -2,13 +2,17 @@
 
 코인 sink/tick_clickhouse.py 패턴 미러(별도 GROUP_ID·테이블). Tick 스키마를 공유한다.
 """
+import logging
 import time
 
+from common import log
 from common.clickhouse_client import create_client
 from common.config import TOPIC_STOCK_TICKS
 from common.constants import COLUMNS_TICKS
 from common.kafka_client import create_consumer
 from streaming.sink._parse import parse_row
+
+logger = logging.getLogger(__name__)
 
 GROUP_ID = "stock-tick-clickhouse-sink"
 TABLE = "stock_ticks"
@@ -21,7 +25,7 @@ def run() -> None:
     client = create_client()
     consumer = create_consumer(GROUP_ID)
     consumer.subscribe([TOPIC_STOCK_TICKS])
-    print(f"[stock-sink] consuming {TOPIC_STOCK_TICKS} → ClickHouse {TABLE}")
+    logger.info(f"consuming {TOPIC_STOCK_TICKS} → ClickHouse {TABLE}")
 
     batch: list = []
     last_flush = time.monotonic()
@@ -34,12 +38,12 @@ def run() -> None:
                 try:
                     batch.append(parse_row(msg.value()))
                 except (KeyError, ValueError, TypeError) as e:
-                    print(f"[stock-sink] skip bad message: {e}")
+                    logger.warning(f"skip bad message: {e}")
             if batch and (len(batch) >= BATCH_SIZE or now - last_flush >= FLUSH_SEC):
                 client.insert(TABLE, batch, column_names=COLUMNS)
                 consumer.commit(asynchronous=False)
                 total += len(batch)
-                print(f"[stock-sink] inserted {len(batch)} rows (total {total})")
+                logger.info(f"inserted {len(batch)} rows (total {total})")
                 batch.clear()
                 last_flush = now
     finally:
@@ -50,7 +54,8 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    log.setup()
     try:
         run()
     except KeyboardInterrupt:
-        print("[stock-sink] stopped")
+        logger.info("stopped")

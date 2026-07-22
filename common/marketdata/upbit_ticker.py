@@ -6,9 +6,12 @@ trade_once가 마크·주문가로 쓸 코인 현재가. 틱 아카이브(ClickH
 
 실행(디버그): PYTHONPATH=. .venv/Scripts/python.exe -m common.marketdata.upbit_ticker
 """
+import logging
 from decimal import Decimal
 
 from common.http_client import get_json
+
+logger = logging.getLogger(__name__)
 
 _TICKER_URL = "https://api.upbit.com/v1/ticker"
 
@@ -25,9 +28,11 @@ def latest_prices(symbols) -> dict:
 if __name__ == "__main__":
     import sys
 
+    from common import log
     from common.config import ENSEMBLE_SYMBOLS
+    log.setup()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    print(latest_prices(ENSEMBLE_SYMBOLS))
+    logger.info(latest_prices(ENSEMBLE_SYMBOLS))
