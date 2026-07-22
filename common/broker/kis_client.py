@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from common.config import KIS_APPKEY, KIS_APPSECRET, KIS_REST_BASE
+from common.constants import BROKER_TIMEOUT
 from common.oauth_token import TokenCache
 
 _TOKEN_PATH = "/oauth2/tokenP"
@@ -29,7 +30,7 @@ def _request_token() -> tuple[str, datetime]:
             "appkey": KIS_APPKEY,
             "appsecret": KIS_APPSECRET,
         },
-        timeout=15.0,
+        timeout=BROKER_TIMEOUT,
     )
     resp.raise_for_status()
     body = resp.json()
