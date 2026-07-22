@@ -105,7 +105,7 @@ def main(argv=None) -> int:
     rows = [run_market(mk, a.horizon, a.seeds, a.folds, a.objective,
                        fundamentals=not a.no_fund, macro=a.macro, inst13f=not a.no_13f,
                        sector=not a.no_sector, kr_micro=a.kr_micro) for mk in a.markets]
-    print(f"\n===== LightGBM 베이스라인 (OOF, purged walk-forward) =====")
+    print("\n===== LightGBM 베이스라인 (OOF, purged walk-forward) =====")
     print_summary(rows)
     return 0
 

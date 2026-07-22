@@ -6,6 +6,10 @@ __pycache__/
 venv/
 env/
 
+# Test coverage
+.coverage
+htmlcov/
+
 # Environment
 .env
 .env.local

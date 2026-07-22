@@ -6,11 +6,13 @@ name: deploy
 on:
   push:
     branches: [main]
+  pull_request:          # 머지 전 게이트(lint·test) — 빌드·배포는 아래 if로 PR에서 스킵
   workflow_dispatch:
 
 concurrency:
-  group: deploy          # 연속 머지 직렬화(최신 대기 런만 유지) — :latest 태그 경합 방지
-  cancel-in-progress: false
+  # PR 런은 PR별 그룹(최신만 유지)으로 격리 — 프로덕션 deploy 직렬화 그룹을 오염하지 않게.
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -23,6 +25,17 @@ env:
   AR: us-central1-docker.pkg.dev/coin-auto-trader-jvfhgq/docker
 
 jobs:
+  # 린트 게이트 — ruff correctness(F·E9) 위반이 있으면 빌드·배포 차단.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -q ruff==0.15.22
+      - run: ruff check .
+
   # 테스트 게이트 — 테스트를 통과해야 빌드·배포(빨간 코드의 프로드 VM 직행 차단).
   test:
     runs-on: ubuntu-latest
@@ -31,8 +44,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install -q -r requirements.txt -r requirements-ml.txt pytest
-      - run: python -m pytest tests/ -q
+      - run: pip install -q -r requirements-dev.txt
+      - run: python -m pytest tests/ -q --cov --cov-report=term
       - name: import 스윕 + 프로덕션 경계 검사
         run: |
           python - <<'EOF'
@@ -62,7 +75,8 @@ jobs:
           echo "BOUNDARY OK"
 
   build:
-    needs: test
+    needs: [lint, test]
+    if: github.event_name != 'pull_request'   # PR에선 게이트만 — 빌드·배포는 main push/dispatch에서만
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -153,8 +167,8 @@ jobs:
   # 어느 잡이든 실패 시 텔레그램 통보 — CI 실패가 GitHub 이메일에만 묻히지 않게 매매 알림과 채널 일원화.
   # (github-deployer SA에 telegram-env secretAccessor 1회 바인딩 필요 — DEPLOY.md CI/CD 절 참조)
   notify-failure:
-    if: failure()
-    needs: [test, build, deploy-collector-vm, update-trade-vm]
+    if: failure() && github.event_name != 'pull_request'   # PR 실패는 PR UI로 충분(WIF/시크릿 접근도 회피)
+    needs: [lint, test, build, deploy-collector-vm, update-trade-vm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

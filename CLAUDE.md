@@ -28,4 +28,5 @@
 
 ## 검증
 
-변경 후 최소: `python -m pytest tests/ -q` 통과 + 영향 모듈 import 확인 + (인프라 변경 시) `docker compose config`.
+변경 후 최소: `python -m pytest tests/ -q` 통과 + `ruff check .` 클린 + 영향 모듈 import 확인 + (인프라 변경 시) `docker compose config`.
+(dev 도구 설치: `pip install -r requirements-dev.txt`. CI가 PR 단계에서 lint·test를 동일하게 게이트한다.)

@@ -1,0 +1,6 @@
+# 개발·CI 전용(프로덕션 이미지 미포함). 테스트가 batch/*를 import(CI import 스윕 포함)하므로 -ml도 필요.
+-r requirements.txt
+-r requirements-ml.txt
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.15.22
